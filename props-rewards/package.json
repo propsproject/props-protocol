@@ -1,0 +1,29 @@
+{
+  "name": "props-rewards",
+  "version": "1.0.0",
+  "description": "Contract that handles props token rewards",
+  "main": "index.js",
+  "scripts": {
+    "test": "oz compile && mocha --exit --recursive"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/propsproject/props-protocol/props-rewards"
+  },
+  "author": "Jonathan Achai",
+  "license": "ISC",
+  "devDependencies": {
+    "@openzeppelin/contracts": "^3.0.1",
+    "@openzeppelin/test-environment": "^0.1.4",
+    "@openzeppelin/test-helpers": "^0.5.5",
+    "chai": "^4.2.0",
+    "mocha": "^7.1.2",    
+    "ganache-core-coverage": "https://github.com/OpenZeppelin/ganache-core-coverage/releases/download/2.5.3-coverage/ganache-core-coverage-2.5.3.tgz",
+    "solidity-coverage": "github:rotcivegaf/solidity-coverage#5875f5b7bc74d447f3312c9c0e9fc7814b482477"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts-ethereum-package": "^2.5.0",
+    "@openzeppelin/upgrades": "^2.8.0",
+    "@truffle/debug-utils": "^4.1.1"
+  }
+}
