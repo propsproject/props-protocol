@@ -1,0 +1,9 @@
+.DS_Store
+node_modules
+.vscode 
+# ZeppelinOS
+zos.dev-*.json
+.zos.session
+/output
+/csv
+.node*
