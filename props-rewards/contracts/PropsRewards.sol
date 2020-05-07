@@ -405,9 +405,12 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
     {        
         
         uint256 amountToStake = _amount;
+        uint256 currentBalance = balanceOf(_to);
         // if there's currently anything staked need to collect interest and add to staking principal
-        if (balanceOf(_to) > 0) {
-            uint256 interestGained = _calculateInterest(_to);
+        if (currentBalance > 0) {
+            uint256 rewardsDay = PropsRewardsLib._currentRewardsDay(rewardsLibData);
+            uint256 daysStaked = rewardsDay.sub(stakingMap[_to].stakeRewardsDay);
+            uint256 interestGained = _calculateInterest(currentBalance,daysStaked,stakingMap[_to].interestRate);
             amountToStake = amountToStake.add(interestGained);
             // also mint actual props to this contract for the interest given
             IPropsToken token = IPropsToken(tokenContract);
@@ -435,11 +438,8 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
             "Cannot unstake more than what was staked"
         );
         uint256 rewardsDay = PropsRewardsLib._currentRewardsDay(rewardsLibData);
-        uint256 daysStaked = rewardsDay.sub(stakingMap[msg.sender].stakeRewardsDay);
-        //Daily Compound Interest = [Start Amount * (1 + (Interest Rate / 365)) ^ (n * 365)] – Start Amount
-        uint256 interestGained = principal.mul(
-            (1 + stakingMap[msg.sender].interestRate.div(1e16).div(365))**(daysStaked*365)
-        ).sub(principal);
+        uint256 daysStaked = rewardsDay.sub(stakingMap[msg.sender].stakeRewardsDay);        
+        uint256 interestGained = _calculateInterest(principal, daysStaked, stakingMap[msg.sender].interestRate);
         //Data for withdraw
         stakingMap[msg.sender].unstakeRewardsDay = rewardsDay;
         stakingMap[msg.sender].amount = stakingMap[msg.sender].amount.add(_amount);
@@ -514,22 +514,28 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
     }
 
 /**
-    * @dev Internal stake call to be used by stake or settle
-    * @param _wallet address where to send the props to    
+    * @dev Internal stake call to be used by stake or settle using Daily Compound Interest = [Start Amount * (1 + (Interest Rate / 365)) ^ (n * 365)] – Start Amount
+    * @param _principal uint256 amount originally staked
+    * @param _days uint256 days for which to calculate interest
+    * @param _interestRate uint256 days for which to calculate interest
     * @return uint256 The gained interest
     */
     function _calculateInterest(
-        address _wallet,        
+        uint256 _principal,
+        uint256 _daysStaked,
+        uint256 _interestRate
     )
         internal
         returns(uint256)
     {
-        uint256 rewardsDay = PropsRewardsLib._currentRewardsDay(rewardsLibData);
-        uint256 daysStaked = rewardsDay.sub(stakingMap[_wallet].stakeRewardsDay);
-        //Daily Compound Interest = [Start Amount * (1 + (Interest Rate / 365)) ^ (n * 365)] – Start Amount
-        uint256 interestGained = principal.mul(
-            (1 + stakingMap[_wallet].interestRate.div(1e16).div(365))**(daysStaked*365)
-        ).sub(principal);
+        
+        
+        // uint256 interestGained = _principal.mul(
+        //     (1 + stakingMap[_wallet].interestRate.div(1e16).div(365))**(daysStaked*365)
+        // ).sub(principal);
+        uint256 interestGained = _principal.mul(
+            (1 + _interestRate.div(1e16).div(365))**(_daysStaked*365)
+        ).sub(_principal);
         return interestGained;
     }
 
