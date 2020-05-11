@@ -480,6 +480,9 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
         stakingMap[_to].interestRate = getParameter(PropsRewardsLib.ParameterName.StakingInterestRate, rewardsDay);
         if (_applicationId != address(0)) { // also allocate to application user
             _allocateToAppUser(_to, amountToStake, _applicationId, _userId, rewardsDay, false);
+        } else {
+            _distributeAppUserAllocations(_to, amountToStake, rewardsDay, false);
+            
         }
         emit Stake(_to, rewardsDay, amountToStake, stakingMap[_to].interestRate);
     }
