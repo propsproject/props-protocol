@@ -23,7 +23,8 @@ library PropsRewardsLib {
         ValidatorMajorityPercent,
         ValidatorRewardsPercent,
         StakingInterestRate,
-        UnstakingCooldownPeriodDays
+        WithdrawCooldownPeriodDays,
+        RestakeCooldownPeriodDays
     }
     enum RewardedEntityType { Application, Validator }
 
