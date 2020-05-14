@@ -447,7 +447,7 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
     }
 
     /**
-    * @dev Collect interest of a staked record
+    * @dev Public collect interest
     * @param _wallet address
     * @return uint256 Interest gained
     */
@@ -456,6 +456,30 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
     )
         public
         returns (uint256)
+    {
+        (uint256 interestGained, uint256 rewardsDay) = _collectInterest(_wallet);
+        IPropsToken token = IPropsToken(tokenContract);
+        token.mint(address(this), interestGained);
+        _mint(_wallet, interestGained);
+        stakingMap[_wallet].stakeRewardsDay = rewardsDay;
+        stakingMap[_wallet].interestRate = getParameter(PropsRewardsLib.ParameterName.StakingInterestRate, rewardsDay);
+        address allocateTo = delegates[_wallet] != address(0) ? delegates[_wallet] : _wallet;
+        _allocateToAppUser(allocateTo, interestGained, address(0), "", rewardsDay, false);
+        //or if we want to distribute between allocations (most cases there will be 1)
+        //_distributeAppUserAllocations(allocateTo, interestGained, rewardsDay, false);
+        return interestGained;
+    }
+
+    /**
+    * @dev Internal collect interest
+    * @param _wallet address
+    * @return uint256, uint256 Interest gained, rewardsDay
+    */
+    function _collectInterest(
+        address _wallet
+    )
+        internal
+        returns (uint256, uint256)
     {
         uint256 stakedBalance = balanceOf(_wallet);
         require(
@@ -471,7 +495,7 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
         stakingMap[_wallet].stakeRewardsDay = rewardsDay;
         stakingMap[_wallet].interestRate = getParameter(PropsRewardsLib.ParameterName.StakingInterestRate, rewardsDay);
         // _distributeAppUserAllocations(_wallet, interestGained, rewardsDay, false);
-        return interestGained;
+        return (interestGained,rewardsDay);
     }
 
     /**
@@ -519,14 +543,17 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
             stakedBalance >= _amount,
             "Cannot unstake more than what was staked"
         );
-        uint256 interestGained = collectInterest(msg.sender);
-        uint256 rewardsDay = PropsRewardsLib._currentRewardsDay(rewardsLibData);
+        (uint256 interestGained, uint256 rewardsDay) = _collectInterest(msg.sender);
         uint256 amountToUnstake = _amount.add(interestGained);
         //Data for withdraw
         stakingMap[msg.sender].unstakeRewardsDay = rewardsDay;
         stakingMap[msg.sender].amountUnstaked = stakingMap[msg.sender].amountUnstaked.add(amountToUnstake);
         _burn(msg.sender, amountToUnstake);
-        _allocateToAppUser(msg.sender, amountToUnstake, _applicationId, _userId, rewardsDay, true);
+        if (delegates[msg.sender] != address(0)) {
+            _removeFromAllocations(delegates[msg.sender], _amount, rewardsDay);
+        } else {
+            _allocateToAppUser(msg.sender, _amount, _applicationId, _userId, rewardsDay, true);
+        }
         emit StakeChanged(
             msg.sender,
             rewardsDay,
@@ -534,7 +561,7 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
             _userId,
             balanceOf(msg.sender),
             stakingMap[msg.sender].amountUnstaked,
-            amountToUnstake,
+            _amount,
             interestGained,
             stakingMap[msg.sender].interestRate
         );
@@ -753,22 +780,30 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
     {
         uint256 stakedBalance = balanceOf(_to);
         uint256 amountToAllocate = _amount;
-        uint256 rewardsDay = PropsRewardsLib._currentRewardsDay(rewardsLibData);
+        uint256 rewardsDay;
         uint256 interestGained = 0;
         // if there's currently anything staked need to collect interest and add to staking principal
         if (stakedBalance > 0) {
-            interestGained = collectInterest(_to);
+            (interestGained, rewardsDay) = _collectInterest(_to);
             amountToAllocate = amountToAllocate.add(interestGained);
+        } else {
+             rewardsDay = PropsRewardsLib._currentRewardsDay(rewardsLibData);
         }
 
         stakingMap[_to].stakeRewardsDay = rewardsDay;
         stakingMap[_to].interestRate = getParameter(PropsRewardsLib.ParameterName.StakingInterestRate, rewardsDay);
-        // if no app user is given distribute proportionally
-        if (_applicationId != address(0)) {
+        // if no app user is given put in un-allocated pool
+        // if delegated assign to unallocated regardless of staked requested application user
+        address allocateTo = delegates[_to] != address(0) ? delegates[_to] : _to;
+        _allocateToAppUser(allocateTo, amountToAllocate, _applicationId, _userId, rewardsDay, false);
+        // Older code below here for reference when we would automatically distribute it
+        /*
+        if (_applicationId == address(0)) {
             _distributeAppUserAllocations(_to, amountToAllocate, rewardsDay, false);
         } else {
             _allocateToAppUser(_to, amountToAllocate, _applicationId, _userId, rewardsDay, false);
         }
+        */
         emit StakeChanged(
             _to,
             rewardsDay,
@@ -780,6 +815,34 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
             interestGained,
             stakingMap[_to].interestRate
         );
+    }
+
+
+    /**
+    * @dev Internal remove an allocation amount from unallocated and proportionally from all other allocations
+    * @param _wallet address of allocating wallet
+    * @param _amount uint256 amount to be allocated
+    * @param _rewardsDay uint256 the rewards day
+    */
+    function _removeFromAllocations(
+        address _wallet,
+        uint256 _amount,
+        uint256 _rewardsDay
+    )
+        internal
+    {
+        bytes32 zeroAppUserId = _getApplicationUserId(address(0), "");
+        // first try to remove all from unallocated pool
+        uint256 unallocatedAmount = allocationsMap[_wallet][zeroAppUserId].amount;
+        if (unallocatedAmount >= _amount) {
+            _allocateToAppUser(_wallet, _amount, address(0), "", _rewardsDay, true);
+        } else {
+            //take whatever is unallocated and the rest proportionally
+            if (unallocatedAmount > 0) {
+                _allocateToAppUser(_wallet, unallocatedAmount, address(0), "", _rewardsDay, true);
+            }
+            _distributeAppUserAllocations(_wallet, _amount.sub(unallocatedAmount), _rewardsDay, true);
+        }
     }
 
     /**
@@ -877,7 +940,10 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
     )
         internal
     {
-        if (allocationsArr[_wallet].length == 0) return; //no current allocations just return
+        require(
+            allocationsArr[_wallet].length > 0,
+            "Cannot distribute if no allocations exist"
+        );
         ApplicationUser memory applicationUser;
         if (allocationsArr[_wallet].length == 1) { // one app - nothing to distribute just one application user will get it
              applicationUser = allocationsMap[_wallet][allocationsArr[_wallet][0]].applicationUser;
@@ -943,6 +1009,15 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
         emit DelegateChanged(delegator, currentDelegate, delegatee);
 
         _moveDelegates(currentDelegate, delegatee, delegatorBalance);
+        if (delegatorBalance > 0 ) {
+            uint256 rewardsDay = PropsRewardsLib._currentRewardsDay(rewardsLibData);
+            address allocateFrom = currentDelegate != address(0) ? currentDelegate : delegator;
+            if (currentDelegate != address(0)) {
+                _removeFromAllocations(allocateFrom, delegatorBalance, rewardsDay);
+            }
+            address allocateTo = delegatee != address(0) ? delegatee : delegator;
+            _allocateToAppUser(allocateTo, delegatorBalance, address(0), "", rewardsDay, false);
+        }
     }
 
     function _moveDelegates(address srcRep, address dstRep, uint256 amount) internal {
