@@ -458,11 +458,6 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
         returns (uint256)
     {
         (uint256 interestGained, uint256 rewardsDay) = _collectInterest(_wallet);
-        IPropsToken token = IPropsToken(tokenContract);
-        token.mint(address(this), interestGained);
-        _mint(_wallet, interestGained);
-        stakingMap[_wallet].stakeRewardsDay = rewardsDay;
-        stakingMap[_wallet].interestRate = getParameter(PropsRewardsLib.ParameterName.StakingInterestRate, rewardsDay);
         address allocateTo = delegates[_wallet] != address(0) ? delegates[_wallet] : _wallet;
         _allocateToAppUser(allocateTo, interestGained, address(0), "", rewardsDay, false);
         //or if we want to distribute between allocations (most cases there will be 1)
