@@ -1,12 +1,12 @@
-pragma solidity ^0.5.16;
+pragma solidity ^0.6.2;
 
-// import "node_modules/@openzeppelin/contracts/token/ERC20.sol";
+//import "@openzeppelin/upgrades/contracts/Initializable.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/Initializable.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/ERC20Detailed.sol";
-import "@openzeppelin/contracts-ethereum-package/contracts/ownership/Ownable.sol";
-// import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/upgrades/contracts/Initializable.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/access/AccessControl.sol";
+
+
 import "./IPropsToken.sol";
 import { PropsRewardsLib } from "./PropsRewardsLib.sol";
 
@@ -25,7 +25,7 @@ import { PropsRewardsLib } from "./PropsRewardsLib.sol";
 
  */
 
-contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* AccessControl {*/
+contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSafe { /* AccessControl {*/
     using SafeMath for uint256;
 
     event DailyRewardsSubmitted(
@@ -84,13 +84,10 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
     event StakeChanged(
         address indexed wallet,
         uint256 indexed rewardsDay,
-        address indexed applicationId,
-        bytes32 userId,
         uint256 amountStaked,
         uint256 amountUnstaked,
         uint256 amountChanged,
-        uint256 interestGained,
-        uint256 interestRate
+        uint256 interestGained
     );
 
     event Withdraw(
@@ -154,17 +151,29 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
     }
 
     /*
+    *  Modifiers
+    */
+    modifier onlyOwner() {
+        require(
+            hasRole(DEFAULT_ADMIN_ROLE, msg.sender),
+            "Caller must be admin of the contract"
+        );
+         _;
+    }
+
+    /*
     *  Storage
     */
 
     uint8 constant public MAX_APPLICATION_USER_PER_WALLET = 10;
+    uint256 constant private precisionMul = 10**6;
     PropsRewardsLib.Data internal rewardsLibData;
     uint256 public maxTotalSupply;
     uint256 public rewardsStartTimestamp;
     uint256 public secondsBetweenDays; // for test networks the option to make each rewards day shorter
     address public tokenContract;
     address public identityContract;
-    
+
     /// @dev A record of each staking/unstaking wallet
     mapping (address => UnstakeData) stakingMap;
     /// @dev A record of each accounts delegate
@@ -185,9 +194,8 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
     mapping (address => bytes32[]) public allocationsArr;
     /// @dev An record for the sum allocated by address
     mapping (address => uint256) public allocationsSum;
-    // bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
-    // bytes32 public constant VALIDATOR_ROLE = keccak256("VALIDATOR_ROLE");
-    // bytes32 public constant APPLICATION_ROLE = keccak256("APPLICATION_ROLE");
+    bytes32 public constant VALIDATOR_ROLE = keccak256("VALIDATOR_ROLE");
+    bytes32 public constant APPLICATION_ROLE = keccak256("APPLICATION_ROLE");
 
     /**
     * @dev Initializer function. Called only once when a proxy for the contract is created.
@@ -207,13 +215,10 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
     public
     initializer
     {
-        // _setupDecimals(18);
-        // _setupRole(DEFAULT_ADMIN_ROLE, _admin);
-        uint8 decimals = 18;
+        ERC20UpgradeSafe.__ERC20_init("Props Staking Token", "sPROPS"); //decimals is by default 18
+         _setupRole(DEFAULT_ADMIN_ROLE, _admin);
         tokenContract = _tokenContract;
         identityContract = _identityContract;
-        Ownable.initialize(_admin);
-        ERC20Detailed.initialize("Props Staking Token", "sPROPS", decimals);
         PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.ApplicationRewardsPercent, 34750, 0);
         // // ApplicationRewardsMaxVariationPercent pphm ==> 150%
         PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.ApplicationRewardsMaxVariationPercent, 150 * 1e6, 0);
@@ -229,7 +234,7 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
         PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.RestakeCooldownPeriodDays, 1, 0);
 
         // max total supply is 1,000,000,000 PROPS specified in AttoPROPS
-        rewardsLibData.maxTotalSupply = maxTotalSupply = 1 * 1e9 * (10 ** uint256(decimals));
+        rewardsLibData.maxTotalSupply = maxTotalSupply = 1 * 1e9 * (10 ** uint256(decimals()));
         rewardsLibData.rewardsStartTimestamp = rewardsStartTimestamp = _rewardsStartTimestamp;
         rewardsLibData.minSecondsBetweenDays = secondsBetweenDays = _minSecondsBetweenDays;
     }
@@ -552,13 +557,10 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
         emit StakeChanged(
             msg.sender,
             rewardsDay,
-            _applicationId,
-            _userId,
             balanceOf(msg.sender),
             stakingMap[msg.sender].amountUnstaked,
             _amount,
-            interestGained,
-            stakingMap[msg.sender].interestRate
+            interestGained
         );
     }
 
@@ -773,12 +775,11 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
     )
         internal
     {
-        uint256 stakedBalance = balanceOf(_to);
         uint256 amountToAllocate = _amount;
         uint256 rewardsDay;
         uint256 interestGained = 0;
         // if there's currently anything staked need to collect interest and add to staking principal
-        if (stakedBalance > 0) {
+        if (balanceOf(_to) > 0) {
             (interestGained, rewardsDay) = _collectInterest(_to);
             amountToAllocate = amountToAllocate.add(interestGained);
         } else {
@@ -802,13 +803,10 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
         emit StakeChanged(
             _to,
             rewardsDay,
-            _applicationId,
-            _userId,
             balanceOf(_to),
             stakingMap[_to].amountUnstaked,
             amountToAllocate,
-            interestGained,
-            stakingMap[_to].interestRate
+            interestGained            
         );
     }
 
@@ -939,13 +937,17 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
             allocationsArr[_wallet].length > 0,
             "Cannot distribute if no allocations exist"
         );
-        ApplicationUser memory applicationUser;
         if (allocationsArr[_wallet].length == 1) { // one app - nothing to distribute just one application user will get it
-             applicationUser = allocationsMap[_wallet][allocationsArr[_wallet][0]].applicationUser;
-            _allocateToAppUser(_wallet, _amount, applicationUser.appId, applicationUser.userId, _rewardsDay, _subtract);
+            _allocateToAppUser(
+                _wallet,
+                _amount,
+                allocationsMap[_wallet][allocationsArr[_wallet][0]].applicationUser.appId,
+                allocationsMap[_wallet][allocationsArr[_wallet][0]].applicationUser.userId,
+                _rewardsDay,
+                _subtract
+            );
         } else {
             uint256[MAX_APPLICATION_USER_PER_WALLET] memory ratios;
-            uint256 precisionMul = 10**6;
 
             for (uint i = 0; i < allocationsArr[_wallet].length; i++) {
                 ratios[i] = allocationsMap[_wallet][allocationsArr[_wallet][i]].amount.mul(precisionMul).div(allocationsSum[_wallet]);
@@ -953,23 +955,20 @@ contract PropsRewards is Initializable, ERC20, ERC20Detailed, Ownable { /* Acces
             uint256 tempSum = 0;
             for (uint i = 0; i < allocationsArr[_wallet].length; i++) {
                 uint256 amountWithRatio;
-                applicationUser = allocationsMap[_wallet][allocationsArr[_wallet][i]].applicationUser;
                 if (i < (allocationsArr[_wallet].length-1)) {
                     amountWithRatio = _amount.mul(ratios[i]).div(precisionMul);
                 } else {
                     amountWithRatio = tempSum.sub(_amount);
                 }
-                _allocateToAppUser(_wallet, amountWithRatio, applicationUser.appId, applicationUser.userId, _rewardsDay, _subtract);
-                tempSum = tempSum.add(amountWithRatio);
-
-                emit AllocationChanged(
+                _allocateToAppUser(
                     _wallet,
-                    _rewardsDay,
+                    amountWithRatio,
                     allocationsMap[_wallet][allocationsArr[_wallet][i]].applicationUser.appId,
                     allocationsMap[_wallet][allocationsArr[_wallet][i]].applicationUser.userId,
-                    allocationsMap[_wallet][allocationsArr[_wallet][i]].amount,
-                    amountWithRatio
+                    _rewardsDay,
+                    _subtract
                 );
+                tempSum = tempSum.add(amountWithRatio);
             }
         }
     }
