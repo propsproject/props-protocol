@@ -1,11 +1,9 @@
 pragma solidity ^0.6.2;
 
-//import "@openzeppelin/upgrades/contracts/Initializable.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/Initializable.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/access/AccessControl.sol";
-
 
 import "./IPropsToken.sol";
 import { PropsRewardsLib } from "./PropsRewardsLib.sol";
@@ -118,39 +116,6 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
     );
 
     /*
-    *  Structs
-    */
-
-    /// @dev Represents an application user
-    struct ApplicationUser {
-        address appId;
-        bytes32 userId;
-    }
-
-    /// @dev Represents staking meta data
-    struct UnstakeData {
-        uint256 stakeRewardsDay;
-        uint256 unstakeRewardsDay;
-        uint256 amountUnstaked;
-        uint256 interestRate; //in pphm
-        ApplicationUser applicationUser;
-    }
-
-    /// @dev A checkpoint for marking number of votes from a given block
-    struct Checkpoint {
-        uint32 fromBlock;
-        uint256 votes;
-    }
-
-    /// @dev A checkpoint for marking number of votes from a given block
-    struct Allocation {
-        ApplicationUser applicationUser;
-        uint256 amount;
-        bool isInitialized;
-        uint256 arrIndex;
-    }
-
-    /*
     *  Modifiers
     */
     modifier onlyOwner() {
@@ -165,8 +130,12 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
     *  Storage
     */
 
-    uint8 constant public MAX_APPLICATION_USER_PER_WALLET = 10;
-    uint256 constant private precisionMul = 10**6;
+    /// @dev A checkpoint for marking number of votes from a given block
+    struct Checkpoint {
+        uint32 fromBlock;
+        uint256 votes;
+    }
+
     PropsRewardsLib.Data internal rewardsLibData;
     uint256 public maxTotalSupply;
     uint256 public rewardsStartTimestamp;
@@ -174,28 +143,18 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
     address public tokenContract;
     address public identityContract;
 
-    /// @dev A record of each staking/unstaking wallet
-    mapping (address => UnstakeData) stakingMap;
     /// @dev A record of each accounts delegate
-    mapping (address => address) public delegates;
+    mapping (address => address) delegates;
     /// @dev A record of votes checkpoints for each account, by index
-    mapping (address => mapping (uint32 => Checkpoint)) public checkpoints;
+    mapping (address => mapping (uint32 => Checkpoint)) checkpoints;
     /// @dev The number of checkpoints for each account
-    mapping (address => uint32) public numCheckpoints;
-     /// @dev The EIP-712 typehash for the contract's domain
+    mapping (address => uint32) numCheckpoints;
+    /// @dev The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
     /// @dev The EIP-712 typehash for the delegation struct used by the contract
     bytes32 public constant DELEGATION_TYPEHASH = keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)");
     /// @dev A record of states for signing / validating signatures
-    mapping (address => uint) public nonces;
-    /// @dev A record for each allocation by address
-    mapping (address => mapping(bytes32 => Allocation)) internal allocationsMap;
-    /// @dev An array to hold allocations keys
-    mapping (address => bytes32[]) public allocationsArr;
-    /// @dev An record for the sum allocated by address
-    mapping (address => uint256) public allocationsSum;
-    bytes32 public constant VALIDATOR_ROLE = keccak256("VALIDATOR_ROLE");
-    bytes32 public constant APPLICATION_ROLE = keccak256("APPLICATION_ROLE");
+    mapping (address => uint) nonces;
 
     /**
     * @dev Initializer function. Called only once when a proxy for the contract is created.
@@ -217,8 +176,8 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
     {
         ERC20UpgradeSafe.__ERC20_init("Props Staking Token", "sPROPS"); //decimals is by default 18
          _setupRole(DEFAULT_ADMIN_ROLE, _admin);
-        tokenContract = _tokenContract;
-        identityContract = _identityContract;
+        rewardsLibData.tokenContract = tokenContract = _tokenContract;
+        rewardsLibData.identityContract = identityContract = _identityContract;
         PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.ApplicationRewardsPercent, 34750, 0);
         // // ApplicationRewardsMaxVariationPercent pphm ==> 150%
         PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.ApplicationRewardsMaxVariationPercent, 150 * 1e6, 0);
@@ -237,6 +196,10 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
         rewardsLibData.maxTotalSupply = maxTotalSupply = 1 * 1e9 * (10 ** uint256(decimals()));
         rewardsLibData.rewardsStartTimestamp = rewardsStartTimestamp = _rewardsStartTimestamp;
         rewardsLibData.minSecondsBetweenDays = secondsBetweenDays = _minSecondsBetweenDays;
+        
+        rewardsLibData.precisionMul = 10**6;
+        rewardsLibData.VALIDATOR_ROLE = keccak256("VALIDATOR_ROLE");
+        rewardsLibData.APPLICATION_ROLE = keccak256("APPLICATION_ROLE");
     }
 
     /**
@@ -409,11 +372,11 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
     )
         public
     {
+        _stake(msg.sender, _amount, _applicationId, _userId, delegates[msg.sender]);
         IPropsToken token = IPropsToken(tokenContract);
         token.permit(msg.sender, address(this), _amount, uint(-1), v, r, s);
         token.transferFrom(msg.sender, address(this), _amount);
         _mint(msg.sender, _amount);
-        return _stake(msg.sender, _amount, _applicationId, _userId);
     }
 
     /**
@@ -433,22 +396,7 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
         view
         returns (uint256)
     {
-        bytes32 appUserId = _getApplicationUserId(_applicationId, _userId);
-        uint256 sum = 0;
-        if (_applicationId != address(0) && _userId[0] != 0) {
-            sum = allocationsMap[_wallet][appUserId].amount;
-        } else {
-            for (uint i = 0; i < allocationsArr[_wallet].length; i++) {
-                if (_applicationId != address(0)) {
-                    if (allocationsMap[_wallet][allocationsArr[_wallet][i]].applicationUser.appId == _applicationId) {
-                        sum = sum.add(allocationsMap[_wallet][allocationsArr[_wallet][i]].amount);
-                    }
-                } else {
-                    sum = sum.add(allocationsMap[_wallet][allocationsArr[_wallet][i]].amount);
-                }
-            }
-        }
-        return sum;
+        return PropsRewardsLib.getAllocated(rewardsLibData, _wallet, _applicationId, _userId);
     }
 
     /**
@@ -464,7 +412,7 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
     {
         (uint256 interestGained, uint256 rewardsDay) = _collectInterest(_wallet);
         address allocateTo = delegates[_wallet] != address(0) ? delegates[_wallet] : _wallet;
-        _allocateToAppUser(allocateTo, interestGained, address(0), "", rewardsDay, false);
+        PropsRewardsLib._allocateToAppUser(rewardsLibData, allocateTo, interestGained, address(0), "", rewardsDay, false);
         //or if we want to distribute between allocations (most cases there will be 1)
         //_distributeAppUserAllocations(allocateTo, interestGained, rewardsDay, false);
         return interestGained;
@@ -486,14 +434,10 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
              stakedBalance > 0,
             "Cannot collect interest if nothing is staked"
         );
-        uint256 rewardsDay = PropsRewardsLib._currentRewardsDay(rewardsLibData);
-        uint256 daysStaked = rewardsDay.sub(stakingMap[_wallet].stakeRewardsDay);
-        uint256 interestGained = _calculateInterest(stakedBalance,daysStaked,stakingMap[_wallet].interestRate);
+        (uint256 interestGained, uint256 rewardsDay) = PropsRewardsLib._collectInterest(rewardsLibData, _wallet, stakedBalance);
         IPropsToken token = IPropsToken(tokenContract);
         token.mint(address(this), interestGained);
         _mint(_wallet, interestGained);
-        stakingMap[_wallet].stakeRewardsDay = rewardsDay;
-        stakingMap[_wallet].interestRate = getParameter(PropsRewardsLib.ParameterName.StakingInterestRate, rewardsDay);
         // _distributeAppUserAllocations(_wallet, interestGained, rewardsDay, false);
         return (interestGained,rewardsDay);
     }
@@ -511,17 +455,9 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
     )
         public
     {
-        require(
-            stakingMap[msg.sender].amountUnstaked > 0,
-            "Cannot restake - nothing to restake"
-        );
-        uint256 rewardsDay = PropsRewardsLib._currentRewardsDay(rewardsLibData);
-        require(
-            rewardsDay.sub(stakingMap[msg.sender].unstakeRewardsDay) > getParameter(PropsRewardsLib.ParameterName.RestakeCooldownPeriodDays, rewardsDay),
-            "Cannot restake - in cooldown"
-        );
-        stakingMap[msg.sender].amountUnstaked = stakingMap[msg.sender].amountUnstaked.sub(_amount);
-        return _stake(msg.sender, _amount, _applicationId, _userId);
+        PropsRewardsLib.restake(rewardsLibData, msg.sender, _amount);
+        _stake(msg.sender, _amount, _applicationId, _userId, delegates[msg.sender]);
+        _mint(msg.sender, _amount); //add back the tokens which we burnt when we unstaked
     }
 
     /**
@@ -537,28 +473,21 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
     )
         public
     {
-        uint256 stakedBalance = balanceOf(msg.sender);
         //bytes32 appUserId = _getApplicationUserId(_applicationId, _userId);
         require(
-            stakedBalance >= _amount,
+            balanceOf(msg.sender) >= _amount,
             "Cannot unstake more than what was staked"
         );
         (uint256 interestGained, uint256 rewardsDay) = _collectInterest(msg.sender);
         uint256 amountToUnstake = _amount.add(interestGained);
-        //Data for withdraw
-        stakingMap[msg.sender].unstakeRewardsDay = rewardsDay;
-        stakingMap[msg.sender].amountUnstaked = stakingMap[msg.sender].amountUnstaked.add(amountToUnstake);
+        PropsRewardsLib.unstake(rewardsLibData, msg.sender, amountToUnstake, _applicationId, _userId, delegates[msg.sender], rewardsDay);
         _burn(msg.sender, amountToUnstake);
-        if (delegates[msg.sender] != address(0)) {
-            _removeFromAllocations(delegates[msg.sender], _amount, rewardsDay);
-        } else {
-            _allocateToAppUser(msg.sender, _amount, _applicationId, _userId, rewardsDay, true);
-        }
+
         emit StakeChanged(
             msg.sender,
             rewardsDay,
             balanceOf(msg.sender),
-            stakingMap[msg.sender].amountUnstaked,
+            rewardsLibData.stakingMap[msg.sender].amountUnstaked,
             _amount,
             interestGained
         );
@@ -570,26 +499,19 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
     function withdraw()
         public
     {
-        require(
-            stakingMap[msg.sender].amountUnstaked > 0,
-            "Cannot withdraw nothing to withdraw"
-        );
         uint256 rewardsDay = PropsRewardsLib._currentRewardsDay(rewardsLibData);
-        require(
-            rewardsDay.sub(stakingMap[msg.sender].unstakeRewardsDay) > getParameter(PropsRewardsLib.ParameterName.WithdrawCooldownPeriodDays, rewardsDay),
-            "Cannot withdraw before cooldown period is over"
-        );
+        uint256 amountUnstaked = rewardsLibData.stakingMap[msg.sender].amountUnstaked;
+        PropsRewardsLib.withdraw(rewardsLibData, msg.sender, rewardsDay);
         IPropsToken token = IPropsToken(tokenContract);
-        token.transfer(msg.sender, stakingMap[msg.sender].amountUnstaked);
-        emit Withdraw(msg.sender, rewardsDay, stakingMap[msg.sender].amountUnstaked);
-        stakingMap[msg.sender].amountUnstaked = 0;
+        token.transfer(msg.sender, amountUnstaked);
+        emit Withdraw(msg.sender, rewardsDay, amountUnstaked);
     }
 
     /**
     * @dev Allows an application to settle sidechain props. Should be called from an application rewards address
     * @param _applicationId address the application main address (used to setup the application)
     * @param _userId bytes32 identification of the user on the sidechain that was settled
-    * @param _to address where to send the props to
+    * @param _wallet address where to send the props to
     * @param _amount uint256 the address used for using the sidechain
     * @param _shouldStake bool if true the amount will be immeidatly staked and allocated to the application user
     * @param v The recovery byte of the signature
@@ -599,7 +521,7 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
     function settle(
         address _applicationId,
         bytes32 _userId,
-        address _to,
+        address _wallet,
         uint256 _amount,
         bool _shouldStake,
         uint8 v,
@@ -614,45 +536,30 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
         );
         IPropsToken token = IPropsToken(tokenContract);
         if (!_shouldStake) {
-            token.permit(_applicationId, _to, _amount, uint(-1), v, r, s);
-            token.transferFrom(_applicationId, _to, _amount);
+            token.permit(_applicationId, _wallet, _amount, uint(-1), v, r, s);
+            token.transferFrom(_applicationId, _wallet, _amount);
         } else {
             token.permit(_applicationId, address(this), _amount, uint(-1), v, r, s);
             token.transferFrom(_applicationId, address(this), _amount);
-            return _stake(_to, _amount, _applicationId, _userId);
+            return _stake(_wallet, _amount, _applicationId, _userId, delegates[_wallet]);
         }
-        emit Settlement(_applicationId, _userId, _to, _amount, msg.sender);
+        emit Settlement(_applicationId, _userId, _wallet, _amount, msg.sender);
     }
 
     /**
     * @dev Public function to allocate unallocated voting power
-    * @param _wallet address of allocating wallet
     * @param _amount uint256 amount to be allocated
     * @param _applicationId address the application main address (used to setup the application)
     * @param _userId bytes32 identification of the user
     */
     function allocateToAppUser(
-        address _wallet,
         uint256 _amount,
         address _applicationId,
         bytes32 _userId
     )
-        internal
+        public
     {
-        require(
-            _applicationId != address(0),
-            "Must allocate to non 0x address"
-        );
-        bytes32 zeroAppUserId = _getApplicationUserId(address(0), "");
-        require(
-            allocationsMap[_wallet][zeroAppUserId].amount >= _amount,
-            "Cannot allocate more than unallocated"
-        );
-        uint256 rewardsDay = PropsRewardsLib._currentRewardsDay(rewardsLibData);
-        // decrease zero appUserId allocation
-        _allocateToAppUser(_wallet, _amount, address(0), "", rewardsDay, true);
-        // allocate to specified application user
-        _allocateToAppUser(_wallet, _amount, _applicationId, _userId, rewardsDay, false);
+        PropsRewardsLib.allocateToAppUser(rewardsLibData, msg.sender, _amount, _applicationId, _userId);
     }
 
     /**
@@ -762,16 +669,18 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
 
     /**
     * @dev Internal stake call to be used by stake or settle
-    * @param _to address where to send the props to
+    * @param _wallet address where to send the props to
     * @param _amount uint256 amount to be staked
     * @param _applicationId address (optional pass 0x address) the application main address (used to setup the application)
     * @param _userId bytes32 (optional pass empty) identification of the user
+    * @param _delegatee address of delagetee
     */
     function _stake(
-        address _to,
+        address _wallet,
         uint256 _amount,
         address _applicationId,
-        bytes32 _userId
+        bytes32 _userId,
+        address _delegatee
     )
         internal
     {
@@ -779,198 +688,22 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
         uint256 rewardsDay;
         uint256 interestGained = 0;
         // if there's currently anything staked need to collect interest and add to staking principal
-        if (balanceOf(_to) > 0) {
-            (interestGained, rewardsDay) = _collectInterest(_to);
+        if (balanceOf(_wallet) > 0) {
+            (interestGained, rewardsDay) = _collectInterest(_wallet);
             amountToAllocate = amountToAllocate.add(interestGained);
         } else {
              rewardsDay = PropsRewardsLib._currentRewardsDay(rewardsLibData);
         }
+        PropsRewardsLib.stake(rewardsLibData, _wallet, amountToAllocate, _applicationId, _userId, rewardsDay, _delegatee);
 
-        stakingMap[_to].stakeRewardsDay = rewardsDay;
-        stakingMap[_to].interestRate = getParameter(PropsRewardsLib.ParameterName.StakingInterestRate, rewardsDay);
-        // if no app user is given put in un-allocated pool
-        // if delegated assign to unallocated regardless of staked requested application user
-        address allocateTo = delegates[_to] != address(0) ? delegates[_to] : _to;
-        _allocateToAppUser(allocateTo, amountToAllocate, _applicationId, _userId, rewardsDay, false);
-        // Older code below here for reference when we would automatically distribute it
-        /*
-        if (_applicationId == address(0)) {
-            _distributeAppUserAllocations(_to, amountToAllocate, rewardsDay, false);
-        } else {
-            _allocateToAppUser(_to, amountToAllocate, _applicationId, _userId, rewardsDay, false);
-        }
-        */
         emit StakeChanged(
-            _to,
-            rewardsDay,
-            balanceOf(_to),
-            stakingMap[_to].amountUnstaked,
-            amountToAllocate,
-            interestGained            
-        );
-    }
-
-
-    /**
-    * @dev Internal remove an allocation amount from unallocated and proportionally from all other allocations
-    * @param _wallet address of allocating wallet
-    * @param _amount uint256 amount to be allocated
-    * @param _rewardsDay uint256 the rewards day
-    */
-    function _removeFromAllocations(
-        address _wallet,
-        uint256 _amount,
-        uint256 _rewardsDay
-    )
-        internal
-    {
-        bytes32 zeroAppUserId = _getApplicationUserId(address(0), "");
-        // first try to remove all from unallocated pool
-        uint256 unallocatedAmount = allocationsMap[_wallet][zeroAppUserId].amount;
-        if (unallocatedAmount >= _amount) {
-            _allocateToAppUser(_wallet, _amount, address(0), "", _rewardsDay, true);
-        } else {
-            //take whatever is unallocated and the rest proportionally
-            if (unallocatedAmount > 0) {
-                _allocateToAppUser(_wallet, unallocatedAmount, address(0), "", _rewardsDay, true);
-            }
-            _distributeAppUserAllocations(_wallet, _amount.sub(unallocatedAmount), _rewardsDay, true);
-        }
-    }
-
-    /**
-    * @dev Internal allocate to user call
-    * @param _wallet address of allocating wallet
-    * @param _amount uint256 amount to be allocated
-    * @param _applicationId address the application main address (used to setup the application)
-    * @param _userId bytes32 identification of the user
-    * @param _rewardsDay uint256 the rewards day
-    * @param _subtract bool should the amount be subtracted
-    */
-    function _allocateToAppUser(
-        address _wallet,
-        uint256 _amount,
-        address _applicationId,
-        bytes32 _userId,
-        uint256 _rewardsDay,
-        bool _subtract
-    )
-        internal
-    {
-        bytes32 appUserId = _getApplicationUserId(_applicationId, _userId);
-        if (_subtract) {
-            require(
-                allocationsMap[_wallet][appUserId].amount > _amount,
-                "Cannot subtract not enough allocated"
-            );
-        }
-
-        if (!allocationsMap[_wallet][appUserId].isInitialized) {
-            allocationsMap[_wallet][appUserId].isInitialized = true;
-            allocationsArr[_wallet].push(appUserId);
-            allocationsMap[_wallet][appUserId].arrIndex = allocationsArr[_wallet].length - 1;
-            allocationsMap[_wallet][appUserId].applicationUser = ApplicationUser(_applicationId, _userId);
-        }
-        if (!_subtract) {
-            allocationsMap[_wallet][appUserId].amount = allocationsMap[_wallet][appUserId].amount.add(_amount);
-            allocationsSum[_wallet] = allocationsSum[_wallet].add(_amount);
-        } else {
-            allocationsMap[_wallet][appUserId].amount = allocationsMap[_wallet][appUserId].amount.sub(_amount);
-            allocationsSum[_wallet] = allocationsSum[_wallet].sub(_amount);
-            if (allocationsMap[_wallet][appUserId].amount == 0) { // if removed all allocation delete the entry and reorganize array
-                _deleteAllocation(_wallet, appUserId);
-            }
-        }
-
-        emit AllocationChanged(
             _wallet,
-            _rewardsDay,
-            _applicationId,
-            _userId,
-            allocationsMap[_wallet][appUserId].amount,
-            _amount
+            rewardsDay,
+            balanceOf(_wallet),
+            rewardsLibData.stakingMap[_wallet].amountUnstaked,
+            amountToAllocate,
+            interestGained
         );
-    }
-
-    /**
-    * @dev Internal delete allocation when no longer needed and reorganize array
-    * @param _wallet address wallet
-    * @param _appUserId bytes32 key generated from appId + userId
-    */
-    function _deleteAllocation(
-        address _wallet,
-        bytes32 _appUserId
-    )
-        internal
-    {
-        allocationsMap[_wallet][_appUserId].isInitialized = false;
-        allocationsMap[_wallet][_appUserId].amount = 0;
-        uint256 arrIndex = allocationsMap[_wallet][_appUserId].arrIndex;
-        uint256 len = allocationsArr[_wallet].length;
-        bool moveLastItemToNewPosition = arrIndex < (len - 1);
-        if (moveLastItemToNewPosition) {
-            allocationsMap[_wallet][allocationsArr[_wallet][len - 1]].arrIndex = arrIndex;
-            allocationsArr[_wallet][arrIndex] = allocationsArr[_wallet][len - 1];
-            allocationsArr[_wallet].pop();
-        } else {
-            allocationsArr[_wallet].pop();
-        }
-    }
-
-    /**
-    * @dev Internal redistribute allocations on amount change
-    * @param _wallet address of allocating wallet
-    * @param _amount uint256 amount to be allocated
-    * @param _rewardsDay uint256 the rewards day
-    * @param _subtract bool should the amount be subtracted
-    */
-
-    function _distributeAppUserAllocations(
-        address _wallet,
-        uint256 _amount,
-        uint256 _rewardsDay,
-        bool _subtract
-    )
-        internal
-    {
-        require(
-            allocationsArr[_wallet].length > 0,
-            "Cannot distribute if no allocations exist"
-        );
-        if (allocationsArr[_wallet].length == 1) { // one app - nothing to distribute just one application user will get it
-            _allocateToAppUser(
-                _wallet,
-                _amount,
-                allocationsMap[_wallet][allocationsArr[_wallet][0]].applicationUser.appId,
-                allocationsMap[_wallet][allocationsArr[_wallet][0]].applicationUser.userId,
-                _rewardsDay,
-                _subtract
-            );
-        } else {
-            uint256[MAX_APPLICATION_USER_PER_WALLET] memory ratios;
-
-            for (uint i = 0; i < allocationsArr[_wallet].length; i++) {
-                ratios[i] = allocationsMap[_wallet][allocationsArr[_wallet][i]].amount.mul(precisionMul).div(allocationsSum[_wallet]);
-            }
-            uint256 tempSum = 0;
-            for (uint i = 0; i < allocationsArr[_wallet].length; i++) {
-                uint256 amountWithRatio;
-                if (i < (allocationsArr[_wallet].length-1)) {
-                    amountWithRatio = _amount.mul(ratios[i]).div(precisionMul);
-                } else {
-                    amountWithRatio = tempSum.sub(_amount);
-                }
-                _allocateToAppUser(
-                    _wallet,
-                    amountWithRatio,
-                    allocationsMap[_wallet][allocationsArr[_wallet][i]].applicationUser.appId,
-                    allocationsMap[_wallet][allocationsArr[_wallet][i]].applicationUser.userId,
-                    _rewardsDay,
-                    _subtract
-                );
-                tempSum = tempSum.add(amountWithRatio);
-            }
-        }
     }
 
     /**
@@ -980,12 +713,12 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
     * @param _interestRate uint256 days for which to calculate interest
     * @return uint256 The gained interest
     */
-    function _calculateInterest(
+    function calculateInterest(
         uint256 _principal,
         uint256 _days,
         uint256 _interestRate
     )
-        internal
+        public
         pure
         returns(uint256)
     {
@@ -1007,10 +740,10 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
             uint256 rewardsDay = PropsRewardsLib._currentRewardsDay(rewardsLibData);
             address allocateFrom = currentDelegate != address(0) ? currentDelegate : delegator;
             if (currentDelegate != address(0)) {
-                _removeFromAllocations(allocateFrom, delegatorBalance, rewardsDay);
+                PropsRewardsLib._removeFromAllocations(rewardsLibData, allocateFrom, delegatorBalance, rewardsDay);
             }
             address allocateTo = delegatee != address(0) ? delegatee : delegator;
-            _allocateToAppUser(allocateTo, delegatorBalance, address(0), "", rewardsDay, false);
+            PropsRewardsLib._allocateToAppUser(rewardsLibData, allocateTo, delegatorBalance, address(0), "", rewardsDay, false);
         }
     }
 
@@ -1054,23 +787,6 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
         uint256 chainId;
         assembly { chainId := chainid() }
         return chainId;
-    }
-
-    /**
-     * @dev Return a unique identified for application userId combination
-     * @param _applicationId address
-     * @param _userId bytes32
-     * @return bytes32 unique identifier
-     */
-    function _getApplicationUserId(
-        address _applicationId,
-        bytes32 _userId
-    )
-        internal
-        pure
-        returns (bytes32)
-    {
-        return keccak256(abi.encode(_applicationId, _userId));
     }
 
     /**

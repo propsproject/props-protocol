@@ -1,6 +1,7 @@
 pragma solidity ^0.6.2;
 
 import "@openzeppelin/contracts-ethereum-package/contracts/math/SafeMath.sol";
+import "./IPropsToken.sol";
 
 /**
  * @title Props Rewards Library
@@ -11,11 +12,20 @@ library PropsRewardsLib {
     /*
     *  Events
     */
-
+    event AllocationChanged(
+        address indexed wallet,
+        uint256 indexed rewardsDay,
+        address indexed appId,
+        bytes32 userId,
+        uint256 amount,
+        uint256 amountChanged
+    );
     /*
     *  Storage
     */
 
+    uint8 public constant  MAX_APPLICATION_USER_PER_WALLET = 10;// max allocations possible by a single wallet
+        
     // The various parameters used by the contract
     enum ParameterName {
         ApplicationRewardsPercent,
@@ -69,6 +79,29 @@ library PropsRewardsLib {
         bool isInitializedState;               // A way to check if there's something in the map and whether it is already added to the list
     }
 
+    /// @dev Represents an application user
+    struct ApplicationUser {
+        address appId;
+        bytes32 userId;
+    }
+
+    /// @dev Represents staking meta data
+    struct UnstakeData {
+        uint256 stakeRewardsDay;
+        uint256 unstakeRewardsDay;
+        uint256 amountUnstaked;
+        uint256 interestRate; //in pphm
+        ApplicationUser applicationUser;
+    }
+
+    /// @dev A checkpoint for marking number of votes from a given block
+    struct Allocation {
+        ApplicationUser applicationUser;
+        uint256 amount;
+        bool isInitialized;
+        uint256 arrIndex;
+    }
+
 
     // represent the storage structures
     struct Data {
@@ -90,6 +123,23 @@ library PropsRewardsLib {
         uint256 rewardsStartTimestamp;
         uint256 maxTotalSupply;
         uint256 lastValidatorsRewardsDay;
+
+        // precision used when distributing allocations
+        uint256 precisionMul;
+        // the token contract address
+        address tokenContract;
+        // the identity contract address
+        address identityContract;
+        /// @dev A record of each staking/unstaking wallet
+        mapping (address => UnstakeData) stakingMap;
+        /// @dev A record for each allocation by address
+        mapping (address => mapping(bytes32 => Allocation)) allocationsMap;
+        /// @dev An array to hold allocations keys
+        mapping (address => bytes32[]) allocationsArr;
+        /// @dev An record for the sum allocated by address
+        mapping (address => uint256) allocationsSum;
+        bytes32 VALIDATOR_ROLE;
+        bytes32 APPLICATION_ROLE;
     }
     /*
     *  Modifiers
@@ -457,6 +507,436 @@ library PropsRewardsLib {
                 return _self.selectedValidators.previousList;
             }
         }
+    }
+
+    /**
+    * @dev Allows getting total allocated per application user.
+    * This function can be used to get total allocated, total allocated to an app and total allocated to a specific application user
+    * @param _self Data pointer to storage
+    * @param _wallet address of allocating wallet
+    * @param _applicationId address (optional pass 0x address) the application main address (used to setup the application)
+    * @param _userId bytes32 (optional pass empty) identification of the user
+    * @return uint256 Amount allocated
+    */
+    function getAllocated(
+        Data storage _self,
+        address _wallet,
+        address _applicationId,
+        bytes32 _userId
+    )
+        public
+        view
+        returns (uint256)
+    {
+        bytes32 appUserId = _getApplicationUserId(_applicationId, _userId);
+        uint256 sum = 0;
+        if (_applicationId != address(0) && _userId[0] != 0) {
+            sum = _self.allocationsMap[_wallet][appUserId].amount;
+        } else {
+            for (uint i = 0; i < _self.allocationsArr[_wallet].length; i++) {
+                if (_applicationId != address(0)) {
+                    if (_self.allocationsMap[_wallet][_self.allocationsArr[_wallet][i]].applicationUser.appId == _applicationId) {
+                        sum = sum.add(_self.allocationsMap[_wallet][_self.allocationsArr[_wallet][i]].amount);
+                    }
+                } else {
+                    sum = sum.add(_self.allocationsMap[_wallet][_self.allocationsArr[_wallet][i]].amount);
+                }
+            }
+        }
+        return sum;
+    }
+
+    /**
+    * @dev Allows a user to restake from unstaked state after restake cooldown
+    * @param _self Data pointer to storage
+    * @param _wallet address of allocating wallet
+    * @param _amount uint256 amount to unstake
+    */
+    function restake(
+        Data storage _self,
+        address _wallet,
+        uint256 _amount
+    )
+        public
+    {
+        require(
+            _self.stakingMap[_wallet].amountUnstaked > 0,
+            "Cannot restake - nothing to restake"
+        );
+        uint256 rewardsDay = _currentRewardsDay(_self);
+        require(
+            rewardsDay.sub(_self.stakingMap[_wallet].unstakeRewardsDay) > getParameterValue(_self,ParameterName.RestakeCooldownPeriodDays, rewardsDay),
+            "Cannot restake - in cooldown"
+        );
+        _self.stakingMap[_wallet].amountUnstaked = _self.stakingMap[_wallet].amountUnstaked.sub(_amount);
+    }
+
+    /**
+    * @dev Allows a user to unstake props.
+    * @param _self Data pointer to storage
+    * @param _wallet address of wallet
+    * @param _amount uint256 amount to unstake
+    * @param _applicationId address (optional pass 0x address) the application main address (used to setup the application)
+    * @param _userId bytes32 (optional pass empty) identification of the user
+    * @param _delegatee address of delegatee
+    * @param _rewardsDay uint256 the rewards day
+    */
+    function unstake(
+        Data storage _self,
+        address _wallet,
+        uint256 _amount,
+        address _applicationId,
+        bytes32 _userId,
+        address _delegatee,
+        uint256 _rewardsDay
+    )
+        public
+    {
+
+        //Data for withdraw
+        _self.stakingMap[_wallet].unstakeRewardsDay = _rewardsDay;
+        _self.stakingMap[_wallet].amountUnstaked = _self.stakingMap[_wallet].amountUnstaked.add(_amount);
+        if (_delegatee != address(0)) {
+            _removeFromAllocations(_self, _delegatee, _amount, _rewardsDay);
+        } else {
+            _allocateToAppUser(_self, _wallet, _amount, _applicationId, _userId, _rewardsDay, true);
+        }
+    }
+
+    /**
+    * @dev Allows a user to unstake props.
+    * @param _self Data pointer to storage
+    * @param _wallet address of wallet
+    * @param _rewardsDay uint256 the rewards day
+    */
+    function withdraw(
+        Data storage _self,
+        address _wallet,
+        uint256 _rewardsDay
+    )
+        public
+    {
+        require(
+            _self.stakingMap[_wallet].amountUnstaked > 0,
+            "Nothing to withdraw"
+        );
+        require(
+            _rewardsDay.sub(_self.stakingMap[_wallet].unstakeRewardsDay) > getParameterValue(_self, ParameterName.WithdrawCooldownPeriodDays, _rewardsDay),
+            "Cooldown period is not over"
+        );
+        _self.stakingMap[_wallet].amountUnstaked = 0;
+    }
+
+    /**
+    * @dev Public function to allocate unallocated voting power
+    * @param _self Data pointer to storage
+    * @param _wallet address of allocating wallet
+    * @param _amount uint256 amount to be allocated
+    * @param _applicationId address the application main address (used to setup the application)
+    * @param _userId bytes32 identification of the user
+    */
+    function allocateToAppUser(
+        Data storage _self,
+        address _wallet,
+        uint256 _amount,
+        address _applicationId,
+        bytes32 _userId
+    )
+        public
+    {
+        require(
+            _applicationId != address(0),
+            "Must allocate to non 0x address"
+        );
+        bytes32 zeroAppUserId = _getApplicationUserId(address(0), "");
+        require(
+            _self.allocationsMap[_wallet][zeroAppUserId].amount >= _amount,
+            "Cannot allocate more than unallocated"
+        );
+        uint256 rewardsDay = _currentRewardsDay(_self);
+        // decrease zero appUserId allocation
+        _allocateToAppUser(_self, _wallet, _amount, address(0), "", rewardsDay, true);
+        // allocate to specified application user
+        _allocateToAppUser(_self, _wallet, _amount, _applicationId, _userId, rewardsDay, false);
+    }
+
+    /**
+    * @dev Library stake call to be used by stake or settle
+    * @param _self Data pointer to storage
+    * @param _wallet address where to send the props to
+    * @param _amount uint256 amount to be staked
+    * @param _applicationId address (optional pass 0x address) the application main address (used to setup the application)
+    * @param _userId bytes32 (optional pass empty) identification of the user
+    * @param _rewardsDay uint256 amount to be staked
+    * @param _delegatee address delegatee
+    */
+    function stake(
+        Data storage _self,
+        address _wallet,
+        uint256 _amount,
+        address _applicationId,
+        bytes32 _userId,
+        uint256 _rewardsDay,
+        address _delegatee
+    )
+        public
+    {
+
+        _self.stakingMap[_wallet].stakeRewardsDay = _rewardsDay;
+        _self.stakingMap[_wallet].interestRate = getParameterValue(_self, ParameterName.StakingInterestRate, _rewardsDay);
+        // if no app user is given put in un-allocated pool
+        // if delegated assign to unallocated regardless of staked requested application user
+        if (_delegatee != address(0)) {
+            _allocateToAppUser(_self, _delegatee, _amount, address(0), "", _rewardsDay, false);
+        } else {
+            _allocateToAppUser(_self, _wallet, _amount, _applicationId, _userId, _rewardsDay, false);
+        }
+        // Older code below here for reference when we would automatically distribute it
+        /*
+        if (_applicationId == address(0)) {
+            _distributeAppUserAllocations(_to, amountToAllocate, rewardsDay, false);
+        } else {
+            _allocateToAppUser(_to, amountToAllocate, _applicationId, _userId, rewardsDay, false);
+        }
+        */
+    }
+
+
+    /**
+    * @dev Internal remove an allocation amount from unallocated and proportionally from all other allocations
+    * @param _self Data pointer to storage
+    * @param _wallet address of allocating wallet
+    * @param _amount uint256 amount to be allocated
+    * @param _rewardsDay uint256 the rewards day
+    */
+    function _removeFromAllocations(
+        Data storage _self,
+        address _wallet,
+        uint256 _amount,
+        uint256 _rewardsDay
+    )
+        internal
+    {
+        bytes32 zeroAppUserId = _getApplicationUserId(address(0), "");
+        // first try to remove all from unallocated pool
+        uint256 unallocatedAmount = _self.allocationsMap[_wallet][zeroAppUserId].amount;
+        if (unallocatedAmount >= _amount) {
+            _allocateToAppUser(_self, _wallet, _amount, address(0), "", _rewardsDay, true);
+        } else {
+            //take whatever is unallocated and the rest proportionally
+            if (unallocatedAmount > 0) {
+                _allocateToAppUser(_self, _wallet, unallocatedAmount, address(0), "", _rewardsDay, true);
+            }
+            if (_self.allocationsArr[_wallet].length > 0) {
+                _distributeAppUserAllocations(_self, _wallet, _amount.sub(unallocatedAmount), _self.allocationsMap[_wallet], _self.allocationsArr[_wallet], _rewardsDay, true);
+            }
+        }
+    }
+
+    /**
+    * @dev Internal allocate to user call
+    * @param _self Data pointer to storage
+    * @param _wallet address of allocating wallet
+    * @param _amount uint256 amount to be allocated
+    * @param _applicationId address the application main address (used to setup the application)
+    * @param _userId bytes32 identification of the user
+    * @param _rewardsDay uint256 the rewards day
+    * @param _subtract bool should the amount be subtracted
+    */
+    function _allocateToAppUser(
+        Data storage _self,
+        address _wallet,
+        uint256 _amount,
+        address _applicationId,
+        bytes32 _userId,
+        uint256 _rewardsDay,
+        bool _subtract
+    )
+        internal
+    {
+        bytes32 appUserId = _getApplicationUserId(_applicationId, _userId);
+        if (_subtract) {
+            require(
+                _self.allocationsMap[_wallet][appUserId].amount > _amount,
+                "Cannot subtract not enough allocated"
+            );
+        }
+
+        if (!_self.allocationsMap[_wallet][appUserId].isInitialized) {
+            _self.allocationsMap[_wallet][appUserId].isInitialized = true;
+            _self.allocationsArr[_wallet].push(appUserId);
+            _self.allocationsMap[_wallet][appUserId].arrIndex = _self.allocationsArr[_wallet].length - 1;
+            _self.allocationsMap[_wallet][appUserId].applicationUser = ApplicationUser(_applicationId, _userId);
+        }
+        if (!_subtract) {
+            _self.allocationsMap[_wallet][appUserId].amount = _self.allocationsMap[_wallet][appUserId].amount.add(_amount);
+            _self.allocationsSum[_wallet] = _self.allocationsSum[_wallet].add(_amount);
+        } else {
+            _self.allocationsMap[_wallet][appUserId].amount = _self.allocationsMap[_wallet][appUserId].amount.sub(_amount);
+            _self.allocationsSum[_wallet] = _self.allocationsSum[_wallet].sub(_amount);
+            if (_self.allocationsMap[_wallet][appUserId].amount == 0) { // if removed all allocation delete the entry and reorganize array
+                _deleteAllocation(_self, _wallet, appUserId);
+            }
+        }
+
+        emit AllocationChanged(
+            _wallet,
+            _rewardsDay,
+            _applicationId,
+            _userId,
+            _self.allocationsMap[_wallet][appUserId].amount,
+            _amount
+        );
+    }
+
+    /**
+    * @dev Internal delete allocation when no longer needed and reorganize array
+    * @param _self Data pointer to storage
+    * @param _wallet address wallet
+    * @param _appUserId bytes32 key generated from appId + userId
+    */
+    function _deleteAllocation(
+        Data storage _self,
+        address _wallet,
+        bytes32 _appUserId
+    )
+        internal
+    {
+        _self.allocationsMap[_wallet][_appUserId].isInitialized = false;
+        _self.allocationsMap[_wallet][_appUserId].amount = 0;
+        uint256 arrIndex = _self.allocationsMap[_wallet][_appUserId].arrIndex;
+        uint256 len = _self.allocationsArr[_wallet].length;
+        bool moveLastItemToNewPosition = arrIndex < (len - 1);
+        if (moveLastItemToNewPosition) {
+            _self.allocationsMap[_wallet][_self.allocationsArr[_wallet][len - 1]].arrIndex = arrIndex;
+            _self.allocationsArr[_wallet][arrIndex] = _self.allocationsArr[_wallet][len - 1];
+            _self.allocationsArr[_wallet].pop();
+        } else {
+            _self.allocationsArr[_wallet].pop();
+        }
+    }
+
+    /**
+    * @dev Internal redistribute allocations on amount change
+    * @param _self Data pointer to storage
+    * @param _wallet address of allocating wallet
+    * @param _amount uint256 amount to be allocated
+    * @param _allocations mapping(bytes32 => Allocation) wallets allocations mapping
+    * @param _allocationsArr bytes32[] wallet allocations array
+    * @param _rewardsDay uint256 the rewards day
+    * @param _subtract bool should the amount be subtracted
+    */
+
+    function _distributeAppUserAllocations(
+        Data storage _self,
+        address _wallet,
+        uint256 _amount,
+        mapping(bytes32 => Allocation) storage _allocations,
+        bytes32[] memory _allocationsArr,
+        uint256 _rewardsDay,
+        bool _subtract
+    )
+        internal
+    {
+        if (_allocationsArr.length == 1) { // one app - nothing to distribute just one application user will get it
+            _allocateToAppUser(
+                _self,
+                _wallet,
+                _amount,
+                _allocations[_allocationsArr[0]].applicationUser.appId,
+                _allocations[_allocationsArr[0]].applicationUser.userId,
+                _rewardsDay,
+                _subtract
+            );
+        } else {
+            uint256[MAX_APPLICATION_USER_PER_WALLET] memory ratios;
+
+            for (uint i = 0; i < _allocationsArr.length; i++) {
+                ratios[i] = _allocations[_allocationsArr[i]].amount.mul(_self.precisionMul).div(_self.allocationsSum[_wallet]);
+            }
+            uint256 tempSum = 0;
+            for (uint i = 0; i < _allocationsArr.length; i++) {
+                uint256 amountWithRatio;
+                if (i < (_allocationsArr.length-1)) {
+                    amountWithRatio = _amount.mul(ratios[i]).div(_self.precisionMul);
+                } else {
+                    amountWithRatio = tempSum.sub(_amount);
+                }
+                _allocateToAppUser(
+                    _self,
+                    _wallet,
+                    amountWithRatio,
+                    _allocations[_allocationsArr[i]].applicationUser.appId,
+                    _allocations[_allocationsArr[i]].applicationUser.userId,
+                    _rewardsDay,
+                    _subtract
+                );
+                tempSum = tempSum.add(amountWithRatio);
+            }
+        }
+    }
+
+    /**
+    * @dev Public function triggered by collectInterest function
+    * @param _self Data pointer to storage
+    * @param _wallet address of allocating wallet
+    * @param _amount uint256 principal
+    * @return uint256, uint256 The gained interest, rewardsday
+    */
+    function _collectInterest(
+        Data storage _self,
+        address _wallet,
+        uint256 _amount
+    )
+        public
+        returns(uint256, uint256)
+    {
+        uint256 rewardsDay = _currentRewardsDay(_self);
+        uint256 daysStaked = rewardsDay.sub(_self.stakingMap[_wallet].stakeRewardsDay);
+        uint256 interestGained = _calculateInterest(_amount,daysStaked,_self.stakingMap[_wallet].interestRate);
+        _self.stakingMap[_wallet].stakeRewardsDay = rewardsDay;
+        _self.stakingMap[_wallet].interestRate = getParameterValue(_self, ParameterName.StakingInterestRate, rewardsDay);
+        // _distributeAppUserAllocations(_wallet, interestGained, rewardsDay, false);
+        return (interestGained,rewardsDay);
+    }
+
+    /**
+    * @dev Internal stake call to be used by stake or settle using Daily Compound Interest = [Start Amount * (1 + (Interest Rate / 365)) ^ (n * 365)] – Start Amount
+    * @param _principal uint256 amount originally staked
+    * @param _days uint256 days for which to calculate interest
+    * @param _interestRate uint256 days for which to calculate interest
+    * @return uint256 The gained interest
+    */
+    function _calculateInterest(
+        uint256 _principal,
+        uint256 _days,
+        uint256 _interestRate
+    )
+        internal
+        pure
+        returns(uint256)
+    {
+        uint256 interestGained = _principal.mul(
+            (1 + _interestRate.div(1e16).div(365))**(_days*365)
+        ).sub(_principal);
+        return interestGained;
+    }
+
+    /**
+     * @dev Return a unique identified for application userId combination
+     * @param _applicationId address
+     * @param _userId bytes32
+     * @return bytes32 unique identifier
+     */
+    function _getApplicationUserId(
+        address _applicationId,
+        bytes32 _userId
+    )
+        internal
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(_applicationId, _userId));
     }
 
     /**
