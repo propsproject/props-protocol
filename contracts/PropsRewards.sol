@@ -91,7 +91,8 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
     event Withdraw(
         address indexed wallet,
         uint256 indexed rewardsDay,
-        uint256 amount
+        uint256 amount,
+        address indexed sendToWallet
     );
 
     event AllocationChanged(
@@ -113,6 +114,12 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
         address indexed delegate,
         uint previousBalance,
         uint newBalance
+    );
+
+    event IPFSHashSubmitted(
+        address indexed applicationId,
+        uint256 indexed rewardsDay,
+        bytes32 IPFSHash
     );
 
     /*
@@ -178,28 +185,48 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
          _setupRole(DEFAULT_ADMIN_ROLE, _admin);
         rewardsLibData.tokenContract = tokenContract = _tokenContract;
         rewardsLibData.identityContract = identityContract = _identityContract;
-        PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.ApplicationRewardsPercent, 34750, 0);
-        // // ApplicationRewardsMaxVariationPercent pphm ==> 150%
-        PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.ApplicationRewardsMaxVariationPercent, 150 * 1e6, 0);
-        // // ValidatorMajorityPercent pphm ==> 50%
+        // ApplicationsDailyRewardsMaxAmount
+        PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.ApplicationsDailyRewardsMaxAmount, 150000, 0);
+        // ValidatorMajorityPercent pphm ==> 50%
         PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.ValidatorMajorityPercent, 50 * 1e6, 0);
-        //  // ValidatorRewardsPercent pphm ==> 0.001829%
-        PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.ValidatorRewardsPercent, 1829, 0);
-        //  // StakingInterestRate pphm ==> 0.01%
+        // ValidatorDailyRewardAmount
+        PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.ValidatorDailyRewardAmount, 2000, 0);
+        // StakingInterestRate pphm ==> 0.01%
         PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.StakingInterestRate, 10000, 0);
-        //  // WithdrawCooldownPeriodDays days ==> 30
+        // WithdrawCooldownPeriodDays days ==> 30
         PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.WithdrawCooldownPeriodDays, 30, 0);
-        //  // RestakeCooldownPeriodDays days ==> 1
+        // RestakeCooldownPeriodDays days ==> 1
         PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.RestakeCooldownPeriodDays, 1, 0);
+        // ApplicationsSubmitFromHour ==> 1am UTC
+        PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.ApplicationsSubmitFromHour, 0, 0);
+        // ApplicationsSubmitToHour ==> 9am UTC
+        PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.ApplicationsSubmitToHour, 8, 0);
+        // ValidatorsSubmitFromHour ==> 9am UTC
+        PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.ValidatorsSubmitFromHour, 8, 0);
+        // ValidatorsSubmitToHour ==> midnight UTC
+        PropsRewardsLib.updateParameter(rewardsLibData, PropsRewardsLib.ParameterName.ValidatorsSubmitToHour, 24, 0);
 
         // max total supply is 1,000,000,000 PROPS specified in AttoPROPS
         rewardsLibData.maxTotalSupply = maxTotalSupply = 1 * 1e9 * (10 ** uint256(decimals()));
         rewardsLibData.rewardsStartTimestamp = rewardsStartTimestamp = _rewardsStartTimestamp;
         rewardsLibData.minSecondsBetweenDays = secondsBetweenDays = _minSecondsBetweenDays;
-        
+
         rewardsLibData.precisionMul = 10**6;
         rewardsLibData.VALIDATOR_ROLE = keccak256("VALIDATOR_ROLE");
         rewardsLibData.APPLICATION_ROLE = keccak256("APPLICATION_ROLE");
+    }
+
+    /**
+    * @dev Set new validators list
+    * @param _rewardsDay uint256 the rewards day from which this change should take effect
+    * @param _hash bytes32 IPFS hash of the app submission
+    */
+    function submitIPFSHash(uint256 _rewardsDay, bytes32 _hash)
+        public
+    {
+        // TODO: check if this is going to be submitted by the application cold or hot wallet - as this changes the check
+        PropsRewardsLib.submitIPFSHash(rewardsLibData, _rewardsDay, _hash);
+        emit IPFSHashSubmitted(msg.sender, _rewardsDay, _hash);
     }
 
     /**
@@ -257,6 +284,7 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
         public
     {
         // if submission is for a new day check if previous day validator rewards were given if not give to participating ones
+        // TODO: check if this logic needs to change with the submission hours
         if (_rewardsDay > rewardsLibData.dailyRewards.lastApplicationsRewardsDay) {
             uint256 previousDayValidatorRewardsAmount = PropsRewardsLib.calculateValidatorRewards(
                 rewardsLibData,
@@ -495,16 +523,17 @@ contract PropsRewards is Initializable, ERC20UpgradeSafe, AccessControlUpgradeSa
 
     /**
     * @dev Allows a user to unstake props.
+    * @param _wallet address where to send the props to
     */
-    function withdraw()
+    function withdraw(address _wallet)
         public
     {
         uint256 rewardsDay = PropsRewardsLib._currentRewardsDay(rewardsLibData);
         uint256 amountUnstaked = rewardsLibData.stakingMap[msg.sender].amountUnstaked;
         PropsRewardsLib.withdraw(rewardsLibData, msg.sender, rewardsDay);
         IPropsToken token = IPropsToken(tokenContract);
-        token.transfer(msg.sender, amountUnstaked);
-        emit Withdraw(msg.sender, rewardsDay, amountUnstaked);
+        token.transfer(_wallet, amountUnstaked);
+        emit Withdraw(msg.sender, rewardsDay, amountUnstaked, _wallet);
     }
 
     /**

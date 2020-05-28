@@ -28,13 +28,16 @@ library PropsRewardsLib {
         
     // The various parameters used by the contract
     enum ParameterName {
-        ApplicationRewardsPercent,
-        ApplicationRewardsMaxVariationPercent,
+        ApplicationsDailyRewardsMaxAmount,
         ValidatorMajorityPercent,
-        ValidatorRewardsPercent,
+        ValidatorDailyRewardAmount,
         StakingInterestRate,
         WithdrawCooldownPeriodDays,
-        RestakeCooldownPeriodDays
+        RestakeCooldownPeriodDays,
+        ApplicationsSubmitFromHour,
+        ApplicationsSubmitToHour,
+        ValidatorsSubmitFromHour,
+        ValidatorsSubmitToHour
     }
     enum RewardedEntityType { Application, Validator }
 
@@ -62,14 +65,14 @@ library PropsRewardsLib {
         uint256 rewardsDay;
     }
 
-    // Represents daily rewards submissions and confirmations
+    // Represents daily rewards submissions and confirmations by validators
     struct DailyRewards {
         mapping (bytes32 => Submission) submissions;
         bytes32[] submittedRewardsHashes;
         uint256 totalSupply;
         bytes32 lastConfirmedRewardsHash;
         uint256 lastApplicationsRewardsDay;
-    }
+    }    
 
     struct Submission {
         mapping (address => bool) validators;
@@ -130,16 +133,17 @@ library PropsRewardsLib {
         address tokenContract;
         // the identity contract address
         address identityContract;
-        /// @dev A record of each staking/unstaking wallet
+        /// @dev Record of each staking/unstaking wallet
         mapping (address => UnstakeData) stakingMap;
-        /// @dev A record for each allocation by address
+        /// @dev Record for each allocation by address
         mapping (address => mapping(bytes32 => Allocation)) allocationsMap;
-        /// @dev An array to hold allocations keys
+        /// @dev Array to hold allocations keys
         mapping (address => bytes32[]) allocationsArr;
-        /// @dev An record for the sum allocated by address
+        /// @dev Record for the sum allocated by address
         mapping (address => uint256) allocationsSum;
         bytes32 VALIDATOR_ROLE;
         bytes32 APPLICATION_ROLE;
+        
     }
     /*
     *  Modifiers
@@ -187,6 +191,21 @@ library PropsRewardsLib {
         _;
     }
 
+    modifier onlySelectedApplications(Data storage _self, uint256 _rewardsDay) {
+        if (!_usePreviousSelectedRewardsEntityList(_self.selectedApplications, _rewardsDay)) {
+            require (
+                _self.selectedApplications.current[msg.sender],
+                "Must be a current selected validator"
+            );
+        } else {
+            require (
+                _self.selectedApplications.previous[msg.sender],
+                "Must be a previous selected validator"
+            );
+        }
+        _;
+    }
+
     modifier onlyValidRewardsDay(Data storage _self, uint256 _rewardsDay) {
         require(
             _currentRewardsDay(_self) > _rewardsDay && _rewardsDay > _self.lastValidatorsRewardsDay,
@@ -210,6 +229,23 @@ library PropsRewardsLib {
             "Must have valid rewards and sidechain addresses"
         );
         _;
+    }
+
+    /**
+    * @dev Set new validators list
+    * @param _self Data pointer to storage
+    * @param _rewardsDay uint256 the rewards day from which this change should take effect
+    */
+    function submitIPFSHash(Data storage _self, uint256 _rewardsDay)
+        public
+        view
+        onlySelectedApplications(_self, _rewardsDay)
+        onlyValidRewardsDay(_self, _rewardsDay)
+    {
+        require(
+            _isValidHours(_self, _rewardsDay, RewardedEntityType.Application),
+            "Must submit within designated hours"
+        );
     }
 
     /**
@@ -238,8 +274,7 @@ library PropsRewardsLib {
             } else {
                 numOfValidators = _self.dailyRewards.submissions[_rewardsHash].confirmations;
             }
-            uint256 rewardsPerValidator = _getValidatorRewardsDailyAmountPerValidator(_self, _rewardsDay, numOfValidators);
-            return rewardsPerValidator;
+            return getParameterValue(_self,ParameterName.ValidatorDailyRewardAmount, _rewardsDay);
         }
         return 0;
     }
@@ -271,6 +306,11 @@ library PropsRewardsLib {
                 _rewardsHashIsValid(_self, _rewardsDay, _rewardsHash, _applications, _amounts),
                 "Rewards Hash is invalid"
         );
+        require(
+            _isValidHours(_self, _rewardsDay, RewardedEntityType.Validator),
+            "Must submit within designated hours"
+        );
+
         if (!_self.dailyRewards.submissions[_rewardsHash].isInitializedState) {
             _self.dailyRewards.submissions[_rewardsHash].isInitializedState = true;
             _self.dailyRewards.submittedRewardsHashes.push(_rewardsHash);
@@ -282,7 +322,7 @@ library PropsRewardsLib {
         if (_self.dailyRewards.submissions[_rewardsHash].confirmations == _requiredValidatorsForAppRewards(_self, _rewardsDay)) {
             uint256 sum = _validateSubmittedData(_self, _applications, _amounts);
             require(
-                sum <= _getMaxAppRewardsDailyAmount(_self, _rewardsDay, _currentTotalSupply),
+                sum <= _getMaxAppRewardsDailyAmount(_self, _rewardsDay),
                 "Rewards data is invalid - exceed daily variation"
             );
             _finalizeDailyApplicationRewards(_self, _rewardsDay, _rewardsHash, _currentTotalSupply);
@@ -960,40 +1000,16 @@ library PropsRewardsLib {
     * @dev Checks how many validators are needed for app rewards
     * @param _self Data pointer to storage
     * @param _rewardsDay uint256 the rewards day
-    * @param _currentTotalSupply uint256 current total supply
     */
     function _getMaxAppRewardsDailyAmount(
         Data storage _self,
-        uint256 _rewardsDay,
-        uint256 _currentTotalSupply
+        uint256 _rewardsDay
     )
         public
         view
         returns (uint256)
     {
-        return ((_self.maxTotalSupply.sub(_currentTotalSupply)).mul(
-        getParameterValue(_self, ParameterName.ApplicationRewardsPercent, _rewardsDay)).mul(
-        getParameterValue(_self, ParameterName.ApplicationRewardsMaxVariationPercent, _rewardsDay))).div(1e16);
-    }
-
-
-    /**
-    * @dev Checks how many validators are needed for app rewards
-    * @param _self Data pointer to storage
-    * @param _rewardsDay uint256 the rewards day
-    * @param _numOfValidators uint256 number of validators
-    */
-    function _getValidatorRewardsDailyAmountPerValidator(
-        Data storage _self,
-        uint256 _rewardsDay,
-        uint256 _numOfValidators
-    )
-        public
-        view
-        returns (uint256)
-    {
-        return (((_self.maxTotalSupply.sub(_self.dailyRewards.totalSupply)).mul(
-        getParameterValue(_self, ParameterName.ValidatorRewardsPercent, _rewardsDay))).div(1e8)).div(_numOfValidators);
+        return getParameterValue(_self, ParameterName.ApplicationsDailyRewardsMaxAmount, _rewardsDay);
     }
 
     /**
@@ -1094,6 +1110,43 @@ library PropsRewardsLib {
             return ((_self.selectedValidators.currentList.length.mul(getParameterValue(_self, ParameterName.ValidatorMajorityPercent, _rewardsDay))).div(1e8)).add(1);
         } else {
             return ((_self.selectedValidators.previousList.length.mul(getParameterValue(_self, ParameterName.ValidatorMajorityPercent, _rewardsDay))).div(1e8)).add(1);
+        }
+    }
+    /**
+    * @dev Check if submission is in designated hour
+    * @param _self Data pointer to storage
+    * @param _rewardsDay uint256 the rewards day
+    * @param _entityType RewardedEntityType either application (0) or validator (1)
+    */
+    function _isValidHours(Data storage _self, uint256 _rewardsDay, RewardedEntityType _entityType)
+        public
+        view
+        returns (bool)
+    {
+        uint256 hourOfDay = _currentHourOfDay(_self);
+        uint256 fromHour = _entityType == RewardedEntityType.Application ?
+            getParameterValue(_self,ParameterName.ApplicationsSubmitFromHour, _rewardsDay) :
+            getParameterValue(_self,ParameterName.ValidatorsSubmitFromHour, _rewardsDay);
+        uint256 toHour = _entityType == RewardedEntityType.Application ?
+            getParameterValue(_self,ParameterName.ApplicationsSubmitToHour, _rewardsDay) :
+            getParameterValue(_self,ParameterName.ValidatorsSubmitToHour, _rewardsDay);
+        return (hourOfDay >= fromHour && hourOfDay < toHour);
+    }
+
+    /**
+    * @dev Get hour of the day in UTC day from block.timestamp
+    * @param _self Data pointer to storage
+    */
+    function _currentHourOfDay(Data storage _self)
+        public
+        view
+        returns (uint256)
+    {
+        //the the start time - floor timestamp to previous midnight divided by seconds in a day will give the rewards day number
+       if (_self.minSecondsBetweenDays > 0) {
+            return (block.timestamp % _self.minSecondsBetweenDays).div(_self.minSecondsBetweenDays.div(24));
+        } else {
+            return 0;
         }
     }
 
