@@ -1,9 +1,7 @@
-.DS_Store
-node_modules
-.vscode 
-# ZeppelinOS
-zos.dev-*.json
-.zos.session
-/output
-/csv
-.node*
+node_modules/
+cache/
+build/
+typechain/
+artifacts/
+coverage*
+.env
