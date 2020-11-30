@@ -6,7 +6,8 @@ async function main() {
   const proxyAddress = process.argv[2]; // passed as argument to the script
   const logicContractFactory = await ethers.getContractFactory("AppToken");
   const res:Contract = await upgrades.upgradeProxy(proxyAddress, logicContractFactory);
-  console.log(`upgrade done: ${res.address}`);  
+  console.log(`upgrade done: ${res.address}`); 
+   
 }
 
 main()
