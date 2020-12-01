@@ -5,6 +5,7 @@ import { AppToken } from "../typechain/AppToken";
 import { AppTokenManager } from "../typechain/AppTokenManager";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import { BigNumber, ContractFactory, ContractTransaction } from "ethers";
+import { expandTo18Decimals } from './utils'
 
 const AppTokenAbi = require("../artifacts/contracts/AppToken.sol/AppToken.json");
 
@@ -27,7 +28,7 @@ describe("AppToken", () => {
     );
     appTokenLogic = (await logicContractFactory.deploy()) as AppToken;
     await appTokenLogic.deployed();
-    console.log(`appTokenLogic.address=${appTokenLogic.address}`);
+    // console.log(`appTokenLogic.address=${appTokenLogic.address}`);
 
     const appTokenManagerFactory:ContractFactory = await ethers.getContractFactory(
       "AppTokenManager",
@@ -36,7 +37,7 @@ describe("AppToken", () => {
     
     appTokenManager = (await appTokenManagerFactory.deploy(appTokenLogic.address)) as AppTokenManager
     await appTokenManager.deployed();
-    console.log(`appTokenManager.address=${appTokenManager.address}`);    
+    // console.log(`appTokenManager.address=${appTokenManager.address}`);    
   });
 
   // 4
@@ -46,7 +47,7 @@ describe("AppToken", () => {
     const testTokenSymbol:string = "EMBR";
     const testTokenSupply:number = 1e9;
     it("app token deployed", async () => {  
-      console.log(testTokenName, testTokenSymbol, testTokenSupply, signers[1].address, signers[2].address);
+      // console.log(testTokenName, testTokenSymbol, testTokenSupply, signers[1].address, signers[2].address);
       const contractTx:ContractTransaction = await appTokenManager.createAppToken(testTokenName, testTokenSymbol, testTokenSupply, signers[1].address, signers[2].address);
       let triggerPromise = new Promise((resolve, reject) => {
         appTokenManager.on("AppTokenCreated(address,string,uint256)", (deployedTokenAddress, deployedTokenName, deployedTokenAmount, event) => { 
@@ -70,16 +71,14 @@ describe("AppToken", () => {
       await triggerPromise;
       
     });
-    it("app token data is readable and correct", async () => {      
-      // (await new ethers.Contract(deployedAppTokenContractAddress, AppTokenAbi.abi, signers[1])) as AppToken;
-      appTokenLogic.attach(deployedAppTokenContractAddress)
-      
+    it("app token data which was deployed is readable and correct", async () => {      
+      appTokenLogic = new ethers.Contract(deployedAppTokenContractAddress, AppTokenAbi.abi, signers[1]) as AppToken;            
       const name: string = await appTokenLogic.name();
       const symbol: string = await appTokenLogic.symbol();
       const supply: BigNumber = await appTokenLogic.totalSupply();
-      expect(name).to.eq(testTokenName);
+      expect(name).to.eq(testTokenName);      
       expect(symbol).to.eq(testTokenSymbol);
-      expect(supply.toString()).to.eq(testTokenSupply.toString());
+      expect(supply.toString()).to.eq(expandTo18Decimals(testTokenSupply).toString());
     });
   });  
 });
