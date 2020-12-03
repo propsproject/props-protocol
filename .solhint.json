@@ -6,7 +6,7 @@
     "avoid-throw": "off",
     "avoid-suicide": "error",
     "avoid-sha3": "warn",
-    "singleQuote": "off"
+    "quotes": "off"
   },
   "plugins": ["prettier"]
 }

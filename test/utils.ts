@@ -1,8 +1,14 @@
-import { BigNumber, providers, utils, Contract } from 'ethers'
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signer-with-address';
+import { BigNumber, Contract, providers, utils } from 'ethers';
+import { ethers } from 'hardhat';
+
+import AppTokenAbi from '../artifacts/contracts/AppToken.sol/AppToken.json';
+import { AppToken } from '../typechain/AppToken';
+import { AppTokenManager } from '../typechain/AppTokenManager';
 
 const PERMIT_TYPEHASH = utils.keccak256(
   utils.toUtf8Bytes('Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)')
-)
+);
 
 function getDomainSeparator(name: string, tokenAddress: string) {
   return utils.keccak256(
@@ -18,21 +24,21 @@ function getDomainSeparator(name: string, tokenAddress: string) {
         tokenAddress,
       ]
     )
-  )
+  );
 }
 
 export async function getApprovalDigest(
   token: Contract,
   approve: {
-    owner: string
-    spender: string
+    owner: string,
+    spender: string,
     value: BigNumber
   },
   nonce: BigNumber,
   deadline: BigNumber
 ): Promise<string> {
-  const name = await token.name()
-  const DOMAIN_SEPARATOR = getDomainSeparator(name, token.address)
+  const name = await token.name();
+  const DOMAIN_SEPARATOR = getDomainSeparator(name, token.address);
   return utils.keccak256(
     utils.solidityPack(
       ['bytes1', 'bytes1', 'bytes32', 'bytes32'],
@@ -48,15 +54,41 @@ export async function getApprovalDigest(
         ),
       ]
     )
-  )
+  );
 }
 
-export const REWARDS_DURATION = 60 * 60 * 24 * 60
+export async function deployContract<T extends Contract>(
+  name: string,
+  signer: SignerWithAddress,
+  ...args: any[]
+): Promise<T> {
+  const contractFactory = await ethers.getContractFactory(name, signer);
+  return await contractFactory.deploy(...args) as T;
+}
 
-export function expandTo18Decimals(n: number): BigNumber {
-  return BigNumber.from(n).mul(BigNumber.from(10).pow(18))
+export async function createAppToken(
+  appTokenManager: AppTokenManager,
+  name: string,
+  symbol: string,
+  amount: BigNumber,
+  owner: string,
+  propsOwner: string
+): Promise<AppToken | undefined> {
+  const tx = await appTokenManager.createAppToken(name, symbol, amount, owner, propsOwner);
+  const receipt = await tx.wait();
+  const appTokenCreatedEvent = receipt.events?.find(
+    ({ eventSignature }) => eventSignature === 'AppTokenCreated(address,string,uint256)'
+  );
+  const eventArgs = appTokenCreatedEvent?.args;
+  return eventArgs
+    ? new ethers.Contract(eventArgs[0] as string, AppTokenAbi.abi, ethers.provider) as AppToken
+    : undefined;
+}
+
+export function expandTo18Decimals(n: number | BigNumber): BigNumber {
+  return BigNumber.from(n).mul(BigNumber.from(10).pow(18));
 }
 
 export async function mineBlock(provider: providers.Web3Provider, timestamp: number): Promise<void> {
-  return provider.send('evm_mine', [timestamp])
+  return provider.send('evm_mine', [timestamp]);
 }

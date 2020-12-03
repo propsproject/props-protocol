@@ -1,4 +1,5 @@
-pragma solidity ^0.6.8;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
