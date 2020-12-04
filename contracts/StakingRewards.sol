@@ -44,7 +44,7 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
         rewardsDistribution = _rewardsDistribution;
-        rewardsDuration = uint256(1e18).div(_dailyEmission);
+        rewardsDuration = uint256(1e18).div(_dailyEmission).mul(1 days);
     }
 
     /* ========== VIEWS ========== */
@@ -170,11 +170,9 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
 
     modifier updateRewardRate() {
         _;
-        if (
-            lastStakeTime != 0 &&
-            block.timestamp < periodFinish &&
-            block.timestamp.sub(lastStakeTime) >= 1 days
-        ) {
+        if (lastStakeTime == 0) {
+            lastStakeTime = block.timestamp;
+        } else if (block.timestamp < periodFinish && block.timestamp.sub(lastStakeTime) >= 1 days) {
             uint256 remaining = periodFinish.sub(block.timestamp);
             uint256 leftover = remaining.mul(rewardRate);
             rewardRate = leftover.div(rewardsDuration);
