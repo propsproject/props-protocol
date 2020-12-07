@@ -7,24 +7,30 @@ import { ethers } from "hardhat";
 
 import { AppToken } from "../typechain/AppToken";
 import { AppTokenManager } from "../typechain/AppTokenManager";
-import { createAppToken, deployContract, expandTo18Decimals } from './utils'
+import {
+  createAppToken,
+  deployContract,
+  expandTo18Decimals,
+  getEvent
+} from "./utils";
 
 chai.use(solidity);
 const { expect } = chai;
 
-describe("AppToken", () => {  
-  let appTokenLogic: AppToken;
-  let appTokenManager: AppTokenManager;
+describe("AppToken", () => {
   let signers: SignerWithAddress[];
+
+  let appTokenManager: AppTokenManager;
 
   beforeEach(async () => {
     signers = await ethers.getSigners();
 
-    appTokenLogic = await deployContract("AppToken", signers[0]);
-    // console.log(`appTokenLogic.address=${appTokenLogic.address}`);
-
-    appTokenManager = await deployContract("AppTokenManager", signers[0], appTokenLogic.address);
-    // console.log(`appTokenManager.address=${appTokenManager.address}`);    
+    const appTokenLogic: AppToken = await deployContract("AppToken", signers[0]);
+    appTokenManager = await deployContract(
+      "AppTokenManager",
+      signers[0],
+      appTokenLogic.address // _implementationContract
+    ); 
   });
 
   describe("new app token from factory", async () => {
@@ -32,31 +38,29 @@ describe("AppToken", () => {
     const testTokenSymbol = "EMBR";
     const testTokenSupply = BigNumber.from(1e9);
 
-    it("app token deployed", async () => {  
-      const tx = await appTokenManager.createAppToken(testTokenName, testTokenSymbol, testTokenSupply, signers[1].address, signers[2].address);
-      const receipt = await tx.wait();
-
-      const appTokenCreatedEvent = receipt.events?.find(
-        ({ eventSignature }) => eventSignature === 'AppTokenCreated(address,string,uint256)'
+    it("deploying a new app token succeeds", async () => {
+      // Deploy a new app token and check that the deployment succeeded
+      const tx = await appTokenManager.createAppToken(
+        testTokenName,      // name
+        testTokenSymbol,    // symbol
+        testTokenSupply,    // amount
+        signers[1].address, // owner
+        signers[2].address  // propsOwner
       );
-      expect(appTokenCreatedEvent).to.not.be.undefined;
-
-      const eventArgs = appTokenCreatedEvent?.args;
-      expect(eventArgs).to.not.be.undefined;
-
-      const [, deployedTokenName, deployedTokenAmount] = eventArgs as Result;
+      const [, deployedTokenName, deployedTokenAmount] = await getEvent(await tx.wait(), "AppTokenCreated(address,string,uint256)");
       expect(deployedTokenName).to.eq(testTokenName);
       expect(deployedTokenAmount).to.eq(testTokenSupply);
     });
 
     it("deployed app token data is readable and correct", async () => {
+      // Deploy a new app token and check the deployed contract
       const appToken = await createAppToken(
         appTokenManager,
-        testTokenName,
-        testTokenSymbol,
-        testTokenSupply,
-        signers[0].address,
-        signers[1].address
+        testTokenName,      // name
+        testTokenSymbol,    // symbol
+        testTokenSupply,    // amount
+        signers[0].address, // owner
+        signers[1].address  // propsOwner
       ) as AppToken;
       expect(await appToken.name()).to.eq(testTokenName);      
       expect(await appToken.symbol()).to.eq(testTokenSymbol);

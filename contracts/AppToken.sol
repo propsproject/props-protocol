@@ -9,17 +9,17 @@ import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
     using SafeMathUpgradeable for uint256;
 
-    uint256 public propsMintPercent = 100000; // denoted as ppm i.e. 10%
+    // Denoted as ppm i.e. 10%
+    uint256 public propsMintPercent = 100000;
 
     /**
-     * @dev App Token's ERC20 Logic contract that proxies point to
-     * @param _name name
-     * @param _owner The address of the thing owner
-     * @param _propsOwner The address of the thing owner
-     * @param _symbol name
-     * @param _amount Amount of tokens to mint
+     * @notice App Token's ERC20 logic contract that proxies point to
+     * @param _name Name of the app token
+     * @param _symbol Symbol of the app token
+     * @param _amount Amount of app tokens to mint
+     * @param _owner The owner of the app token
+     * @param _propsOwner The owner of the protocol-assigned tokens
      */
-
     function initialize(
         string memory _name,
         string memory _symbol,
@@ -33,7 +33,7 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
             transferOwnership(_owner);
         }
 
-        uint256 amountWithDecimals = _amount.mul(10**uint256(decimals()));
+        uint256 amountWithDecimals = _amount.mul(10 ** uint256(decimals()));
         uint256 propsTokens = amountWithDecimals.mul(propsMintPercent).div(1e6);
 
         _mint(_owner, amountWithDecimals.sub(propsTokens));

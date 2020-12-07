@@ -1,5 +1,12 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signer-with-address';
-import { BigNumber, Contract, providers, utils } from 'ethers';
+import {
+  BigNumber,
+  Contract,
+  ContractReceipt,
+  providers,
+  utils
+} from 'ethers';
+import { Result } from 'ethers/lib/utils';
 import { ethers } from 'hardhat';
 
 import AppTokenAbi from '../artifacts/contracts/AppToken.sol/AppToken.json';
@@ -57,6 +64,8 @@ export async function getApprovalDigest(
   );
 }
 
+// Generic helpers
+
 export async function deployContract<T extends Contract>(
   name: string,
   signer: SignerWithAddress,
@@ -65,6 +74,26 @@ export async function deployContract<T extends Contract>(
   const contractFactory = await ethers.getContractFactory(name, signer);
   return await contractFactory.deploy(...args) as T;
 }
+
+export async function getEvent(receipt: ContractReceipt, signature: string): Promise<Result> {
+  const event = receipt.events?.find(({ eventSignature }) => eventSignature === signature);
+  const eventArgs = event?.args;
+  return eventArgs as Result;
+}
+
+export async function mineBlock(provider: providers.JsonRpcProvider, timestamp: BigNumber): Promise<void> {
+  return provider.send('evm_mine', [timestamp.toNumber()]);
+}
+
+export function expandTo18Decimals(n: number | BigNumber): BigNumber {
+  return BigNumber.from(n).mul(BigNumber.from(10).pow(18));
+}
+
+export function daysToTimestamp(days: number | BigNumber): BigNumber {
+  return BigNumber.from(days).mul(24 * 3600);
+}
+
+// Specialized helpers
 
 export async function createAppToken(
   appTokenManager: AppTokenManager,
@@ -83,16 +112,4 @@ export async function createAppToken(
   return eventArgs
     ? new ethers.Contract(eventArgs[0] as string, AppTokenAbi.abi, ethers.provider) as AppToken
     : undefined;
-}
-
-export async function mineBlock(provider: providers.JsonRpcProvider, timestamp: BigNumber): Promise<void> {
-  return provider.send('evm_mine', [timestamp.toNumber()]);
-}
-
-export function expandTo18Decimals(n: number | BigNumber): BigNumber {
-  return BigNumber.from(n).mul(BigNumber.from(10).pow(18));
-}
-
-export function daysToTimestamp(days: number | BigNumber): BigNumber {
-  return BigNumber.from(days).mul(24 * 3600);
 }
