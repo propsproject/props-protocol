@@ -183,7 +183,7 @@ contract SProps is ILockableERC20 {
      * @param spender The address of the account spending the funds
      * @return The number of tokens approved
      */
-    function allowance(address account, address spender) external override view returns (uint256) {
+    function allowance(address account, address spender) external view override returns (uint256) {
         return allowances[account][spender];
     }
 
@@ -259,7 +259,7 @@ contract SProps is ILockableERC20 {
      * @param account The address of the account to get the balance of
      * @return The number of tokens held
      */
-    function balanceOf(address account) public override view returns (uint256) {
+    function balanceOf(address account) public view override returns (uint256) {
         return balances[account];
     }
 
@@ -268,7 +268,7 @@ contract SProps is ILockableERC20 {
      * @param account The address of the account to get the total balance of
      * @return The total number of tokens held
      */
-    function totalBalanceOf(address account) public override view returns (uint256) {
+    function totalBalanceOf(address account) public view override returns (uint256) {
         return SafeMath.add(balances[account], totalLocked[account]);
     }
 
@@ -463,10 +463,11 @@ contract SProps is ILockableERC20 {
 
     function _delegate(address delegator, address delegatee) internal {
         address currentDelegate = delegates[delegator];
-        uint96 delegatorBalance = safe96(
-          this.totalBalanceOf(delegator),
-          "SProps::_delegate: total balance of delegator overflows"
-        );
+        uint96 delegatorBalance =
+            safe96(
+                this.totalBalanceOf(delegator),
+                "SProps::_delegate: total balance of delegator overflows"
+            );
         delegates[delegator] = delegatee;
 
         emit DelegateChanged(delegator, currentDelegate, delegatee);

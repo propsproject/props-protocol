@@ -1,9 +1,10 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/dist/src/signer-with-address';
+import * as ethUtil from 'ethereumjs-util';
 import {
   BigNumber,
+  BigNumberish,
   Contract,
   ContractReceipt,
-  providers,
   utils
 } from 'ethers';
 import { Interface, Result } from 'ethers/lib/utils';
@@ -12,6 +13,8 @@ import { ethers } from 'hardhat';
 import AppTokenAbi from '../artifacts/contracts/AppToken.sol/AppToken.json';
 import { AppToken } from '../typechain/AppToken';
 import { AppTokenManager } from '../typechain/AppTokenManager';
+
+// Specialized helpers
 
 const PERMIT_TYPEHASH = utils.keccak256(
   utils.toUtf8Bytes('Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)')
@@ -64,6 +67,25 @@ export async function getApprovalDigest(
   );
 }
 
+export async function createAppToken(
+  appTokenManager: AppTokenManager,
+  name: string,
+  symbol: string,
+  amount: BigNumber,
+  owner: string,
+  propsOwner: string
+): Promise<AppToken | undefined> {
+  const tx = await appTokenManager.createAppToken(name, symbol, amount, owner, propsOwner);
+  const receipt = await tx.wait();
+  const appTokenCreatedEvent = receipt.events?.find(
+    ({ eventSignature }) => eventSignature === 'AppTokenCreated(address,string,uint256)'
+  );
+  const eventArgs = appTokenCreatedEvent?.args;
+  return eventArgs
+    ? new ethers.Contract(eventArgs[0] as string, AppTokenAbi.abi, ethers.provider) as AppToken
+    : undefined;
+}
+
 // Generic helpers
 
 export async function deployContract<T extends Contract>(
@@ -100,39 +122,40 @@ export function getIndirectEvent(
   return eventArgs as Result;
 }
 
-export async function mineBlock(provider: providers.JsonRpcProvider, timestamp: BigNumber): Promise<void> {
-  return provider.send('evm_mine', [timestamp.toNumber()]);
+export function getFutureContractAddress(deployerAddress: string, deployerNonce: number): string {
+  return ethUtil.bufferToHex(
+    ethUtil.generateAddress(
+      ethUtil.toBuffer(deployerAddress),
+      ethUtil.toBuffer(deployerNonce)
+    )
+  );
 }
 
-export function expandTo18Decimals(n: number | BigNumber): BigNumber {
+export function encodeParameters(types: string[], values: any[]) {
+  const abi = new ethers.utils.AbiCoder();
+  return abi.encode(types, values);
+}
+
+export async function mineBlock(timestamp?: BigNumberish): Promise<void> {
+  if (timestamp) {
+    return ethers.provider.send('evm_mine', [bn(timestamp).toNumber()]);
+  }
+  return ethers.provider.send('evm_mine', []);
+}
+
+export async function now(): Promise<BigNumber> {
+  const latestBlock = await ethers.provider.getBlock('latest');
+  return bn(latestBlock.timestamp);
+}
+
+export function expandTo18Decimals(n: BigNumberish): BigNumber {
   return BigNumber.from(n).mul(BigNumber.from(10).pow(18));
 }
 
-export function bn(n: number): BigNumber {
+export function bn(n: BigNumberish): BigNumber {
   return BigNumber.from(n);
 }
 
-export function daysToTimestamp(days: number | BigNumber): BigNumber {
-  return BigNumber.from(days).mul(24 * 3600);
-}
-
-// Specialized helpers
-
-export async function createAppToken(
-  appTokenManager: AppTokenManager,
-  name: string,
-  symbol: string,
-  amount: BigNumber,
-  owner: string,
-  propsOwner: string
-): Promise<AppToken | undefined> {
-  const tx = await appTokenManager.createAppToken(name, symbol, amount, owner, propsOwner);
-  const receipt = await tx.wait();
-  const appTokenCreatedEvent = receipt.events?.find(
-    ({ eventSignature }) => eventSignature === 'AppTokenCreated(address,string,uint256)'
-  );
-  const eventArgs = appTokenCreatedEvent?.args;
-  return eventArgs
-    ? new ethers.Contract(eventArgs[0] as string, AppTokenAbi.abi, ethers.provider) as AppToken
-    : undefined;
+export function daysToTimestamp(days: BigNumberish): BigNumber {
+  return BigNumber.from(days).mul(24).mul(3600);
 }

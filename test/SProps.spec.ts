@@ -10,7 +10,8 @@ import {
   deployContract,
   expandTo18Decimals,
   getDirectEvent,
-  mineBlock
+  mineBlock,
+  now
 } from "./utils";
 
 chai.use(solidity);
@@ -29,7 +30,7 @@ describe("SProps", () => {
       signers[0],
       signers[0].address, // account
       signers[0].address, // minter_
-      bn(Date.now()).add(daysToTimestamp(365)) // mintingAllowedAfter_
+      (await now()).add(daysToTimestamp(365)) // mintingAllowedAfter_
     );
   });
 
@@ -56,7 +57,7 @@ describe("SProps", () => {
     expect(await sProps.totalBalanceOf(signers[1].address)).to.eq(amount);
 
     // Fast forward until after the unlock time
-    await mineBlock(ethers.provider, unlockTime.add(1));
+    await mineBlock(unlockTime.add(1));
 
     // Unlock the locked tokens and check that it succeeded
     await sProps.unlock(signers[1].address, [lockTime]);
@@ -72,7 +73,7 @@ describe("SProps", () => {
     const [,,, unlockTime] = getDirectEvent(await tx.wait(), "Locked(address,uint256,uint256,uint256)");
     
     // Fast forward until after the unlock time
-    await mineBlock(ethers.provider, unlockTime.add(1));
+    await mineBlock(unlockTime.add(1));
 
     // Delegate and check that the locked tokens were accounted for in the delegation
     await sProps.connect(signers[1]).delegate(signers[2].address);

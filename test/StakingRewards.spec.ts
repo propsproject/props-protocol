@@ -132,7 +132,7 @@ describe("StakingRewards", () => {
     expect(await stakingRewards.periodFinish()).to.eq(initialPeriodFinish);
 
     // Fast forward until one day after the last stake
-    await mineBlock(ethers.provider, (await stakingRewards.lastStakeTime()).add(daysToTimestamp(1)));
+    await mineBlock((await stakingRewards.lastStakeTime()).add(daysToTimestamp(1)));
 
     // Second stake
     await stakingToken.connect(signers[0]).transfer(signers[2].address, stakeAmount);
@@ -152,7 +152,7 @@ describe("StakingRewards", () => {
     await stakingRewards.connect(signers[3]).stake(stakeAmount);
 
     // Fast forward until just before one day after the last stake
-    await mineBlock(ethers.provider, (await stakingRewards.lastStakeTime()).add(daysToTimestamp(1)).sub(1));
+    await mineBlock((await stakingRewards.lastStakeTime()).add(daysToTimestamp(1)).sub(1));
 
     // The reward parameters adjustments can occur at most once per day
     expect(await stakingRewards.rewardRate()).to.eq(newRewardRate);
@@ -174,7 +174,7 @@ describe("StakingRewards", () => {
     await stakingRewards.connect(signers[1]).stake(stakeAmount);
 
     // Fast forward
-    await mineBlock(ethers.provider, (await stakingRewards.lastStakeTime()).add(daysToTimestamp(356)));
+    await mineBlock((await stakingRewards.lastStakeTime()).add(daysToTimestamp(356)));
 
     // Claim rewards
     const tx = await stakingRewards.connect(signers[1]).getReward();
@@ -193,7 +193,7 @@ describe("StakingRewards", () => {
     );
 
     // Fast forward until after the unlock time
-    await mineBlock(ethers.provider, unlockTime.add(1));
+    await mineBlock(unlockTime.add(1));
 
     // Unlock the rewards and check that it succeeded
     await rewardsToken.unlock(signers[1].address, [lockTime]);

@@ -33,7 +33,7 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
             transferOwnership(_owner);
         }
 
-        uint256 amountWithDecimals = _amount.mul(10 ** uint256(decimals()));
+        uint256 amountWithDecimals = _amount.mul(10**uint256(decimals()));
         uint256 propsTokens = amountWithDecimals.mul(propsMintPercent).div(1e6);
 
         _mint(_owner, amountWithDecimals.sub(propsTokens));

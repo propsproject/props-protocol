@@ -27,17 +27,14 @@ contract LockableERC20 is ERC20, ILockableERC20 {
     /// @notice An event thats emitted when an account unlocks previously locked tokens
     event Unlocked(address indexed account, uint256 amount, uint256 lockTime);
 
-    constructor(
-        string memory name,
-        string memory symbol
-    ) public ERC20(name, symbol) {}
+    constructor(string memory name, string memory symbol) public ERC20(name, symbol) {}
 
     /**
      * @notice Get the total number of tokens held by the `account` (locked + transferable)
      * @param account The address of the account to get the total balance of
      * @return The total number of tokens held
      */
-    function totalBalanceOf(address account) external override view returns (uint256) {
+    function totalBalanceOf(address account) external view override returns (uint256) {
         return balanceOf(account).add(totalLocked[account]);
     }
 
