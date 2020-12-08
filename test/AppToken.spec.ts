@@ -1,17 +1,16 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { BigNumber } from "ethers";
-import { Result } from "ethers/lib/utils";
 import { ethers } from "hardhat";
 
 import { AppToken } from "../typechain/AppToken";
 import { AppTokenManager } from "../typechain/AppTokenManager";
 import {
+  bn,
   createAppToken,
   deployContract,
   expandTo18Decimals,
-  getEvent
+  getDirectEvent
 } from "./utils";
 
 chai.use(solidity);
@@ -36,7 +35,7 @@ describe("AppToken", () => {
   describe("new app token from factory", async () => {
     const testTokenName = "Embers";
     const testTokenSymbol = "EMBR";
-    const testTokenSupply = BigNumber.from(1e9);
+    const testTokenSupply = bn(1e9);
 
     it("deploying a new app token succeeds", async () => {
       // Deploy a new app token and check that the deployment succeeded
@@ -47,7 +46,10 @@ describe("AppToken", () => {
         signers[1].address, // owner
         signers[2].address  // propsOwner
       );
-      const [, deployedTokenName, deployedTokenAmount] = await getEvent(await tx.wait(), "AppTokenCreated(address,string,uint256)");
+      const [, deployedTokenName, deployedTokenAmount] = getDirectEvent(
+        await tx.wait(),
+        "AppTokenCreated(address,string,uint256)"
+      );
       expect(deployedTokenName).to.eq(testTokenName);
       expect(deployedTokenAmount).to.eq(testTokenSupply);
     });

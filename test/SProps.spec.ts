@@ -1,15 +1,15 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 
 import { SProps } from "../typechain/SProps";
 import {
+  bn,
   daysToTimestamp,
   deployContract,
   expandTo18Decimals,
-  getEvent,
+  getDirectEvent,
   mineBlock
 } from "./utils";
 
@@ -29,7 +29,7 @@ describe("SProps", () => {
       signers[0],
       signers[0].address, // account
       signers[0].address, // minter_
-      BigNumber.from(Date.now()).add(daysToTimestamp(365)) // mintingAllowedAfter_
+      bn(Date.now()).add(daysToTimestamp(365)) // mintingAllowedAfter_
     );
   });
 
@@ -38,10 +38,13 @@ describe("SProps", () => {
 
     // Transfer a locked amount
     const tx = await sProps.connect(signers[0]).transferWithLock(signers[1].address, amount);
-    const [,, lockTime, unlockTime] = await getEvent(await tx.wait(), "Locked(address,uint256,uint256,uint256)");
+    const [,, lockTime, unlockTime] = getDirectEvent(
+      await tx.wait(),
+      "Locked(address,uint256,uint256,uint256)"
+    );
 
     // The balance is still 0 as the locked tokens don't count
-    expect(await sProps.balanceOf(signers[1].address)).to.eq(BigNumber.from(0));
+    expect(await sProps.balanceOf(signers[1].address)).to.eq(bn(0));
     // The total balance gets updated accordingly
     expect(await sProps.totalBalanceOf(signers[1].address)).to.eq(amount);
     // The unlock time for the transferred tokens is correctly set
@@ -49,7 +52,7 @@ describe("SProps", () => {
 
     // Try to unlock the locked tokens and check that it failed
     await sProps.unlock(signers[1].address, [lockTime]);
-    expect(await sProps.balanceOf(signers[1].address)).to.eq(BigNumber.from(0));
+    expect(await sProps.balanceOf(signers[1].address)).to.eq(bn(0));
     expect(await sProps.totalBalanceOf(signers[1].address)).to.eq(amount);
 
     // Fast forward until after the unlock time
@@ -66,7 +69,7 @@ describe("SProps", () => {
 
     // Transfer a locked amount
     const tx = await sProps.connect(signers[0]).transferWithLock(signers[1].address, amount);
-    const [,,, unlockTime] = await getEvent(await tx.wait(), "Locked(address,uint256,uint256,uint256)");
+    const [,,, unlockTime] = getDirectEvent(await tx.wait(), "Locked(address,uint256,uint256,uint256)");
     
     // Fast forward until after the unlock time
     await mineBlock(ethers.provider, unlockTime.add(1));

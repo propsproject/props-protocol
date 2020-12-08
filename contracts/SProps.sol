@@ -3,7 +3,9 @@ pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 
-contract SProps {
+import "./interfaces/ILockableERC20.sol";
+
+contract SProps is ILockableERC20 {
     /// @notice EIP-20 token name for this token
     string public constant name = "sProps";
 
@@ -14,7 +16,7 @@ contract SProps {
     uint8 public constant decimals = 18;
 
     /// @notice Total number of tokens in circulation
-    uint256 public totalSupply = 1_000_000_000e18; // 1 billion sProps
+    uint256 public override totalSupply = 1_000_000_000e18; // 1 billion sProps
 
     /// @notice Address which may mint new tokens
     address public minter;
@@ -181,7 +183,7 @@ contract SProps {
      * @param spender The address of the account spending the funds
      * @return The number of tokens approved
      */
-    function allowance(address account, address spender) external view returns (uint256) {
+    function allowance(address account, address spender) external override view returns (uint256) {
         return allowances[account][spender];
     }
 
@@ -193,7 +195,7 @@ contract SProps {
      * @param rawAmount The number of tokens that are approved (2^256-1 means infinite)
      * @return Whether or not the approval succeeded
      */
-    function approve(address spender, uint256 rawAmount) external returns (bool) {
+    function approve(address spender, uint256 rawAmount) external override returns (bool) {
         uint96 amount;
         if (rawAmount == uint256(-1)) {
             amount = uint96(-1);
@@ -257,16 +259,16 @@ contract SProps {
      * @param account The address of the account to get the balance of
      * @return The number of tokens held
      */
-    function balanceOf(address account) public view returns (uint256) {
+    function balanceOf(address account) public override view returns (uint256) {
         return balances[account];
     }
 
     /**
      * @notice Get the total number of tokens held by the `account` (locked + transferable)
      * @param account The address of the account to get the total balance of
-     * @return The total numbers of token held
+     * @return The total number of tokens held
      */
-    function totalBalanceOf(address account) public view returns (uint256) {
+    function totalBalanceOf(address account) public override view returns (uint256) {
         return SafeMath.add(balances[account], totalLocked[account]);
     }
 
@@ -276,7 +278,7 @@ contract SProps {
      * @param rawAmount The number of tokens to transfer
      * @return Whether or not the transfer succeeded
      */
-    function transfer(address dst, uint256 rawAmount) external returns (bool) {
+    function transfer(address dst, uint256 rawAmount) external override returns (bool) {
         uint96 amount = safe96(rawAmount, "SProps::transfer: amount exceeds 96 bits");
         _transferTokens(msg.sender, dst, amount);
         return true;
@@ -293,7 +295,7 @@ contract SProps {
         address src,
         address dst,
         uint256 rawAmount
-    ) external returns (bool) {
+    ) external override returns (bool) {
         address spender = msg.sender;
         uint96 spenderAllowance = allowances[src][spender];
         uint96 amount = safe96(rawAmount, "SProps::transferFrom: amount exceeds 96 bits");
@@ -320,7 +322,7 @@ contract SProps {
      * @param rawAmount The number of tokens to transfer
      * @return Whether or not the transfer succeeded
      */
-    function transferWithLock(address dst, uint256 rawAmount) public returns (bool) {
+    function transferWithLock(address dst, uint256 rawAmount) external override returns (bool) {
         require(locks[dst][now] == 0, "SProps::transferWithLock: tokens already locked");
         require(rawAmount != 0, "SProps::transferWithLock: amount cannot be 0");
 
@@ -345,7 +347,7 @@ contract SProps {
      * @param account Address claiming back unlockable tokens
      * @param lockTimesToUnlock Array of lock times requested to be unlocked
      */
-    function unlock(address account, uint256[] memory lockTimesToUnlock) public returns (bool) {
+    function unlock(address account, uint256[] calldata lockTimesToUnlock) external override {
         uint96 unlockedTokens = 0;
         for (uint256 i = 0; i < lockTimesToUnlock.length; i++) {
             uint96 lockedTokens = locks[account][lockTimesToUnlock[i]];
@@ -461,12 +463,10 @@ contract SProps {
 
     function _delegate(address delegator, address delegatee) internal {
         address currentDelegate = delegates[delegator];
-        uint96 delegatorBalance =
-            add96(
-                balances[delegator],
-                totalLocked[delegator],
-                "SProps::_transferTokens: delegator balance overflows"
-            );
+        uint96 delegatorBalance = safe96(
+          this.totalBalanceOf(delegator),
+          "SProps::_delegate: total balance of delegator overflows"
+        );
         delegates[delegator] = delegatee;
 
         emit DelegateChanged(delegator, currentDelegate, delegatee);

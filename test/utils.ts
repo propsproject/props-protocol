@@ -6,7 +6,7 @@ import {
   providers,
   utils
 } from 'ethers';
-import { Result } from 'ethers/lib/utils';
+import { Interface, Result } from 'ethers/lib/utils';
 import { ethers } from 'hardhat';
 
 import AppTokenAbi from '../artifacts/contracts/AppToken.sol/AppToken.json';
@@ -75,8 +75,27 @@ export async function deployContract<T extends Contract>(
   return await contractFactory.deploy(...args) as T;
 }
 
-export async function getEvent(receipt: ContractReceipt, signature: string): Promise<Result> {
+// Get the arguments of an event that was directly triggered by the calling function
+export function getDirectEvent(receipt: ContractReceipt, signature: string): Result {
   const event = receipt.events?.find(({ eventSignature }) => eventSignature === signature);
+  const eventArgs = event?.args;
+  return eventArgs as Result;
+}
+
+// Get the arguments of an event that was indirectly triggered by the calling function (e.g. in sub-calls)
+export function getIndirectEvent(
+  receipt: ContractReceipt,
+  eventSignature: string,
+  abiInterface: Interface,
+): Result {
+  let parsedEvents: utils.LogDescription[] = [];
+  try {
+    receipt.logs.forEach(log => parsedEvents.push(abiInterface.parseLog(log)));
+  } catch {
+    // Ignore any errors, we should have already processed all the needed events
+  }
+
+  const event = parsedEvents.find(({ signature }) => signature === eventSignature);
   const eventArgs = event?.args;
   return eventArgs as Result;
 }
@@ -87,6 +106,10 @@ export async function mineBlock(provider: providers.JsonRpcProvider, timestamp: 
 
 export function expandTo18Decimals(n: number | BigNumber): BigNumber {
   return BigNumber.from(n).mul(BigNumber.from(10).pow(18));
+}
+
+export function bn(n: number): BigNumber {
+  return BigNumber.from(n);
 }
 
 export function daysToTimestamp(days: number | BigNumber): BigNumber {

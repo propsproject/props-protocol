@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "../LockableERC20.sol";
 
-contract TestERC20 is ERC20 {
+contract TestLockableERC20 is LockableERC20 {
     constructor(
         string memory name,
         string memory symbol,
         uint256 amount
-    ) public ERC20(name, symbol) {
+    ) public LockableERC20(name, symbol) {
         _mint(msg.sender, amount);
     }
 }

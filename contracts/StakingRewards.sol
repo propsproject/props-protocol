@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+import "./interfaces/ILockableERC20.sol";
+
 // Inheritance
 import "./interfaces/IStakingRewards.sol";
 import "./RewardsDistributionRecipient.sol";
@@ -16,7 +18,7 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
 
     /* ========== STATE VARIABLES ========== */
 
-    IERC20 public rewardsToken;
+    ILockableERC20 public rewardsToken;
     IERC20 public stakingToken;
     uint256 public periodFinish = 0;
     uint256 public rewardRate = 0;
@@ -24,11 +26,9 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
     uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
     uint256 public lastStakeTime;
-    uint256 public rewardsCooldownTime = 30 days;
 
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
-    mapping(address => uint256) public stakingStartTime;
 
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
@@ -41,7 +41,7 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
         address _stakingToken,
         uint256 _dailyEmission
     ) public {
-        rewardsToken = IERC20(_rewardsToken);
+        rewardsToken = ILockableERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
         rewardsDistribution = _rewardsDistribution;
         rewardsDuration = uint256(1e18).div(_dailyEmission).mul(1 days);
@@ -97,7 +97,6 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
         require(amount > 0, "Cannot stake 0");
         _totalSupply = _totalSupply.add(amount);
         _balances[msg.sender] = _balances[msg.sender].add(amount);
-        stakingStartTime[msg.sender] = block.timestamp;
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
         emit Staked(msg.sender, amount);
     }
@@ -111,14 +110,10 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
     }
 
     function getReward() public override nonReentrant updateReward(msg.sender) {
-        require(
-            block.timestamp.sub(stakingStartTime[msg.sender]) >= rewardsCooldownTime,
-            "Cooldown period still ongoing"
-        );
         uint256 reward = rewards[msg.sender];
         if (reward > 0) {
             rewards[msg.sender] = 0;
-            rewardsToken.safeTransfer(msg.sender, reward);
+            rewardsToken.transferWithLock(msg.sender, reward);
             emit RewardPaid(msg.sender, reward);
         }
     }

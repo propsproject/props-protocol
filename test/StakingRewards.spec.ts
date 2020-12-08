@@ -1,18 +1,20 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
-import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 
 import { AppToken } from "../typechain/AppToken";
 import { AppTokenManager } from "../typechain/AppTokenManager";
 import { StakingRewards } from "../typechain/StakingRewards";
-import { TestErc20 } from "../typechain/TestErc20";
+import { TestLockableErc20 } from "../typechain/TestLockableErc20";
 import {
+  bn,
   createAppToken,
   daysToTimestamp,
   deployContract,
   expandTo18Decimals,
+  getDirectEvent,
+  getIndirectEvent,
   mineBlock
 } from "./utils";
 
@@ -29,37 +31,46 @@ const STAKING_TOKEN_AMOUNT = expandTo18Decimals(1000);
 
 // Corresponds to 0.0003658 - taken from old Props rewards formula
 // Distributes 12.5% of the remaining rewards pool each year
-const STAKING_REWARDS_DAILY_EMISSION = BigNumber.from(3658).mul(1e11);
+const STAKING_REWARDS_DAILY_EMISSION = bn(3658).mul(1e11);
 
 describe("StakingRewards", () => {
   let signers: SignerWithAddress[];
   
   let appTokenManager: AppTokenManager;
-  let rewardsToken: AppToken;
-  let stakingToken: TestErc20;
+  let rewardsToken: TestLockableErc20;
+  let stakingToken: TestLockableErc20;
   let stakingRewards: StakingRewards;
 
   beforeEach(async () => {
     signers = await ethers.getSigners();
 
-    const appTokenLogic: AppToken = await deployContract("AppToken", signers[0]);
-    appTokenManager = await deployContract(
-      "AppTokenManager",
-      signers[0],
-      appTokenLogic.address // _implementationContract
-    );
+    // TODO: Make app tokens lockable
+    // const appTokenLogic: AppToken = await deployContract("AppToken", signers[0]);
+    // appTokenManager = await deployContract(
+    //   "AppTokenManager",
+    //   signers[0],
+    //   appTokenLogic.address // _implementationContract
+    // );
 
-    rewardsToken = await createAppToken(
-      appTokenManager,
+    // rewardsToken = await createAppToken(
+    //   appTokenManager,
+    //   REWARDS_TOKEN_NAME,   // name
+    //   REWARDS_TOKEN_SYMBOL, // symbol
+    //   REWARDS_TOKEN_AMOUNT, // amount
+    //   signers[0].address,   // owner
+    //   signers[1].address    // propsOwner
+    // ) as AppToken;
+
+    rewardsToken = await deployContract(
+      "TestLockableERC20",
+      signers[0],
       REWARDS_TOKEN_NAME,   // name
       REWARDS_TOKEN_SYMBOL, // symbol
-      REWARDS_TOKEN_AMOUNT, // amount
-      signers[0].address,   // owner
-      signers[1].address    // propsOwner
-    ) as AppToken;
+      REWARDS_TOKEN_AMOUNT  // amount
+    );
 
     stakingToken = await deployContract(
-      "TestERC20",
+      "TestLockableERC20",
       signers[0],
       STAKING_TOKEN_NAME,   // name
       STAKING_TOKEN_SYMBOL, // symbol
@@ -106,7 +117,7 @@ describe("StakingRewards", () => {
     await rewardsToken.connect(signers[0]).transfer(stakingRewards.address, reward);
     await stakingRewards.connect(signers[0]).notifyRewardAmount(reward);
 
-    const stakeAmount = BigNumber.from(100000);
+    const stakeAmount = bn(100000);
 
     const initialRewardRate = await stakingRewards.rewardRate();
     const initialPeriodFinish = await stakingRewards.periodFinish();
@@ -146,5 +157,47 @@ describe("StakingRewards", () => {
     // The reward parameters adjustments can occur at most once per day
     expect(await stakingRewards.rewardRate()).to.eq(newRewardRate);
     expect(await stakingRewards.periodFinish()).to.eq(newPeriodFinish);
+  });
+
+  it("rewards are under a lock period before they get in the possesion of the staker", async () => {
+    const reward = expandTo18Decimals(100);
+
+    // Distribute rewards
+    await rewardsToken.connect(signers[0]).transfer(stakingRewards.address, reward);
+    await stakingRewards.connect(signers[0]).notifyRewardAmount(reward);
+
+    const stakeAmount = bn(100000);
+
+    // Stake
+    await stakingToken.connect(signers[0]).transfer(signers[1].address, stakeAmount);
+    await stakingToken.connect(signers[1]).approve(stakingRewards.address, stakeAmount);
+    await stakingRewards.connect(signers[1]).stake(stakeAmount);
+
+    // Fast forward
+    await mineBlock(ethers.provider, (await stakingRewards.lastStakeTime()).add(daysToTimestamp(356)));
+
+    // Claim rewards
+    const tx = await stakingRewards.connect(signers[1]).getReward();
+
+    const txReceipt = await tx.wait();
+
+    // Check that the claimed rewards are locked
+    const [, earnedReward] = getDirectEvent(txReceipt, "RewardPaid(address,uint256)");
+    expect(await rewardsToken.balanceOf(signers[1].address)).to.eq(bn(0));
+    expect(await rewardsToken.totalBalanceOf(signers[1].address)).to.eq(earnedReward);
+
+    const [,, lockTime, unlockTime] = getIndirectEvent(
+      txReceipt,
+      "Locked(address,uint256,uint256,uint256)",
+      (await ethers.getContractFactory("TestLockableERC20")).interface
+    );
+
+    // Fast forward until after the unlock time
+    await mineBlock(ethers.provider, unlockTime.add(1));
+
+    // Unlock the rewards and check that it succeeded
+    await rewardsToken.unlock(signers[1].address, [lockTime]);
+    expect(await rewardsToken.balanceOf(signers[1].address)).to.eq(earnedReward);
+    expect(await rewardsToken.totalBalanceOf(signers[1].address)).to.eq(earnedReward);
   });
 });
