@@ -12,8 +12,8 @@ import {
   daysToTimestamp,
   deployContract,
   encodeParameters,
-  getDirectEvent,
-  getFutureContractAddress,
+  getEvent,
+  getFutureAddress,
   mineBlock,
   now
 } from "./utils";
@@ -40,9 +40,9 @@ describe("GovernorAlpha", () => {
 
     const nonce = await signers[0].getTransactionCount();
     // Make sure the contracts are deployed in this exact order to keep the same addresses
-    const sPropsAddress = getFutureContractAddress(signers[0].address, nonce);
-    const timelockAddress = getFutureContractAddress(signers[0].address, nonce + 1);
-    const governorAlphaAddress = getFutureContractAddress(signers[0].address, nonce + 2);
+    const sPropsAddress = getFutureAddress(signers[0].address, nonce);
+    const timelockAddress = getFutureAddress(signers[0].address, nonce + 1);
+    const governorAlphaAddress = getFutureAddress(signers[0].address, nonce + 2);
 
     sProps = await deployContract(
       "SProps",
@@ -91,7 +91,7 @@ describe("GovernorAlpha", () => {
       ,,,,
       proposalStartBlock,
       proposalEndBlock,
-    ] = getDirectEvent(await tx.wait(), PROPOSAL_CREATED_SIGNATURE);
+    ] = await getEvent(await tx.wait(), PROPOSAL_CREATED_SIGNATURE, 'GovernorAlpha');
     expect(proposer).to.eq(signers[1].address);
 
     // Fast forward until the start of the voting period
@@ -105,14 +105,14 @@ describe("GovernorAlpha", () => {
 
     // Vote on proposal and check that it succeeded, from an account that has no voting power
     tx = await governorAlpha.connect(signers[0]).castVote(proposalId, true);
-    [voter, , support, votes] = getDirectEvent(await tx.wait(), VOTE_CAST_SIGNATURE);
+    [voter, , support, votes] = await getEvent(await tx.wait(), VOTE_CAST_SIGNATURE, "GovernorAlpha");
     expect(voter).to.eq(signers[0].address);
     expect(support).to.eq(true);
     expect(votes).to.eq(await sProps.getPriorVotes(signers[0].address, proposalStartBlock));
 
     // Vote once again on proposal, this time from an account that has voting power
     tx = await governorAlpha.connect(signers[1]).castVote(proposalId, true);
-    [voter, , support, votes] = getDirectEvent(await tx.wait(), VOTE_CAST_SIGNATURE);
+    [voter, , support, votes] = await getEvent(await tx.wait(), VOTE_CAST_SIGNATURE, "GovernorAlpha");
     expect(voter).to.eq(signers[1].address);
     expect(support).to.eq(true);
     expect(votes).to.eq(await sProps.getPriorVotes(signers[1].address, proposalStartBlock));
@@ -127,7 +127,7 @@ describe("GovernorAlpha", () => {
 
     // Queue proposal for execution
     tx = await governorAlpha.queue(proposalId);
-    const [, eta] = getDirectEvent(await tx.wait(), PROPOSAL_QUEUED_SIGNATURE);
+    const [, eta] = await getEvent(await tx.wait(), PROPOSAL_QUEUED_SIGNATURE, "GovernorAlpha");
 
     // Try to execute the proposal and check that it fails: still under time lock
     await expect(governorAlpha.execute(proposalId)).to.be.reverted;

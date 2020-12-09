@@ -10,7 +10,7 @@ import {
   createAppToken,
   deployContract,
   expandTo18Decimals,
-  getDirectEvent
+  getEvent
 } from "./utils";
 
 chai.use(solidity);
@@ -46,9 +46,10 @@ describe("AppToken", () => {
         signers[1].address, // owner
         signers[2].address  // propsOwner
       );
-      const [, deployedTokenName, deployedTokenAmount] = getDirectEvent(
+      const [, deployedTokenName, deployedTokenAmount] = await getEvent(
         await tx.wait(),
-        "AppTokenCreated(address,string,uint256)"
+        "AppTokenCreated(address,string,uint256)",
+        "AppTokenManager"
       );
       expect(deployedTokenName).to.eq(testTokenName);
       expect(deployedTokenAmount).to.eq(testTokenSupply);

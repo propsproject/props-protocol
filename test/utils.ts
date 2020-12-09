@@ -7,7 +7,7 @@ import {
   ContractReceipt,
   utils
 } from 'ethers';
-import { Interface, Result } from 'ethers/lib/utils';
+import { Result } from 'ethers/lib/utils';
 import { ethers } from 'hardhat';
 
 import AppTokenAbi from '../artifacts/contracts/AppToken.sol/AppToken.json';
@@ -20,7 +20,10 @@ const PERMIT_TYPEHASH = utils.keccak256(
   utils.toUtf8Bytes('Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)')
 );
 
-function getDomainSeparator(name: string, tokenAddress: string) {
+const getDomainSeparator = (
+  name: string,
+  tokenAddress: string
+): string => {
   return utils.keccak256(
     utils.defaultAbiCoder.encode(
       ['bytes32', 'bytes32', 'bytes32', 'uint256', 'address'],
@@ -35,9 +38,9 @@ function getDomainSeparator(name: string, tokenAddress: string) {
       ]
     )
   );
-}
+};
 
-export async function getApprovalDigest(
+export const getApprovalDigest = async (
   token: Contract,
   approve: {
     owner: string,
@@ -46,7 +49,7 @@ export async function getApprovalDigest(
   },
   nonce: BigNumber,
   deadline: BigNumber
-): Promise<string> {
+): Promise<string> => {
   const name = await token.name();
   const DOMAIN_SEPARATOR = getDomainSeparator(name, token.address);
   return utils.keccak256(
@@ -65,97 +68,112 @@ export async function getApprovalDigest(
       ]
     )
   );
-}
+};
 
-export async function createAppToken(
+// Deploys a new app token having the given attributes
+export const createAppToken = async (
   appTokenManager: AppTokenManager,
   name: string,
   symbol: string,
   amount: BigNumber,
   owner: string,
   propsOwner: string
-): Promise<AppToken | undefined> {
+): Promise<AppToken> => {
   const tx = await appTokenManager.createAppToken(name, symbol, amount, owner, propsOwner);
-  const receipt = await tx.wait();
-  const appTokenCreatedEvent = receipt.events?.find(
-    ({ eventSignature }) => eventSignature === 'AppTokenCreated(address,string,uint256)'
+
+  const [appTokenAddress, ] = await getEvent(
+    await tx.wait(),
+    'AppTokenCreated(address,string,uint256)',
+    'AppTokenManager'
   );
-  const eventArgs = appTokenCreatedEvent?.args;
-  return eventArgs
-    ? new ethers.Contract(eventArgs[0] as string, AppTokenAbi.abi, ethers.provider) as AppToken
-    : undefined;
-}
+  return new ethers.Contract(appTokenAddress, AppTokenAbi.abi, ethers.provider) as AppToken;
+};
+
+// Encode a governance action's parameters
+export const encodeParameters = (
+  types: string[],
+  values: any[]
+) => {
+  const abi = new ethers.utils.AbiCoder();
+  return abi.encode(types, values);
+};
 
 // Generic helpers
 
-export async function deployContract<T extends Contract>(
+// Deploys a given contract from an address
+export const deployContract = async <T extends Contract>(
   name: string,
-  signer: SignerWithAddress,
+  deployer: SignerWithAddress,
   ...args: any[]
-): Promise<T> {
-  const contractFactory = await ethers.getContractFactory(name, signer);
+): Promise<T> => {
+  const contractFactory = await ethers.getContractFactory(name, deployer);
   return await contractFactory.deploy(...args) as T;
-}
+};
 
-// Get the arguments of an event that was directly triggered by the calling function
-export function getDirectEvent(receipt: ContractReceipt, signature: string): Result {
-  const event = receipt.events?.find(({ eventSignature }) => eventSignature === signature);
-  const eventArgs = event?.args;
-  return eventArgs as Result;
-}
-
-// Get the arguments of an event that was indirectly triggered by the calling function (e.g. in sub-calls)
-export function getIndirectEvent(
-  receipt: ContractReceipt,
-  eventSignature: string,
-  abiInterface: Interface,
-): Result {
-  let parsedEvents: utils.LogDescription[] = [];
-  try {
-    receipt.logs.forEach(log => parsedEvents.push(abiInterface.parseLog(log)));
-  } catch {
-    // Ignore any errors, we should have already processed all the needed events
+// Retrieves an on-chain event's parameters
+export const getEvent = async (
+  txReceipt: ContractReceipt,
+  eventSig: string,
+  contractName: string,
+): Promise<Result> => {
+  // First, search the receipt's events
+  const event = txReceipt.events?.find(({ eventSignature }) => eventSignature === eventSig);
+  if (event) {
+    return event.args as Result;
   }
 
-  const event = parsedEvents.find(({ signature }) => signature === eventSignature);
-  const eventArgs = event?.args;
-  return eventArgs as Result;
-}
+  // If not there, search the receipt's logs
+  const contractAbi = (await ethers.getContractFactory(contractName)).interface;
 
-export function getFutureContractAddress(deployerAddress: string, deployerNonce: number): string {
-  return ethUtil.bufferToHex(
+  let parsedLogs: utils.LogDescription[] = [];
+  try {
+    txReceipt.logs.forEach(log => parsedLogs.push(contractAbi.parseLog(log)));
+  } catch {
+    // Ignore any errors, we should have already processed all needed events
+  }
+
+  // Assume the event is present
+  const log = parsedLogs.find(({ signature }) => signature === eventSig);
+  return (log?.args) as Result;
+};
+
+// Returns the future address of a contract deployed by a specific address and correponding nonce
+export const getFutureAddress = (
+  deployerAddress: string,
+  deployerNonce: number
+): string => (
+  ethUtil.bufferToHex(
     ethUtil.generateAddress(
       ethUtil.toBuffer(deployerAddress),
       ethUtil.toBuffer(deployerNonce)
     )
-  );
-}
+  )
+);
 
-export function encodeParameters(types: string[], values: any[]) {
-  const abi = new ethers.utils.AbiCoder();
-  return abi.encode(types, values);
-}
+// Mine a block at a given timestamp
+export const mineBlock = async (timestamp?: BigNumberish) => (
+  timestamp
+    ? ethers.provider.send('evm_mine', [bn(timestamp).toNumber()])
+    : ethers.provider.send('evm_mine', [])
+);
 
-export async function mineBlock(timestamp?: BigNumberish): Promise<void> {
-  if (timestamp) {
-    return ethers.provider.send('evm_mine', [bn(timestamp).toNumber()]);
-  }
-  return ethers.provider.send('evm_mine', []);
-}
-
-export async function now(): Promise<BigNumber> {
+// Retrieves the current timestamp on the blockchain
+export const now = async (): Promise<BigNumber> => {
   const latestBlock = await ethers.provider.getBlock('latest');
   return bn(latestBlock.timestamp);
-}
+};
 
-export function expandTo18Decimals(n: BigNumberish): BigNumber {
-  return BigNumber.from(n).mul(BigNumber.from(10).pow(18));
-}
+// Pads a given number with 18 zeros
+export const expandTo18Decimals = (n: BigNumberish): BigNumber => (
+  bn(n).mul(bn(10).pow(18))
+);
 
-export function bn(n: BigNumberish): BigNumber {
-  return BigNumber.from(n);
-}
+// Simple wrapper for converting to BigNumber
+export const bn = (n: BigNumberish): BigNumber => (
+  BigNumber.from(n)
+);
 
-export function daysToTimestamp(days: BigNumberish): BigNumber {
-  return BigNumber.from(days).mul(24).mul(3600);
-}
+// Converts a given number of days to seconds
+export const daysToTimestamp = (days: BigNumberish): BigNumber => (
+  bn(days).mul(24).mul(3600)
+);

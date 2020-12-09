@@ -9,7 +9,7 @@ import {
   daysToTimestamp,
   deployContract,
   expandTo18Decimals,
-  getDirectEvent,
+  getEvent,
   mineBlock,
   now
 } from "./utils";
@@ -39,9 +39,10 @@ describe("SProps", () => {
 
     // Transfer a locked amount
     const tx = await sProps.connect(signers[0]).transferWithLock(signers[1].address, amount);
-    const [,, lockTime, unlockTime] = getDirectEvent(
+    const [,, lockTime, unlockTime] = await getEvent(
       await tx.wait(),
-      "Locked(address,uint256,uint256,uint256)"
+      "Locked(address,uint256,uint256,uint256)",
+      "SProps"
     );
 
     // The balance is still 0 as the locked tokens don't count
@@ -70,7 +71,7 @@ describe("SProps", () => {
 
     // Transfer a locked amount
     const tx = await sProps.connect(signers[0]).transferWithLock(signers[1].address, amount);
-    const [,,, unlockTime] = getDirectEvent(await tx.wait(), "Locked(address,uint256,uint256,uint256)");
+    const [,,, unlockTime] = await getEvent(await tx.wait(), "Locked(address,uint256,uint256,uint256)", "SProps");
     
     // Fast forward until after the unlock time
     await mineBlock(unlockTime.add(1));

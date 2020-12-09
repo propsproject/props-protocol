@@ -13,8 +13,7 @@ import {
   daysToTimestamp,
   deployContract,
   expandTo18Decimals,
-  getDirectEvent,
-  getIndirectEvent,
+  getEvent,
   mineBlock
 } from "./utils";
 
@@ -182,14 +181,14 @@ describe("StakingRewards", () => {
     const txReceipt = await tx.wait();
 
     // Check that the claimed rewards are locked
-    const [, earnedReward] = getDirectEvent(txReceipt, "RewardPaid(address,uint256)");
+    const [, earnedReward] = await getEvent(txReceipt, "RewardPaid(address,uint256)", "StakingRewards");
     expect(await rewardsToken.balanceOf(signers[1].address)).to.eq(bn(0));
     expect(await rewardsToken.totalBalanceOf(signers[1].address)).to.eq(earnedReward);
 
-    const [,, lockTime, unlockTime] = getIndirectEvent(
+    const [,, lockTime, unlockTime] = await getEvent(
       txReceipt,
       "Locked(address,uint256,uint256,uint256)",
-      (await ethers.getContractFactory("TestLockableERC20")).interface
+      "TestLockableERC20"
     );
 
     // Fast forward until after the unlock time
