@@ -5,8 +5,9 @@ import { ethers } from "hardhat";
 
 import { AppToken } from "../typechain/AppToken";
 import { AppTokenManager } from "../typechain/AppTokenManager";
+import { RewardsEscrow } from "../typechain/RewardsEscrow";
 import { StakingRewards } from "../typechain/StakingRewards";
-import { TestLockableErc20 } from "../typechain/TestLockableErc20";
+import { TestErc20 } from "../typechain/TestErc20";
 import {
   bn,
   createAppToken,
@@ -14,74 +15,81 @@ import {
   deployContract,
   expandTo18Decimals,
   getEvent,
-  mineBlock
+  mineBlock,
+  mineBlocks
 } from "./utils";
 
 chai.use(solidity);
 const { expect } = chai;
 
-const REWARDS_TOKEN_NAME = "App Token";
-const REWARDS_TOKEN_SYMBOL = "APPTKN";
-const REWARDS_TOKEN_AMOUNT = expandTo18Decimals(1000);
-
-const STAKING_TOKEN_NAME = "Props Token";
-const STAKING_TOKEN_SYMBOL = "PROPS";
-const STAKING_TOKEN_AMOUNT = expandTo18Decimals(1000);
-
-// Corresponds to 0.0003658 - taken from old Props rewards formula
-// Distributes 12.5% of the remaining rewards pool each year
-const STAKING_REWARDS_DAILY_EMISSION = bn(3658).mul(1e11);
-
 describe("StakingRewards", () => {
-  let signers: SignerWithAddress[];
+  let deployer: SignerWithAddress;
+  let rewardsDistribution: SignerWithAddress;
+  let alice: SignerWithAddress;
+  let bob: SignerWithAddress;
+  let carol: SignerWithAddress;
   
   let appTokenManager: AppTokenManager;
-  let rewardsToken: TestLockableErc20;
-  let stakingToken: TestLockableErc20;
+  let rewardsToken: TestErc20;
+  let stakingToken: TestErc20;
+  let rewardsEscrow: RewardsEscrow;
   let stakingRewards: StakingRewards;
 
+  const REWARDS_TOKEN_NAME = "App Token";
+  const REWARDS_TOKEN_SYMBOL = "APPTKN";
+  const REWARDS_TOKEN_AMOUNT = expandTo18Decimals(1000);
+
+  const STAKING_TOKEN_NAME = "Props Token";
+  const STAKING_TOKEN_SYMBOL = "PROPS";
+  const STAKING_TOKEN_AMOUNT = expandTo18Decimals(1000);
+
+  const REWARDS_ESCROW_LOCK_DURATION = bn(100);
+
+  // Corresponds to 0.0003658 - taken from old Props rewards formula
+  // Distributes 12.5% of the remaining rewards pool each year
+  const STAKING_REWARDS_DAILY_EMISSION = bn(3658).mul(1e11);
+
   beforeEach(async () => {
-    signers = await ethers.getSigners();
+    [deployer, rewardsDistribution, alice, bob, carol, ] = await ethers.getSigners();
 
-    // TODO: Make app tokens lockable
-    // const appTokenLogic: AppToken = await deployContract("AppToken", signers[0]);
-    // appTokenManager = await deployContract(
-    //   "AppTokenManager",
-    //   signers[0],
-    //   appTokenLogic.address // _implementationContract
-    // );
+    const appTokenLogic: AppToken = await deployContract("AppToken", deployer);
+    appTokenManager = await deployContract(
+      "AppTokenManager",
+      deployer,
+      appTokenLogic.address // _implementationContract
+    );
 
-    // rewardsToken = await createAppToken(
-    //   appTokenManager,
-    //   REWARDS_TOKEN_NAME,   // name
-    //   REWARDS_TOKEN_SYMBOL, // symbol
-    //   REWARDS_TOKEN_AMOUNT, // amount
-    //   signers[0].address,   // owner
-    //   signers[1].address    // propsOwner
-    // ) as AppToken;
-
-    rewardsToken = await deployContract(
-      "TestLockableERC20",
-      signers[0],
-      REWARDS_TOKEN_NAME,   // name
-      REWARDS_TOKEN_SYMBOL, // symbol
-      REWARDS_TOKEN_AMOUNT  // amount
+    rewardsToken = await createAppToken(
+      appTokenManager,
+      REWARDS_TOKEN_NAME,          // name
+      REWARDS_TOKEN_SYMBOL,        // symbol
+      REWARDS_TOKEN_AMOUNT,        // amount
+      rewardsDistribution.address, // owner
+      rewardsDistribution.address  // propsOwner
     );
 
     stakingToken = await deployContract(
-      "TestLockableERC20",
-      signers[0],
+      "TestERC20",
+      deployer,
       STAKING_TOKEN_NAME,   // name
       STAKING_TOKEN_SYMBOL, // symbol
       STAKING_TOKEN_AMOUNT  // amount
     );
 
+    rewardsEscrow = await deployContract(
+      "RewardsEscrow",
+      deployer,
+      rewardsToken.address,        // _rewardsToken
+      REWARDS_ESCROW_LOCK_DURATION // _lockDuration
+    );
+
     stakingRewards = await deployContract(
       "StakingRewards",
-      signers[0],
-      signers[0].address,   // rewardsDistribution
-      rewardsToken.address, // rewardsToken
-      stakingToken.address, // stakingToken
+      deployer,
+      rewardsDistribution.address,   // rewardsDistribution
+      rewardsToken.address,          // rewardsToken
+      stakingToken.address,          // stakingToken
+      rewardsEscrow.address,         // rewardsEscrow
       STAKING_REWARDS_DAILY_EMISSION // dailyEmission
     );
   });
@@ -90,8 +98,8 @@ describe("StakingRewards", () => {
     const reward = expandTo18Decimals(100);
 
     // Distribute rewards
-    await rewardsToken.connect(signers[0]).transfer(stakingRewards.address, reward);
-    await stakingRewards.connect(signers[0]).notifyRewardAmount(reward);
+    await rewardsToken.connect(rewardsDistribution).transfer(stakingRewards.address, reward);
+    await stakingRewards.connect(rewardsDistribution).notifyRewardAmount(reward);
 
     // The rewards duration is correct
     const rewardsDuration = await stakingRewards.rewardsDuration();
@@ -113,8 +121,8 @@ describe("StakingRewards", () => {
     const reward = expandTo18Decimals(100);
 
     // Distribute rewards
-    await rewardsToken.connect(signers[0]).transfer(stakingRewards.address, reward);
-    await stakingRewards.connect(signers[0]).notifyRewardAmount(reward);
+    await rewardsToken.connect(rewardsDistribution).transfer(stakingRewards.address, reward);
+    await stakingRewards.connect(rewardsDistribution).notifyRewardAmount(reward);
 
     const stakeAmount = bn(100000);
 
@@ -122,9 +130,9 @@ describe("StakingRewards", () => {
     const initialPeriodFinish = await stakingRewards.periodFinish();
 
     // First stake
-    await stakingToken.connect(signers[0]).transfer(signers[1].address, stakeAmount);
-    await stakingToken.connect(signers[1]).approve(stakingRewards.address, stakeAmount);
-    await stakingRewards.connect(signers[1]).stake(stakeAmount);
+    await stakingToken.connect(deployer).transfer(alice.address, stakeAmount);
+    await stakingToken.connect(alice).approve(stakingRewards.address, stakeAmount);
+    await stakingRewards.connect(alice).stake(stakeAmount);
 
     // First stake does not change anything
     expect(await stakingRewards.rewardRate()).to.eq(initialRewardRate);
@@ -134,9 +142,9 @@ describe("StakingRewards", () => {
     await mineBlock((await stakingRewards.lastStakeTime()).add(daysToTimestamp(1)));
 
     // Second stake
-    await stakingToken.connect(signers[0]).transfer(signers[2].address, stakeAmount);
-    await stakingToken.connect(signers[2]).approve(stakingRewards.address, stakeAmount);
-    await stakingRewards.connect(signers[2]).stake(stakeAmount);
+    await stakingToken.connect(deployer).transfer(bob.address, stakeAmount);
+    await stakingToken.connect(bob).approve(stakingRewards.address, stakeAmount);
+    await stakingRewards.connect(bob).stake(stakeAmount);
 
     const newRewardRate = await stakingRewards.rewardRate();
     const newPeriodFinish = await stakingRewards.periodFinish();
@@ -146,9 +154,9 @@ describe("StakingRewards", () => {
     expect(newPeriodFinish).to.not.eq(initialPeriodFinish);
 
     // Third stake
-    await stakingToken.connect(signers[0]).transfer(signers[3].address, stakeAmount);
-    await stakingToken.connect(signers[3]).approve(stakingRewards.address, stakeAmount);
-    await stakingRewards.connect(signers[3]).stake(stakeAmount);
+    await stakingToken.connect(deployer).transfer(carol.address, stakeAmount);
+    await stakingToken.connect(carol).approve(stakingRewards.address, stakeAmount);
+    await stakingRewards.connect(carol).stake(stakeAmount);
 
     // Fast forward until just before one day after the last stake
     await mineBlock((await stakingRewards.lastStakeTime()).add(daysToTimestamp(1)).sub(1));
@@ -158,45 +166,45 @@ describe("StakingRewards", () => {
     expect(await stakingRewards.periodFinish()).to.eq(newPeriodFinish);
   });
 
-  it("rewards are under a lock period before they get in the possesion of the staker", async () => {
+  it("claimed rewards get sent to the rewards escrow", async () => {
     const reward = expandTo18Decimals(100);
 
     // Distribute rewards
-    await rewardsToken.connect(signers[0]).transfer(stakingRewards.address, reward);
-    await stakingRewards.connect(signers[0]).notifyRewardAmount(reward);
+    await rewardsToken.connect(rewardsDistribution).transfer(stakingRewards.address, reward);
+    await stakingRewards.connect(rewardsDistribution).notifyRewardAmount(reward);
 
     const stakeAmount = bn(100000);
 
     // Stake
-    await stakingToken.connect(signers[0]).transfer(signers[1].address, stakeAmount);
-    await stakingToken.connect(signers[1]).approve(stakingRewards.address, stakeAmount);
-    await stakingRewards.connect(signers[1]).stake(stakeAmount);
+    await stakingToken.connect(deployer).transfer(alice.address, stakeAmount);
+    await stakingToken.connect(alice).approve(stakingRewards.address, stakeAmount);
+    await stakingRewards.connect(alice).stake(stakeAmount);
 
     // Fast forward
     await mineBlock((await stakingRewards.lastStakeTime()).add(daysToTimestamp(356)));
 
     // Claim rewards
-    const tx = await stakingRewards.connect(signers[1]).getReward();
+    const tx = await stakingRewards.connect(alice).getReward();
 
     const txReceipt = await tx.wait();
 
-    // Check that the claimed rewards are locked
+    // Check that the claimed rewards are locked in the rewards escrow
     const [, earnedReward] = await getEvent(txReceipt, "RewardPaid(address,uint256)", "StakingRewards");
-    expect(await rewardsToken.balanceOf(signers[1].address)).to.eq(bn(0));
-    expect(await rewardsToken.totalBalanceOf(signers[1].address)).to.eq(earnedReward);
+    expect(await rewardsToken.balanceOf(alice.address)).to.eq(bn(0));
+    expect(await rewardsEscrow.lockedBalanceOf(alice.address)).to.eq(earnedReward);
 
-    const [,, lockTime, unlockTime] = await getEvent(
+    const [,, lockBlock, unlockBlock] = await getEvent(
       txReceipt,
       "Locked(address,uint256,uint256,uint256)",
-      "TestLockableERC20"
+      "RewardsEscrow"
     );
 
-    // Fast forward until after the unlock time
-    await mineBlock(unlockTime.add(1));
+    // Fast forward until after the rewards time lock
+    await mineBlocks(unlockBlock.sub(lockBlock).add(1));
 
     // Unlock the rewards and check that it succeeded
-    await rewardsToken.unlock(signers[1].address, [lockTime]);
-    expect(await rewardsToken.balanceOf(signers[1].address)).to.eq(earnedReward);
-    expect(await rewardsToken.totalBalanceOf(signers[1].address)).to.eq(earnedReward);
+    await rewardsEscrow.unlock(alice.address, [lockBlock]);
+    expect(await rewardsToken.balanceOf(alice.address)).to.eq(earnedReward);
+    expect(await rewardsEscrow.lockedBalanceOf(alice.address)).to.eq(bn(0));
   });
 });

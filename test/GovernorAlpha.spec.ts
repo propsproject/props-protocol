@@ -5,85 +5,105 @@ import { BigNumber, ContractTransaction } from "ethers";
 import { ethers } from "hardhat";
 
 import { GovernorAlpha } from "../typechain/GovernorAlpha";
-import { SProps } from "../typechain/SProps";
+import { RewardsEscrow } from "../typechain/RewardsEscrow";
+import { SPropsToken } from "../typechain/SPropsToken";
 import { Timelock } from "../typechain/Timelock";
 import {
   bn,
   daysToTimestamp,
   deployContract,
   encodeParameters,
+  expandTo18Decimals,
   getEvent,
   getFutureAddress,
   mineBlock,
-  now
+  mineBlocks
 } from "./utils";
 
 chai.use(solidity);
 const { expect } = chai;
 
-const TIMELOCK_DELAY = daysToTimestamp(3);
-const GOVERNANCE_VOTING_PERIOD = bn(5);
-
-const PROPOSAL_CREATED_SIGNATURE = 'ProposalCreated(uint256,address,address[],uint256[],string[],bytes[],uint256,uint256,string)';
-const VOTE_CAST_SIGNATURE = 'VoteCast(address,uint256,bool,uint256)';
-const PROPOSAL_QUEUED_SIGNATURE = 'ProposalQueued(uint256,uint256)';
-
 describe("GovernorAlpha", () => {
-  let signers: SignerWithAddress[];
+  let deployer: SignerWithAddress;
+  let alice: SignerWithAddress;
+  let bob: SignerWithAddress;
   
-  let sProps: SProps;
+  let rewardsEscrow: RewardsEscrow;
+  let sProps: SPropsToken;
   let timelock: Timelock;
   let governorAlpha: GovernorAlpha;
 
-  beforeEach(async () => {
-    signers = await ethers.getSigners();
+  const REWARDS_ESCROW_LOCK_DURATION = bn(100);
 
-    const nonce = await signers[0].getTransactionCount();
-    // Make sure the contracts are deployed in this exact order to keep the same addresses
-    const sPropsAddress = getFutureAddress(signers[0].address, nonce);
-    const timelockAddress = getFutureAddress(signers[0].address, nonce + 1);
-    const governorAlphaAddress = getFutureAddress(signers[0].address, nonce + 2);
+  const SPROPS_TOKEN_SUPPLY = expandTo18Decimals(1000);
+
+  const TIMELOCK_DELAY = daysToTimestamp(3);
+
+  const GOVERNANCE_VOTING_DELAY = bn(1);
+  const GOVERNANCE_VOTING_PERIOD = bn(5);
+
+  beforeEach(async () => {
+    [deployer, alice, bob, ] = await ethers.getSigners();
+
+    const sPropsAddress = getFutureAddress(
+      deployer.address,
+      (await deployer.getTransactionCount()) + 1
+    );
+
+    rewardsEscrow = await deployContract(
+      "RewardsEscrow",
+      deployer,
+      sPropsAddress, // _rewardsToken
+      REWARDS_ESCROW_LOCK_DURATION // _lockDuration
+    );
 
     sProps = await deployContract(
-      "SProps",
-      signers[0],
-      signers[0].address, // account
-      signers[0].address, // minter_
-      (await now()).add(daysToTimestamp(365)) // mintingAllowedAfter_
+      "SPropsToken",
+      deployer,
+      SPROPS_TOKEN_SUPPLY,  // _supply
+      rewardsEscrow.address // _rewardsEscrow
     );
+
+    const governorAlphaAddress = getFutureAddress(
+      deployer.address,
+      (await deployer.getTransactionCount()) + 1
+    );
+
     timelock = await deployContract(
       "Timelock",
-      signers[0],
+      deployer,
       governorAlphaAddress, // admin_
-      TIMELOCK_DELAY        // delay_
+      TIMELOCK_DELAY   // delay_
     );
+
     governorAlpha = await deployContract(
       "GovernorAlpha",
-      signers[0],
+      deployer,
       timelock.address, // timelock_
-      sProps.address,    // sProps_
+      sProps.address,   // sProps_
+      GOVERNANCE_VOTING_DELAY, // votingDelay_
       GOVERNANCE_VOTING_PERIOD // votingPeriod_
     );
   });
 
-  it("governance flow", async () => {
+  it("basic governance flow", async () => {
     // Delegate voting power
-    await sProps.connect(signers[0]).delegate(signers[1].address);
+    await sProps.connect(deployer).delegate(alice.address);
 
     let tx: ContractTransaction;
 
     // Create proposal and check that it succeeded
-    tx = await governorAlpha.connect(signers[1]).propose(
+    tx = await governorAlpha.connect(alice).propose(
       // targets: the addresses of the contracts to call
       [timelock.address],
-      // values: optionally send Ether along the calls
+      // values: optionally send Ether along with the calls
       [0],
       // signatures: the signatures of the functions to call
-      ['setPendingAdmin(address)'],
+      ["setPendingAdmin(address)"],
       // calldatas: the parameters for each function call
-      [encodeParameters(['address'], [signers[0].address])],
+      [encodeParameters(["address"], [alice.address])],
       // description: description of the proposal
-      'Change Timelocks admin'
+      "Change Timelock's admin"
     );
     const [
       proposalId,
@@ -91,43 +111,55 @@ describe("GovernorAlpha", () => {
       ,,,,
       proposalStartBlock,
       proposalEndBlock,
-    ] = await getEvent(await tx.wait(), PROPOSAL_CREATED_SIGNATURE, 'GovernorAlpha');
-    expect(proposer).to.eq(signers[1].address);
+    ] = await getEvent(
+      await tx.wait(),
+      "ProposalCreated(uint256,address,address[],uint256[],string[],bytes[],uint256,uint256,string)",
+      "GovernorAlpha"
+    );
+    expect(proposer).to.eq(alice.address);
 
     // Fast forward until the start of the voting period
-    for (let i = 0; i < (await governorAlpha.votingDelay()).toNumber(); i++) {
-      await mineBlock();
-    }
+    await mineBlocks((await governorAlpha.votingDelay()).toNumber());
 
     let voter: string;
     let support: boolean;
     let votes: BigNumber;
 
-    // Vote on proposal and check that it succeeded, from an account that has no voting power
-    tx = await governorAlpha.connect(signers[0]).castVote(proposalId, true);
-    [voter, , support, votes] = await getEvent(await tx.wait(), VOTE_CAST_SIGNATURE, "GovernorAlpha");
-    expect(voter).to.eq(signers[0].address);
+    // Vote on proposal, from an account that has no voting power
+    tx = await governorAlpha.connect(bob).castVote(proposalId, true);
+    [voter, , support, votes] = await getEvent(
+      await tx.wait(),
+      "VoteCast(address,uint256,bool,uint256)",
+      "GovernorAlpha"
+    );
+    expect(voter).to.eq(bob.address);
     expect(support).to.eq(true);
-    expect(votes).to.eq(await sProps.getPriorVotes(signers[0].address, proposalStartBlock));
+    expect(votes).to.eq(await sProps.getPriorVotes(bob.address, proposalStartBlock));
 
     // Vote once again on proposal, this time from an account that has voting power
-    tx = await governorAlpha.connect(signers[1]).castVote(proposalId, true);
-    [voter, , support, votes] = await getEvent(await tx.wait(), VOTE_CAST_SIGNATURE, "GovernorAlpha");
-    expect(voter).to.eq(signers[1].address);
+    tx = await governorAlpha.connect(alice).castVote(proposalId, true);
+    [voter, , support, votes] = await getEvent(
+      await tx.wait(),
+      "VoteCast(address,uint256,bool,uint256)",
+      "GovernorAlpha"
+    );
+    expect(voter).to.eq(alice.address);
     expect(support).to.eq(true);
-    expect(votes).to.eq(await sProps.getPriorVotes(signers[1].address, proposalStartBlock));
+    expect(votes).to.eq(await sProps.getPriorVotes(alice.address, proposalStartBlock));
 
     // Fast forward until the start of the voting period
-    for (let i = 0; i < proposalEndBlock - proposalStartBlock + 1; i++) {
-      await mineBlock();
-    }
+    await mineBlocks(proposalEndBlock - proposalStartBlock + 1);
 
     // Try to execute the proposal and check that it fails: the proposal needs to be queued first
     await expect(governorAlpha.execute(proposalId)).to.be.reverted;
 
     // Queue proposal for execution
     tx = await governorAlpha.queue(proposalId);
-    const [, eta] = await getEvent(await tx.wait(), PROPOSAL_QUEUED_SIGNATURE, "GovernorAlpha");
+    const [, eta] = await getEvent(
+      await tx.wait(),
+      "ProposalQueued(uint256,uint256)",
+      "GovernorAlpha"
+    );
 
     // Try to execute the proposal and check that it fails: still under time lock
     await expect(governorAlpha.execute(proposalId)).to.be.reverted;
@@ -137,6 +169,6 @@ describe("GovernorAlpha", () => {
 
     // Execute the proposal and check that its actions were successfully performed
     await governorAlpha.execute(proposalId);
-    expect(await timelock.pendingAdmin()).to.eq(signers[0].address);
+    expect(await timelock.pendingAdmin()).to.eq(alice.address);
   });
 });

@@ -6,7 +6,10 @@
     "avoid-throw": "off",
     "avoid-suicide": "error",
     "avoid-sha3": "warn",
-    "quotes": "off"
+    "quotes": "off",
+    "reason-string": "off",
+    "not-rely-on-time": "off",
+    "no-inline-assembly": "off"
   },
   "plugins": ["prettier"]
 }

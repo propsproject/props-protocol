@@ -2,19 +2,25 @@
 pragma solidity ^0.6.0;
 pragma experimental ABIEncoderV2;
 
+import "@openzeppelin/contracts/math/SafeMath.sol";
+
+import "./SPropsToken.sol";
+
 contract GovernorAlpha {
+    using SafeMath for uint256;
+
     /// @notice The name of this contract
     string public constant name = "Props Governor Alpha";
 
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
-    function quorumVotes() public pure returns (uint256) {
-        return 40_000_000e18;
-    } // 4% of sProps
+    function quorumVotes() public view returns (uint256) {
+        return sProps.totalSupply() / 25;
+    } // 4% of supply
 
     /// @notice The number of votes required in order for a voter to become a proposer
-    function proposalThreshold() public pure returns (uint256) {
-        return 10_000_000e18;
-    } // 1% of sProps
+    function proposalThreshold() public view returns (uint256) {
+        return sProps.totalSupply() / 100;
+    } // 1% of supply
 
     /// @notice The maximum number of actions that can be included in a proposal
     function proposalMaxOperations() public pure returns (uint256) {
@@ -22,9 +28,7 @@ contract GovernorAlpha {
     } // 10 actions
 
     /// @notice The delay before voting on a proposal may take place, once proposed
-    function votingDelay() public pure returns (uint256) {
-        return 1;
-    } // 1 block
+    uint256 public votingDelay;
 
     /// @notice The duration of voting on a proposal, in blocks
     uint256 public votingPeriod;
@@ -33,7 +37,7 @@ contract GovernorAlpha {
     TimelockInterface public timelock;
 
     /// @notice The address of the sProps governance token
-    SPropsInterface public sProps;
+    SPropsToken public sProps;
 
     /// @notice The total number of proposals
     uint256 public proposalCount;
@@ -76,7 +80,7 @@ contract GovernorAlpha {
         /// @notice Whether or not the voter supports the proposal
         bool support;
         /// @notice The number of votes the voter had, which were cast
-        uint96 votes;
+        uint256 votes;
     }
 
     /// @notice Possible states that a proposal may be in
@@ -120,9 +124,15 @@ contract GovernorAlpha {
     /// @notice An event emitted when a proposal has been executed in the Timelock
     event ProposalExecuted(uint256 id);
 
-    constructor(address timelock_, address sProps_, uint256 votingPeriod_) public {
+    constructor(
+        address timelock_,
+        address sProps_,
+        uint256 votingDelay_,
+        uint256 votingPeriod_
+    ) public {
         timelock = TimelockInterface(timelock_);
-        sProps = SPropsInterface(sProps_);
+        sProps = SPropsToken(sProps_);
+        votingDelay = votingDelay_;
         votingPeriod = votingPeriod_;
     }
 
@@ -134,7 +144,7 @@ contract GovernorAlpha {
         string memory description
     ) public returns (uint256) {
         require(
-            sProps.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold(),
+            sProps.getPriorVotes(msg.sender, block.number.sub(1)) > proposalThreshold(),
             "GovernorAlpha::propose: proposer votes below proposal threshold"
         );
         require(
@@ -162,8 +172,8 @@ contract GovernorAlpha {
             );
         }
 
-        uint256 startBlock = add256(block.number, votingDelay());
-        uint256 endBlock = add256(startBlock, votingPeriod);
+        uint256 startBlock = block.number.add(votingDelay);
+        uint256 endBlock = startBlock.add(votingPeriod);
 
         proposalCount++;
         Proposal memory newProposal =
@@ -206,7 +216,7 @@ contract GovernorAlpha {
             "GovernorAlpha::queue: proposal can only be queued if it is succeeded"
         );
         Proposal storage proposal = proposals[proposalId];
-        uint256 eta = add256(block.timestamp, timelock.delay());
+        uint256 eta = block.timestamp.add(timelock.delay());
         for (uint256 i = 0; i < proposal.targets.length; i++) {
             _queueOrRevert(
                 proposal.targets[i],
@@ -264,7 +274,7 @@ contract GovernorAlpha {
 
         Proposal storage proposal = proposals[proposalId];
         require(
-            sProps.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold(),
+            sProps.getPriorVotes(proposal.proposer, block.number.sub(1)) < proposalThreshold(),
             "GovernorAlpha::cancel: proposer above threshold"
         );
 
@@ -320,7 +330,7 @@ contract GovernorAlpha {
             return ProposalState.Succeeded;
         } else if (proposal.executed) {
             return ProposalState.Executed;
-        } else if (block.timestamp >= add256(proposal.eta, timelock.GRACE_PERIOD())) {
+        } else if (block.timestamp >= proposal.eta.add(timelock.GRACE_PERIOD())) {
             return ProposalState.Expired;
         } else {
             return ProposalState.Queued;
@@ -361,12 +371,12 @@ contract GovernorAlpha {
         Proposal storage proposal = proposals[proposalId];
         Receipt storage receipt = proposal.receipts[voter];
         require(receipt.hasVoted == false, "GovernorAlpha::_castVote: voter already voted");
-        uint96 votes = sProps.getPriorVotes(voter, proposal.startBlock);
+        uint256 votes = sProps.getPriorVotes(voter, proposal.startBlock);
 
         if (support) {
-            proposal.forVotes = add256(proposal.forVotes, votes);
+            proposal.forVotes = proposal.forVotes.add(votes);
         } else {
-            proposal.againstVotes = add256(proposal.againstVotes, votes);
+            proposal.againstVotes = proposal.againstVotes.add(votes);
         }
 
         receipt.hasVoted = true;
@@ -374,17 +384,6 @@ contract GovernorAlpha {
         receipt.votes = votes;
 
         emit VoteCast(voter, proposalId, support, votes);
-    }
-
-    function add256(uint256 a, uint256 b) internal pure returns (uint256) {
-        uint256 c = a + b;
-        require(c >= a, "addition overflow");
-        return c;
-    }
-
-    function sub256(uint256 a, uint256 b) internal pure returns (uint256) {
-        require(b <= a, "subtraction underflow");
-        return a - b;
     }
 
     function getChainId() internal pure returns (uint256) {
@@ -428,8 +427,4 @@ interface TimelockInterface {
         bytes calldata data,
         uint256 eta
     ) external payable returns (bytes memory);
-}
-
-interface SPropsInterface {
-    function getPriorVotes(address account, uint256 blockNumber) external view returns (uint96);
 }

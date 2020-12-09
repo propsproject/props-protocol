@@ -6,9 +6,8 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import "./interfaces/ILockableERC20.sol";
-
 // Inheritance
+import "./interfaces/IRewardsEscrow.sol";
 import "./interfaces/IStakingRewards.sol";
 import "./RewardsDistributionRecipient.sol";
 
@@ -18,8 +17,9 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
 
     /* ========== STATE VARIABLES ========== */
 
-    ILockableERC20 public rewardsToken;
+    IERC20 public rewardsToken;
     IERC20 public stakingToken;
+    IRewardsEscrow public rewardsEscrow;
     uint256 public periodFinish = 0;
     uint256 public rewardRate = 0;
     uint256 public rewardsDuration;
@@ -39,11 +39,13 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
         address _rewardsDistribution,
         address _rewardsToken,
         address _stakingToken,
+        address _rewardsEscrow,
         uint256 _dailyEmission
     ) public {
-        rewardsToken = ILockableERC20(_rewardsToken);
-        stakingToken = IERC20(_stakingToken);
         rewardsDistribution = _rewardsDistribution;
+        rewardsToken = IERC20(_rewardsToken);
+        stakingToken = IERC20(_stakingToken);
+        rewardsEscrow = IRewardsEscrow(_rewardsEscrow);
         rewardsDuration = uint256(1e18).div(_dailyEmission).mul(1 days);
     }
 
@@ -113,7 +115,8 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
         uint256 reward = rewards[msg.sender];
         if (reward > 0) {
             rewards[msg.sender] = 0;
-            rewardsToken.transferWithLock(msg.sender, reward);
+            rewardsToken.safeIncreaseAllowance(address(rewardsEscrow), reward);
+            rewardsEscrow.lock(msg.sender, reward);
             emit RewardPaid(msg.sender, reward);
         }
     }

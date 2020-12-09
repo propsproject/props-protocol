@@ -17,57 +17,59 @@ chai.use(solidity);
 const { expect } = chai;
 
 describe("AppToken", () => {
-  let signers: SignerWithAddress[];
+  let deployer: SignerWithAddress;
+  let alice: SignerWithAddress;
+  let bob: SignerWithAddress;
 
   let appTokenManager: AppTokenManager;
 
   beforeEach(async () => {
-    signers = await ethers.getSigners();
+    [deployer, alice, bob, ] = await ethers.getSigners();
 
-    const appTokenLogic: AppToken = await deployContract("AppToken", signers[0]);
+    const appTokenLogic = await deployContract<AppToken>("AppToken", deployer);
     appTokenManager = await deployContract(
       "AppTokenManager",
-      signers[0],
+      deployer,
       appTokenLogic.address // _implementationContract
     ); 
   });
 
   describe("new app token from factory", async () => {
-    const testTokenName = "Embers";
-    const testTokenSymbol = "EMBR";
-    const testTokenSupply = bn(1e9);
+    const TEST_TOKEN_NAME = "Ember";
+    const TEST_TOKEN_SYMBOL = "EMBR";
+    const TEST_TOKEN_SUPPLY = bn(1e9);
 
     it("deploying a new app token succeeds", async () => {
       // Deploy a new app token and check that the deployment succeeded
       const tx = await appTokenManager.createAppToken(
-        testTokenName,      // name
-        testTokenSymbol,    // symbol
-        testTokenSupply,    // amount
-        signers[1].address, // owner
-        signers[2].address  // propsOwner
+        TEST_TOKEN_NAME,   // name
+        TEST_TOKEN_SYMBOL, // symbol
+        TEST_TOKEN_SUPPLY, // amount
+        alice.address,     // owner
+        bob.address        // propsOwner
       );
       const [, deployedTokenName, deployedTokenAmount] = await getEvent(
         await tx.wait(),
         "AppTokenCreated(address,string,uint256)",
         "AppTokenManager"
       );
-      expect(deployedTokenName).to.eq(testTokenName);
-      expect(deployedTokenAmount).to.eq(testTokenSupply);
+      expect(deployedTokenName).to.eq(TEST_TOKEN_NAME);
+      expect(deployedTokenAmount).to.eq(TEST_TOKEN_SUPPLY);
     });
 
     it("deployed app token data is readable and correct", async () => {
       // Deploy a new app token and check the deployed contract
       const appToken = await createAppToken(
         appTokenManager,
-        testTokenName,      // name
-        testTokenSymbol,    // symbol
-        testTokenSupply,    // amount
-        signers[0].address, // owner
-        signers[1].address  // propsOwner
-      ) as AppToken;
-      expect(await appToken.name()).to.eq(testTokenName);      
-      expect(await appToken.symbol()).to.eq(testTokenSymbol);
-      expect(await appToken.totalSupply()).to.eq(expandTo18Decimals(testTokenSupply));
+        TEST_TOKEN_NAME,   // name
+        TEST_TOKEN_SYMBOL, // symbol
+        TEST_TOKEN_SUPPLY, // amount
+        alice.address,     // owner
+        bob.address        // propsOwner
+      );
+      expect(await appToken.name()).to.eq(TEST_TOKEN_NAME);      
+      expect(await appToken.symbol()).to.eq(TEST_TOKEN_SYMBOL);
+      expect(await appToken.totalSupply()).to.eq(expandTo18Decimals(TEST_TOKEN_SUPPLY));
     });
   });  
 });
