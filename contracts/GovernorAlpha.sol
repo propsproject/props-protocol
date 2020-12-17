@@ -2,12 +2,12 @@
 pragma solidity ^0.6.0;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 
-import "./SPropsToken.sol";
+import "./SProps.sol";
 
 contract GovernorAlpha {
-    using SafeMath for uint256;
+    using SafeMathUpgradeable for uint256;
 
     /// @notice The name of this contract
     string public constant name = "Props Governor Alpha";
@@ -37,7 +37,7 @@ contract GovernorAlpha {
     TimelockInterface public timelock;
 
     /// @notice The address of the sProps governance token
-    SPropsToken public sProps;
+    SProps public sProps;
 
     /// @notice The total number of proposals
     uint256 public proposalCount;
@@ -131,7 +131,7 @@ contract GovernorAlpha {
         uint256 votingPeriod_
     ) public {
         timelock = TimelockInterface(timelock_);
-        sProps = SPropsToken(sProps_);
+        sProps = SProps(sProps_);
         votingDelay = votingDelay_;
         votingPeriod = votingPeriod_;
     }
@@ -145,30 +145,27 @@ contract GovernorAlpha {
     ) public returns (uint256) {
         require(
             sProps.getPriorVotes(msg.sender, block.number.sub(1)) > proposalThreshold(),
-            "GovernorAlpha::propose: proposer votes below proposal threshold"
+            "Proposer votes below proposal threshold"
         );
         require(
             targets.length == values.length &&
                 targets.length == signatures.length &&
                 targets.length == calldatas.length,
-            "GovernorAlpha::propose: proposal function information arity mismatch"
+            "Proposal function information arity mismatch"
         );
-        require(targets.length != 0, "GovernorAlpha::propose: must provide actions");
-        require(
-            targets.length <= proposalMaxOperations(),
-            "GovernorAlpha::propose: too many actions"
-        );
+        require(targets.length != 0, "Must provide actions");
+        require(targets.length <= proposalMaxOperations(), "Too many actions");
 
         uint256 latestProposalId = latestProposalIds[msg.sender];
         if (latestProposalId != 0) {
             ProposalState proposersLatestProposalState = state(latestProposalId);
             require(
                 proposersLatestProposalState != ProposalState.Active,
-                "GovernorAlpha::propose: one live proposal per proposer, found an already active proposal"
+                "One live proposal per proposer, found an already active proposal"
             );
             require(
                 proposersLatestProposalState != ProposalState.Pending,
-                "GovernorAlpha::propose: one live proposal per proposer, found an already pending proposal"
+                "One live proposal per proposer, found an already pending proposal"
             );
         }
 
@@ -213,7 +210,7 @@ contract GovernorAlpha {
     function queue(uint256 proposalId) public {
         require(
             state(proposalId) == ProposalState.Succeeded,
-            "GovernorAlpha::queue: proposal can only be queued if it is succeeded"
+            "Proposal can only be queued if it is succeeded"
         );
         Proposal storage proposal = proposals[proposalId];
         uint256 eta = block.timestamp.add(timelock.delay());
@@ -241,7 +238,7 @@ contract GovernorAlpha {
             !timelock.queuedTransactions(
                 keccak256(abi.encode(target, value, signature, data, eta))
             ),
-            "GovernorAlpha::_queueOrRevert: proposal action already queued at eta"
+            "Proposal action already queued at eta"
         );
         timelock.queueTransaction(target, value, signature, data, eta);
     }
@@ -249,7 +246,7 @@ contract GovernorAlpha {
     function execute(uint256 proposalId) public payable {
         require(
             state(proposalId) == ProposalState.Queued,
-            "GovernorAlpha::execute: proposal can only be executed if it is queued"
+            "Proposal can only be executed if it is queued"
         );
         Proposal storage proposal = proposals[proposalId];
         proposal.executed = true;
@@ -267,15 +264,12 @@ contract GovernorAlpha {
 
     function cancel(uint256 proposalId) public {
         ProposalState state = state(proposalId);
-        require(
-            state != ProposalState.Executed,
-            "GovernorAlpha::cancel: cannot cancel executed proposal"
-        );
+        require(state != ProposalState.Executed, "Cannot cancel executed proposal");
 
         Proposal storage proposal = proposals[proposalId];
         require(
             sProps.getPriorVotes(proposal.proposer, block.number.sub(1)) < proposalThreshold(),
-            "GovernorAlpha::cancel: proposer above threshold"
+            "Proposer above threshold"
         );
 
         proposal.canceled = true;
@@ -311,10 +305,7 @@ contract GovernorAlpha {
     }
 
     function state(uint256 proposalId) public view returns (ProposalState) {
-        require(
-            proposalCount >= proposalId && proposalId > 0,
-            "GovernorAlpha::state: invalid proposal id"
-        );
+        require(proposalCount >= proposalId && proposalId > 0, "Invalid proposal id");
         Proposal storage proposal = proposals[proposalId];
         if (proposal.canceled) {
             return ProposalState.Canceled;
@@ -355,7 +346,7 @@ contract GovernorAlpha {
         bytes32 structHash = keccak256(abi.encode(BALLOT_TYPEHASH, proposalId, support));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
         address signatory = ecrecover(digest, v, r, s);
-        require(signatory != address(0), "GovernorAlpha::castVoteBySig: invalid signature");
+        require(signatory != address(0), "Invalid signature");
         return _castVote(signatory, proposalId, support);
     }
 
@@ -364,13 +355,10 @@ contract GovernorAlpha {
         uint256 proposalId,
         bool support
     ) internal {
-        require(
-            state(proposalId) == ProposalState.Active,
-            "GovernorAlpha::_castVote: voting is closed"
-        );
+        require(state(proposalId) == ProposalState.Active, "Voting is closed");
         Proposal storage proposal = proposals[proposalId];
         Receipt storage receipt = proposal.receipts[voter];
-        require(receipt.hasVoted == false, "GovernorAlpha::_castVote: voter already voted");
+        require(receipt.hasVoted == false, "Voter already voted");
         uint256 votes = sProps.getPriorVotes(voter, proposal.startBlock);
 
         if (support) {

@@ -4,10 +4,14 @@ import { solidity } from "ethereum-waffle";
 import { BigNumber, ContractTransaction } from "ethers";
 import { ethers } from "hardhat";
 
-import { GovernorAlpha } from "../typechain/GovernorAlpha";
-import { RewardsEscrow } from "../typechain/RewardsEscrow";
-import { SPropsToken } from "../typechain/SPropsToken";
-import { Timelock } from "../typechain/Timelock";
+import type {
+  AppToken,
+  AppTokenManager,
+  AppTokenStaking,
+  GovernorAlpha,
+  TestErc20,
+  Timelock
+} from "../typechain";
 import {
   bn,
   daysToTimestamp,
@@ -24,76 +28,118 @@ chai.use(solidity);
 const { expect } = chai;
 
 describe("GovernorAlpha", () => {
-  let deployer: SignerWithAddress;
+  let governance: SignerWithAddress;
+  let appTokenOwner: SignerWithAddress;
+  let propsTreasury: SignerWithAddress;
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
   
-  let rewardsEscrow: RewardsEscrow;
-  let sProps: SPropsToken;
+  let propsToken: TestErc20;
+  let appTokenManager: AppTokenManager;
   let timelock: Timelock;
   let governorAlpha: GovernorAlpha;
 
-  const REWARDS_ESCROW_LOCK_DURATION = bn(100);
+  const PROPS_TOKEN_NAME = "Props";
+  const PROPS_TOKEN_SYMBOL = "Props";
+  const PROPS_TOKEN_AMOUNT = expandTo18Decimals(1000);
 
-  const SPROPS_TOKEN_SUPPLY = expandTo18Decimals(1000);
+  const APP_TOKEN_NAME = "AppToken";
+  const APP_TOKEN_SYMBOL = "AppToken";
+  const APP_TOKEN_AMOUNT = expandTo18Decimals(1000);
+
+  // Corresponds to 0.0003658 - taken from old Props rewards formula
+  // Distributes 12.5% of the remaining rewards pool each year
+  const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
 
   const TIMELOCK_DELAY = daysToTimestamp(3);
 
   const GOVERNANCE_VOTING_DELAY = bn(1);
   const GOVERNANCE_VOTING_PERIOD = bn(5);
 
+  const deployAppToken = async (): Promise<[AppToken, AppTokenStaking]> => {
+    const tx = await appTokenManager.connect(appTokenOwner)
+      .deployAppToken(
+        APP_TOKEN_NAME,
+        APP_TOKEN_SYMBOL,
+        APP_TOKEN_AMOUNT,
+        appTokenOwner.address,
+        propsTreasury.address,
+        DAILY_REWARDS_EMISSION
+      );
+    const [appTokenAddress, appTokenStakingAddress, ] = await getEvent(
+      await tx.wait(),
+      "AppTokenDeployed(address,address,string,uint256)",
+      "AppTokenManager"
+    );
+    
+    return [
+      (await ethers.getContractFactory("AppToken")).attach(appTokenAddress) as AppToken,
+      (await ethers.getContractFactory("AppTokenStaking")).attach(appTokenStakingAddress) as AppTokenStaking
+    ];
+  }
+
   beforeEach(async () => {
-    [deployer, alice, bob, ] = await ethers.getSigners();
+    [governance, appTokenOwner, propsTreasury, alice, bob, ] = await ethers.getSigners();
 
-    const sPropsAddress = getFutureAddress(
-      deployer.address,
-      (await deployer.getTransactionCount()) + 1
+    const appTokenLogic = await deployContract<AppToken>("AppToken", propsTreasury);
+    const appTokenStakingLogic = await deployContract<AppTokenStaking>("AppTokenStaking", propsTreasury);
+
+    propsToken = await deployContract<TestErc20>(
+      "TestERC20",
+      propsTreasury,
+      PROPS_TOKEN_NAME,
+      PROPS_TOKEN_SYMBOL,
+      PROPS_TOKEN_AMOUNT
     );
 
-    rewardsEscrow = await deployContract(
-      "RewardsEscrow",
-      deployer,
-      sPropsAddress, // _rewardsToken
-      REWARDS_ESCROW_LOCK_DURATION // _lockDuration
-    );
-
-    sProps = await deployContract(
-      "SPropsToken",
-      deployer,
-      SPROPS_TOKEN_SUPPLY,  // _supply
-      rewardsEscrow.address // _rewardsEscrow
-    );
+    appTokenManager = await deployContract<AppTokenManager>("AppTokenManager", propsTreasury);
+    await appTokenManager.connect(propsTreasury)
+      .initialize(
+        propsToken.address,
+        appTokenLogic.address,
+        appTokenStakingLogic.address
+      );
 
     const governorAlphaAddress = getFutureAddress(
-      deployer.address,
-      (await deployer.getTransactionCount()) + 1
+      governance.address,
+      (await governance.getTransactionCount()) + 1
     );
 
     timelock = await deployContract(
       "Timelock",
-      deployer,
-      governorAlphaAddress, // admin_
-      TIMELOCK_DELAY   // delay_
+      governance,
+      governorAlphaAddress,
+      TIMELOCK_DELAY
     );
 
     governorAlpha = await deployContract(
       "GovernorAlpha",
-      deployer,
-      timelock.address, // timelock_
-      sProps.address,   // sProps_
-      GOVERNANCE_VOTING_DELAY, // votingDelay_
-      GOVERNANCE_VOTING_PERIOD // votingPeriod_
+      governance,
+      timelock.address,
+      appTokenManager.address,
+      GOVERNANCE_VOTING_DELAY,
+      GOVERNANCE_VOTING_PERIOD
     );
   });
 
   it("basic governance flow", async () => {
+    const [appToken, appTokenStaking] = await deployAppToken();
+
+    // Stake and get sProps
+    const stakeAmount = bn(100);
+    await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
+    await propsToken.connect(alice).approve(appTokenManager.address, stakeAmount);
+    await appTokenManager.connect(alice).adjustStakes([appToken.address], [stakeAmount]);
+
+    expect(await appTokenManager.balanceOf(alice.address)).to.eq(stakeAmount);
+
     // Delegate voting power
-    await sProps.connect(deployer).delegate(alice.address);
+    await appTokenManager.connect(alice).delegate(bob.address);
 
     let tx: ContractTransaction;
 
     // Create proposal and check that it succeeded
-    tx = await governorAlpha.connect(alice).propose(
+    tx = await governorAlpha.connect(bob).propose(
       // targets: the addresses of the contracts to call
       [timelock.address],
       // values: optionally send Ether along with the calls
@@ -101,7 +147,7 @@ describe("GovernorAlpha", () => {
       // signatures: the signatures of the functions to call
       ["setPendingAdmin(address)"],
       // calldatas: the parameters for each function call
-      [encodeParameters(["address"], [alice.address])],
+      [encodeParameters(["address"], [bob.address])],
       // description: description of the proposal
       "Change Timelock's admin"
     );
@@ -116,7 +162,7 @@ describe("GovernorAlpha", () => {
       "ProposalCreated(uint256,address,address[],uint256[],string[],bytes[],uint256,uint256,string)",
       "GovernorAlpha"
     );
-    expect(proposer).to.eq(alice.address);
+    expect(proposer).to.eq(bob.address);
 
     // Fast forward until the start of the voting period
     await mineBlocks((await governorAlpha.votingDelay()).toNumber());
@@ -126,17 +172,6 @@ describe("GovernorAlpha", () => {
     let votes: BigNumber;
 
     // Vote on proposal, from an account that has no voting power
-    tx = await governorAlpha.connect(bob).castVote(proposalId, true);
-    [voter, , support, votes] = await getEvent(
-      await tx.wait(),
-      "VoteCast(address,uint256,bool,uint256)",
-      "GovernorAlpha"
-    );
-    expect(voter).to.eq(bob.address);
-    expect(support).to.eq(true);
-    expect(votes).to.eq(await sProps.getPriorVotes(bob.address, proposalStartBlock));
-
-    // Vote once again on proposal, this time from an account that has voting power
     tx = await governorAlpha.connect(alice).castVote(proposalId, true);
     [voter, , support, votes] = await getEvent(
       await tx.wait(),
@@ -145,7 +180,18 @@ describe("GovernorAlpha", () => {
     );
     expect(voter).to.eq(alice.address);
     expect(support).to.eq(true);
-    expect(votes).to.eq(await sProps.getPriorVotes(alice.address, proposalStartBlock));
+    expect(votes).to.eq(await appTokenManager.getPriorVotes(alice.address, proposalStartBlock));
+
+    // Vote once again on proposal, this time from an account that has voting power
+    tx = await governorAlpha.connect(bob).castVote(proposalId, true);
+    [voter, , support, votes] = await getEvent(
+      await tx.wait(),
+      "VoteCast(address,uint256,bool,uint256)",
+      "GovernorAlpha"
+    );
+    expect(voter).to.eq(bob.address);
+    expect(support).to.eq(true);
+    expect(votes).to.eq(await appTokenManager.getPriorVotes(bob.address, proposalStartBlock));
 
     // Fast forward until the start of the voting period
     await mineBlocks(proposalEndBlock - proposalStartBlock + 1);
@@ -169,6 +215,6 @@ describe("GovernorAlpha", () => {
 
     // Execute the proposal and check that its actions were successfully performed
     await governorAlpha.execute(proposalId);
-    expect(await timelock.pendingAdmin()).to.eq(alice.address);
+    expect(await timelock.pendingAdmin()).to.eq(bob.address);
   });
 });

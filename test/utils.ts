@@ -10,10 +10,6 @@ import {
 import { Result } from "ethers/lib/utils";
 import { ethers } from "hardhat";
 
-import AppTokenAbi from "../artifacts/contracts/AppToken.sol/AppToken.json";
-import { AppToken } from "../typechain/AppToken";
-import { AppTokenManager } from "../typechain/AppTokenManager";
-
 // Specialized helpers
 
 const PERMIT_TYPEHASH = utils.keccak256(
@@ -68,25 +64,6 @@ export const getApprovalDigest = async (
       ]
     )
   );
-};
-
-// Deploys a new app token having the given attributes
-export const createAppToken = async (
-  appTokenManager: AppTokenManager,
-  name: string,
-  symbol: string,
-  amount: BigNumber,
-  owner: string,
-  propsOwner: string
-): Promise<AppToken> => {
-  const tx = await appTokenManager.createAppToken(name, symbol, amount, owner, propsOwner);
-
-  const [appTokenAddress, ] = await getEvent(
-    await tx.wait(),
-    "AppTokenCreated(address,string,uint256)",
-    "AppTokenManager"
-  );
-  return new ethers.Contract(appTokenAddress, AppTokenAbi.abi, ethers.provider) as AppToken;
 };
 
 // Encode a governance action"s parameters
@@ -164,6 +141,12 @@ export const mineBlocks = async (numBlocks: number) => {
 export const now = async (): Promise<BigNumber> => {
   const latestBlock = await ethers.provider.getBlock("latest");
   return bn(latestBlock.timestamp);
+};
+
+// Retrieves the current block number on the blockchain
+export const currentBlockNumber = async (): Promise<BigNumber> => {
+  const latestBlock = await ethers.provider.getBlock("latest");
+  return bn(latestBlock.number);
 };
 
 // Pads a given number with 18 zeros

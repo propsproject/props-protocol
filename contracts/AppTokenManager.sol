@@ -1,43 +1,71 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.0;
 
-import "./AppToken.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "../temp-oz-contracts-for-proxy/upgradeability/ProxyFactory.sol";
 
-contract AppTokenManager is ProxyFactory {
-    // EVENTS
+import "./StakingManager.sol";
 
-    event AppTokenCreated(address indexed tokenAddress, string name, uint256 amount);
+contract AppTokenManager is Initializable, ProxyFactory, StakingManager {
+    address public appTokenImplementationContract;
+    address public appTokenStakingImplementationContract;
 
-    // STORAGE
-
-    address public implementationContract;
     address[] public appTokens;
 
-    constructor(address _implementationContract) public {
-        implementationContract = _implementationContract;
+    event AppTokenDeployed(
+        address indexed appTokenAddress,
+        address indexed appTokenStakingAddress,
+        string name,
+        uint256 amount
+    );
+
+    function initialize(
+        address _propsToken,
+        address _appTokenImplementationContract,
+        address _appTokenStakingImplementationContract
+    ) public initializer {
+        StakingManager.__StakingManager_init(_propsToken);
+
+        appTokenImplementationContract = _appTokenImplementationContract;
+        appTokenStakingImplementationContract = _appTokenStakingImplementationContract;
     }
 
-    function createAppToken(
+    function deployAppToken(
         string memory _name,
         string memory _symbol,
         uint256 _amount,
         address _owner,
-        address _propsOwner
+        address _propsTreasury,
+        uint256 _dailyRewardsEmission
     ) public returns (address) {
-        bytes memory payload =
+        bytes memory appTokenPayload =
             abi.encodeWithSignature(
                 "initialize(string,string,uint256,address,address)",
                 _name,
                 _symbol,
                 _amount,
                 _owner,
-                _propsOwner
+                _propsTreasury
             );
-        address proxy = deployMinimal(implementationContract, payload);
-        emit AppTokenCreated(proxy, _name, _amount);
+        address appTokenProxy = deployMinimal(appTokenImplementationContract, appTokenPayload);
 
-        appTokens.push(proxy);
-        return proxy;
+        bytes memory appTokenStakingPayload =
+            abi.encodeWithSignature(
+                "initialize(address,address,address,uint256)",
+                _owner,
+                appTokenProxy,
+                propsToken,
+                _dailyRewardsEmission
+            );
+        address appTokenStakingProxy =
+            deployMinimal(appTokenStakingImplementationContract, appTokenStakingPayload);
+
+        appTokens.push(appTokenProxy);
+        appTokenToStaking[appTokenProxy] = appTokenStakingProxy;
+
+        emit AppTokenDeployed(appTokenProxy, appTokenStakingProxy, _name, _amount);
+
+        return appTokenProxy;
     }
 }

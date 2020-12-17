@@ -1,23 +1,34 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.0;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
-import "./interfaces/IRewardsEscrow.sol";
+abstract contract SProps is Initializable {
+    using SafeMathUpgradeable for uint256;
 
-contract SPropsToken is ERC20, Ownable {
-    /// @notice The sProps rewards escrow contract
-    IRewardsEscrow public rewardsEscrow;
+    /// @notice EIP-20 token name for this token
+    string public constant name = "sProps";
+
+    /// @notice EIP-20 token symbol for this token
+    string public constant symbol = "sProps";
+
+    /// @notice EIP-20 token decimals for this token
+    uint8 public constant decimals = 18;
+
+    /// @notice Total number of tokens in circulation
+    uint256 public totalSupply;
+
+    /// @notice Official record of token balances for each account
+    mapping(address => uint96) internal balances;
 
     /// @notice A record of each accounts delegate
-    mapping(address => address) internal _delegates;
+    mapping(address => address) public delegates;
 
     /// @notice A checkpoint for marking number of votes from a given block
     struct Checkpoint {
         uint32 fromBlock;
-        uint256 votes;
+        uint96 votes;
     }
 
     /// @notice A record of votes checkpoints for each account, by index
@@ -33,6 +44,12 @@ contract SPropsToken is ERC20, Ownable {
     /// @notice The EIP-712 typehash for the delegation struct used by the contract
     bytes32 public constant DELEGATION_TYPEHASH =
         keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)");
+
+    /// @notice The EIP-712 typehash for the permit struct used by the contract
+    bytes32 public constant PERMIT_TYPEHASH =
+        keccak256(
+            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+        );
 
     /// @notice A record of states for signing / validating signatures
     mapping(address => uint256) public nonces;
@@ -51,32 +68,87 @@ contract SPropsToken is ERC20, Ownable {
         uint256 newBalance
     );
 
-    constructor(uint256 _supply, address _rewardsEscrow) public ERC20("sProps", "SPROPS") {
-        rewardsEscrow = IRewardsEscrow(_rewardsEscrow);
-        mint(msg.sender, _supply);
+    /// @notice The standard EIP-20 transfer event
+    event Transfer(address indexed from, address indexed to, uint256 amount);
+
+    function __SProps_init() public initializer {
+        // Nothing to initialize
     }
 
     /**
-     * @notice Creates `_amount` token to `_to` (must only be called by the owner)
+     * @notice Mint new tokens
+     * @param dst The address of the destination account
+     * @param rawAmount The number of tokens to be minted
      */
-    function mint(address _to, uint256 _amount) public onlyOwner {
-        _mint(_to, _amount);
-        _moveDelegates(address(0), _delegates[_to], _amount);
+    function mint(address dst, uint256 rawAmount) internal {
+        require(dst != address(0), "Cannot mint to the zero address");
+
+        // Mint the amount
+        uint96 amount = safe96(rawAmount, "Amount exceeds 96 bits");
+        totalSupply = safe96(totalSupply.add(amount), "totalSupply exceeds 96 bits");
+
+        // Transfer the amount to the destination account
+        balances[dst] = add96(balances[dst], amount, "Mint amount overflows");
+        emit Transfer(address(0), dst, amount);
+
+        // Move delegates
+        _moveDelegates(address(0), delegates[dst], amount);
     }
 
     /**
-     * @notice Delegate votes from `msg.sender` to `delegatee`
-     * @param delegator The address to get delegatee for
+     * @notice Burn existing tokens
+     * @param src The address of the source account
+     * @param rawAmount The number of tokens to be burned
      */
-    function delegates(address delegator) external view returns (address) {
-        return _delegates[delegator];
+    function burn(address src, uint256 rawAmount) internal {
+        require(src != address(0), "Cannot burn from the zero address");
+
+        // Burn the amount
+        uint96 amount = safe96(rawAmount, "Amount exceeds 96 bits");
+        totalSupply = safe96(totalSupply.sub(amount), "totalSupply exceeds 96 bits");
+
+        // Transfer the amount from the source account
+        balances[src] = sub96(balances[src], amount, "Transfer amount overflows");
+        emit Transfer(src, address(0), amount);
+
+        // Move delegates
+        _moveDelegates(delegates[src], address(0), amount);
+    }
+
+    /**
+     * @notice Get the number of tokens held by the `account`
+     * @param account The address of the account to get the balance of
+     * @return The number of tokens held
+     */
+    function balanceOf(address account) external view returns (uint256) {
+        return balances[account];
+    }
+
+    function allowance(address, address) external view returns (uint256) {
+        revert("sProps are not transferrable");
+    }
+
+    function approve(address, uint256) external returns (bool) {
+        revert("sProps are not transferrable");
+    }
+
+    function transfer(address, uint256) external returns (bool) {
+        revert("sProps are not transferrable");
+    }
+
+    function transferFrom(
+        address,
+        address,
+        uint256
+    ) external returns (bool) {
+        revert("sProps are not transferrable");
     }
 
     /**
      * @notice Delegate votes from `msg.sender` to `delegatee`
      * @param delegatee The address to delegate votes to
      */
-    function delegate(address delegatee) external {
+    function delegate(address delegatee) public {
         return _delegate(msg.sender, delegatee);
     }
 
@@ -96,20 +168,17 @@ contract SPropsToken is ERC20, Ownable {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external {
+    ) public {
         bytes32 domainSeparator =
             keccak256(
-                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name())), getChainId(), address(this))
+                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), getChainId(), address(this))
             );
-
         bytes32 structHash = keccak256(abi.encode(DELEGATION_TYPEHASH, delegatee, nonce, expiry));
-
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
-
         address signatory = ecrecover(digest, v, r, s);
-        require(signatory != address(0), "sProps::delegateBySig: invalid signature");
-        require(nonce == nonces[signatory]++, "sProps::delegateBySig: invalid nonce");
-        require(now <= expiry, "sProps::delegateBySig: signature expired");
+        require(signatory != address(0), "Invalid signature");
+        require(nonce == nonces[signatory]++, "Invalid nonce");
+        require(now <= expiry, "Signature expired");
         return _delegate(signatory, delegatee);
     }
 
@@ -118,7 +187,7 @@ contract SPropsToken is ERC20, Ownable {
      * @param account The address to get votes balance
      * @return The number of current votes for `account`
      */
-    function getCurrentVotes(address account) external view returns (uint256) {
+    function getCurrentVotes(address account) external view returns (uint96) {
         uint32 nCheckpoints = numCheckpoints[account];
         return nCheckpoints > 0 ? checkpoints[account][nCheckpoints - 1].votes : 0;
     }
@@ -130,8 +199,8 @@ contract SPropsToken is ERC20, Ownable {
      * @param blockNumber The block number to get the vote balance at
      * @return The number of votes the account had as of the given block
      */
-    function getPriorVotes(address account, uint256 blockNumber) external view returns (uint256) {
-        require(blockNumber < block.number, "sProps::getPriorVotes: not yet determined");
+    function getPriorVotes(address account, uint256 blockNumber) public view returns (uint96) {
+        require(blockNumber < block.number, "Not yet determined");
 
         uint32 nCheckpoints = numCheckpoints[account];
         if (nCheckpoints == 0) {
@@ -166,11 +235,9 @@ contract SPropsToken is ERC20, Ownable {
     }
 
     function _delegate(address delegator, address delegatee) internal {
-        address currentDelegate = _delegates[delegator];
-        // Underlying sProps balance (transferrable + locked rewards)
-        uint256 delegatorBalance =
-            balanceOf(delegator).add(rewardsEscrow.lockedBalanceOf(delegator));
-        _delegates[delegator] = delegatee;
+        address currentDelegate = delegates[delegator];
+        uint96 delegatorBalance = balances[delegator];
+        delegates[delegator] = delegatee;
 
         emit DelegateChanged(delegator, currentDelegate, delegatee);
 
@@ -180,22 +247,20 @@ contract SPropsToken is ERC20, Ownable {
     function _moveDelegates(
         address srcRep,
         address dstRep,
-        uint256 amount
+        uint96 amount
     ) internal {
         if (srcRep != dstRep && amount > 0) {
             if (srcRep != address(0)) {
-                // Decrease old representative
                 uint32 srcRepNum = numCheckpoints[srcRep];
-                uint256 srcRepOld = srcRepNum > 0 ? checkpoints[srcRep][srcRepNum - 1].votes : 0;
-                uint256 srcRepNew = srcRepOld.sub(amount);
+                uint96 srcRepOld = srcRepNum > 0 ? checkpoints[srcRep][srcRepNum - 1].votes : 0;
+                uint96 srcRepNew = sub96(srcRepOld, amount, "Vote amount underflows");
                 _writeCheckpoint(srcRep, srcRepNum, srcRepOld, srcRepNew);
             }
 
             if (dstRep != address(0)) {
-                // Increase new representative
                 uint32 dstRepNum = numCheckpoints[dstRep];
-                uint256 dstRepOld = dstRepNum > 0 ? checkpoints[dstRep][dstRepNum - 1].votes : 0;
-                uint256 dstRepNew = dstRepOld.add(amount);
+                uint96 dstRepOld = dstRepNum > 0 ? checkpoints[dstRep][dstRepNum - 1].votes : 0;
+                uint96 dstRepNew = add96(dstRepOld, amount, "Vote amount overflows");
                 _writeCheckpoint(dstRep, dstRepNum, dstRepOld, dstRepNew);
             }
         }
@@ -204,11 +269,10 @@ contract SPropsToken is ERC20, Ownable {
     function _writeCheckpoint(
         address delegatee,
         uint32 nCheckpoints,
-        uint256 oldVotes,
-        uint256 newVotes
+        uint96 oldVotes,
+        uint96 newVotes
     ) internal {
-        uint32 blockNumber =
-            safe32(block.number, "sProps::_writeCheckpoint: block number exceeds 32 bits");
+        uint32 blockNumber = safe32(block.number, "Block number exceeds 32 bits");
 
         if (nCheckpoints > 0 && checkpoints[delegatee][nCheckpoints - 1].fromBlock == blockNumber) {
             checkpoints[delegatee][nCheckpoints - 1].votes = newVotes;
@@ -223,6 +287,30 @@ contract SPropsToken is ERC20, Ownable {
     function safe32(uint256 n, string memory errorMessage) internal pure returns (uint32) {
         require(n < 2**32, errorMessage);
         return uint32(n);
+    }
+
+    function safe96(uint256 n, string memory errorMessage) internal pure returns (uint96) {
+        require(n < 2**96, errorMessage);
+        return uint96(n);
+    }
+
+    function add96(
+        uint96 a,
+        uint96 b,
+        string memory errorMessage
+    ) internal pure returns (uint96) {
+        uint96 c = a + b;
+        require(c >= a, errorMessage);
+        return c;
+    }
+
+    function sub96(
+        uint96 a,
+        uint96 b,
+        string memory errorMessage
+    ) internal pure returns (uint96) {
+        require(b <= a, errorMessage);
+        return a - b;
     }
 
     function getChainId() internal pure returns (uint256) {

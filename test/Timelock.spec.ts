@@ -4,7 +4,7 @@ import { solidity } from "ethereum-waffle";
 import { BigNumber, BigNumberish } from "ethers";
 import { ethers } from "hardhat";
 
-import { Timelock } from "../typechain/Timelock";
+import type { Timelock } from "../typechain";
 import {
   bn,
   daysToTimestamp,
@@ -39,70 +39,69 @@ const execute = (
 ) => fn(tx.target, tx.value, tx.signature, tx.data, tx.eta);
 
 describe("Timelock", () => {
-  let deployer: SignerWithAddress;
+  let admin: SignerWithAddress;
   let alice: SignerWithAddress;
-  let bob: SignerWithAddress;
   
   let timelock: Timelock;
 
   const TIMELOCK_DELAY = daysToTimestamp(3);
 
   beforeEach(async () => {
-    [deployer, alice, bob, ] = await ethers.getSigners();
+    [admin, alice, ] = await ethers.getSigners();
 
     timelock = await deployContract(
       "Timelock",
-      deployer,
-      alice.address, // admin_
-      TIMELOCK_DELAY // delay_
+      admin,
+      admin.address,
+      TIMELOCK_DELAY
     );
   });
 
-  it("properly handles queueing transactions", async () => {
+  it("queue transactions", async () => {
     const timelockTx: TimelockTx = {
       target: timelock.address,
       value: 0,
       signature: "setPendingAdmin(address)",
-      data: encodeParameters(["address"], [bob.address]),
+      data: encodeParameters(["address"], [alice.address]),
       eta: (await now()).add(TIMELOCK_DELAY).add(daysToTimestamp(1))
     };
 
     // Only the admin can queue transactions
     await expect(
-      execute(timelock.connect(bob).queueTransaction, timelockTx)
-    ).to.be.revertedWith("Timelock::queueTransaction: Call must come from admin.");
+      execute(timelock.connect(alice).queueTransaction, timelockTx)
+    ).to.be.revertedWith("Call must come from admin");
 
     // The admin can queue transactions
-    await execute(timelock.connect(alice).queueTransaction, timelockTx);
+    await execute(timelock.connect(admin).queueTransaction, timelockTx);
   });
 
-  it("properly handles cancelling transactions", async () => {
+  it("cancel transactions", async () => {
     const timelockTx: TimelockTx = {
       target: timelock.address,
       value: 0,
       signature: "setPendingAdmin(address)",
-      data: encodeParameters(["address"], [bob.address]),
+      data: encodeParameters(["address"], [alice.address]),
       eta: (await now()).add(TIMELOCK_DELAY).add(daysToTimestamp(1))
     };
 
     // Queue transaction
-    await execute(timelock.connect(alice).queueTransaction, timelockTx)
+    await execute(timelock.connect(admin).queueTransaction, timelockTx)
 
     // Only the admin can cancel transactions
     await expect(
-      execute(timelock.connect(bob).cancelTransaction, timelockTx)
-    ).to.be.revertedWith("Timelock::cancelTransaction: Call must come from admin.");
+      execute(timelock.connect(alice).cancelTransaction, timelockTx)
+    ).to.be.revertedWith("Call must come from admin");
 
     // The admin can cancel transactions
-    await execute(timelock.connect(alice).cancelTransaction, timelockTx);
+    await execute(timelock.connect(admin).cancelTransaction, timelockTx);
 
     // Cannot execute a cancelled transaction
     await expect(
-      execute(timelock.connect(alice).executeTransaction, timelockTx)
-    ).to.be.revertedWith("Timelock::executeTransaction: Transaction hasn't been queued.");
+      execute(timelock.connect(admin).executeTransaction, timelockTx)
+    ).to.be.revertedWith("Transaction hasn't been queued");
   });
 
-  it("properly handles executing transactions", async () => {
+  it("execute transactions", async () => {
     const newDelay = TIMELOCK_DELAY.add(1);
     const timelockTx: TimelockTx = {
       target: timelock.address,
@@ -113,18 +112,18 @@ describe("Timelock", () => {
     };
 
     // Queue transaction
-    await execute(timelock.connect(alice).queueTransaction, timelockTx)
+    await execute(timelock.connect(admin).queueTransaction, timelockTx)
 
     // Fast forward until after the transaction's timelock
     await mineBlock(timelockTx.eta.add(1));
 
     // Only the admin can execute transactions
     await expect(
-      execute(timelock.connect(bob).executeTransaction, timelockTx)
-    ).to.be.revertedWith("Timelock::executeTransaction: Call must come from admin.");
+      execute(timelock.connect(alice).executeTransaction, timelockTx)
+    ).to.be.revertedWith("Call must come from admin");
 
     // The admin can execute transactions
-    await execute(timelock.connect(alice).executeTransaction, timelockTx);
+    await execute(timelock.connect(admin).executeTransaction, timelockTx);
 
     // The transaction was indeed executed
     expect(await timelock.delay()).to.eq(newDelay);
@@ -141,24 +140,24 @@ describe("Timelock", () => {
 
     // The transaction's eta must satisfy the Timelock's execution delay
     await expect(
-      execute(timelock.connect(alice).queueTransaction, timelockTx)
-    ).to.be.revertedWith("Timelock::queueTransaction: Estimated execution block must satisfy delay.");
+      execute(timelock.connect(admin).queueTransaction, timelockTx)
+    ).to.be.revertedWith("Estimated execution block must satisfy delay");
 
     // Set a valid eta and queue the transaction
     timelockTx.eta = (await now()).add(TIMELOCK_DELAY).add(daysToTimestamp(1));
-    await execute(timelock.connect(alice).queueTransaction, timelockTx);
+    await execute(timelock.connect(admin).queueTransaction, timelockTx);
 
     // Cannot execute transactions that are under time lock
     await expect(
-      execute(timelock.connect(alice).executeTransaction, timelockTx)
-    ).to.be.revertedWith("Timelock::executeTransaction: Transaction hasn't surpassed time lock.");
+      execute(timelock.connect(admin).executeTransaction, timelockTx)
+    ).to.be.revertedWith("Transaction hasn't surpassed time lock");
 
     // Fast forward until after the grace period for executing the transaction
     await mineBlock(timelockTx.eta.add(await timelock.GRACE_PERIOD()).add(1));
 
     // Cannot execute transactions that have surpassed the execution period
     await expect(
-      execute(timelock.connect(alice).executeTransaction, timelockTx)
-    ).to.be.revertedWith("Timelock::executeTransaction: Transaction is stale.");
+      execute(timelock.connect(admin).executeTransaction, timelockTx)
+    ).to.be.revertedWith("Transaction is stale");
   });
 });
