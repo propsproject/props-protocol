@@ -137,6 +137,7 @@ contract Timelock {
             callData = abi.encodePacked(bytes4(keccak256(bytes(signature))), data);
         }
 
+        // solhint-disable-next-line avoid-low-level-calls
         (bool success, bytes memory returnData) = target.call{value: value}(callData);
         require(success, "Transaction execution reverted");
 

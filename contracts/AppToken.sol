@@ -6,12 +6,6 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 
-// TODOs:
-// - implement `permit`
-// - implement `recover`
-// - handle non-overridable `totalSupply`
-// - add events
-
 contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
     using SafeMathUpgradeable for uint256;
 
@@ -22,12 +16,11 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
     uint256 public inflationRateChangeDelay;
     // Denoted in tokens/second
     uint256 public inflationRate;
+    uint256 public pendingInflationRate;
 
     // Denoted as timestamp
-    uint256 private lastMint;
-    // Denoted as timestamp
-    uint256 private lastInflationRateChange;
-    uint256 private pendingInflationRate;
+    uint256 private _lastMint;
+    uint256 private _lastInflationRateChange;
 
     /**
      * @param _name The name of the app token
@@ -54,22 +47,22 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
         propsTreasuryMintPercentage = 50000;
         inflationRateChangeDelay = 7 days;
 
-        // Initial token mint
+        // Initial mint
         uint256 propsTreasuryAmount = _amount.mul(propsTreasuryMintPercentage).div(1e6);
         uint256 ownerAmount = _amount.sub(propsTreasuryAmount);
 
         _mint(propsTreasury, propsTreasuryAmount);
         _mint(super.owner(), ownerAmount);
 
-        lastMint = block.timestamp;
+        _lastMint = block.timestamp;
     }
 
     function mint() public onlyOwner {
-        if (block.timestamp.sub(lastInflationRateChange) > inflationRateChangeDelay) {
+        if (block.timestamp.sub(_lastInflationRateChange) > inflationRateChangeDelay) {
             inflationRate = pendingInflationRate;
         }
 
-        uint256 amount = inflationRate.mul(block.timestamp.sub(lastMint));
+        uint256 amount = inflationRate.mul(block.timestamp.sub(_lastMint));
         if (amount != 0) {
             uint256 propsTreasuryAmount = amount.mul(propsTreasuryMintPercentage).div(1e6);
             uint256 ownerAmount = amount.sub(propsTreasuryAmount);
@@ -77,20 +70,27 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
             _mint(propsTreasury, propsTreasuryAmount);
             _mint(super.owner(), ownerAmount);
 
-            lastMint = block.timestamp;
+            _lastMint = block.timestamp;
         }
     }
 
     function changeInflationRate(uint256 _inflationRate) public onlyOwner {
         pendingInflationRate = _inflationRate;
-        lastInflationRateChange = block.timestamp;
+        _lastInflationRateChange = block.timestamp;
     }
 
     function getTotalSupply() public view returns (uint256) {
-        return super.totalSupply().add(block.timestamp.sub(lastMint).mul(inflationRate));
+        return super.totalSupply().add(block.timestamp.sub(_lastMint).mul(inflationRate));
     }
 
-    // OZ's ERC20 `totalSupply()` function is not virtual so it can't be overriden
+    // TODO Implement `permit`
+
+    // TODO Implement `recover`
+
+    // TODO Add events
+
+    // TODO Handle non-overridable `totalSupply`
+    // OZ's ERC20 `totalSupply` function is not virtual so it can't be overriden
     // function totalSupply() public override view returns (uint256) {
     //     return super.totalSupply().add(block.timestamp.sub(lastMint).mul(inflationRate));
     // }

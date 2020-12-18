@@ -10,15 +10,19 @@ contract GovernorAlpha {
     using SafeMathUpgradeable for uint256;
 
     /// @notice The name of this contract
-    string public constant name = "Props Governor Alpha";
+    function name() public pure returns (string memory) {
+        return "Props Governor Alpha";
+    }
 
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
     function quorumVotes() public view returns (uint256) {
+        // TODO Handle non-fixed total supply of sProps
         return sProps.totalSupply() / 25;
     } // 4% of supply
 
     /// @notice The number of votes required in order for a voter to become a proposer
     function proposalThreshold() public view returns (uint256) {
+        // TODO Handle non-fixed total supply of sProps
         return sProps.totalSupply() / 100;
     } // 1% of supply
 
@@ -341,7 +345,7 @@ contract GovernorAlpha {
     ) public {
         bytes32 domainSeparator =
             keccak256(
-                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), getChainId(), address(this))
+                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name())), getChainId(), address(this))
             );
         bytes32 structHash = keccak256(abi.encode(BALLOT_TYPEHASH, proposalId, support));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
@@ -384,9 +388,10 @@ contract GovernorAlpha {
 }
 
 interface TimelockInterface {
-    function delay() external view returns (uint256);
-
+    // solhint-disable-next-line func-name-mixedcase
     function GRACE_PERIOD() external view returns (uint256);
+
+    function delay() external view returns (uint256);
 
     function acceptAdmin() external;
 

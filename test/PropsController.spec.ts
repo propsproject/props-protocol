@@ -5,7 +5,7 @@ import { ethers } from "hardhat";
 
 import type {
   AppToken,
-  AppTokenManager,
+  PropsController,
   AppTokenStaking,
   TestErc20
 } from "../typechain";
@@ -19,14 +19,14 @@ import {
 chai.use(solidity);
 const { expect } = chai;
 
-describe("AppTokenManager", () => {
+describe("PropsController", () => {
   let propsTreasury: SignerWithAddress;
   let appTokenOwner: SignerWithAddress;
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
 
   let propsToken: TestErc20;
-  let appTokenManager: AppTokenManager;
+  let propsController: PropsController;
 
   const PROPS_TOKEN_NAME = "Props";
   const PROPS_TOKEN_SYMBOL = "Props";
@@ -41,7 +41,7 @@ describe("AppTokenManager", () => {
   const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
 
   const deployAppToken = async (): Promise<[AppToken, AppTokenStaking]> => {
-    const tx = await appTokenManager.connect(appTokenOwner)
+    const tx = await propsController.connect(appTokenOwner)
       .deployAppToken(
         APP_TOKEN_NAME,
         APP_TOKEN_SYMBOL,
@@ -53,7 +53,7 @@ describe("AppTokenManager", () => {
     const [appTokenAddress, appTokenStakingAddress, ] = await getEvent(
       await tx.wait(),
       "AppTokenDeployed(address,address,string,uint256)",
-      "AppTokenManager"
+      "PropsController"
     );
     
     return [
@@ -76,8 +76,8 @@ describe("AppTokenManager", () => {
       PROPS_TOKEN_AMOUNT
     );
 
-    appTokenManager = await deployContract<AppTokenManager>("AppTokenManager", propsTreasury);
-    await appTokenManager.connect(propsTreasury)
+    propsController = await deployContract<PropsController>("PropsController", propsTreasury);
+    await propsController.connect(propsTreasury)
       .initialize(
         propsToken.address,
         appTokenLogic.address,
@@ -89,7 +89,7 @@ describe("AppTokenManager", () => {
     const [appToken, appTokenStaking] = await deployAppToken();
 
     // Check that the staking contract was correctly associated with the app token
-    expect(await appTokenManager.appTokenToStaking(appToken.address)).to.eq(appTokenStaking.address);
+    expect(await propsController.appTokenToStaking(appToken.address)).to.eq(appTokenStaking.address);
 
     // Check basic token information
     expect(await appToken.name()).to.eq(APP_TOKEN_NAME);
@@ -111,15 +111,15 @@ describe("AppTokenManager", () => {
     // Stake
     const stakeAmount = bn(100);
     await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
-    await propsToken.connect(alice).approve(appTokenManager.address, stakeAmount);
-    await appTokenManager.connect(alice).adjustStakes([appToken.address], [stakeAmount]);
+    await propsToken.connect(alice).approve(propsController.address, stakeAmount);
+    await propsController.connect(alice).adjustStakes([appToken.address], [stakeAmount]);
 
     // Check that the Props were indeed staked in the app token staking contract
     expect(await appTokenStaking.balanceOf(alice.address)).to.eq(stakeAmount);
 
     // Rebalance
     const adjustment = bn(-70);
-    await appTokenManager.connect(alice).adjustStakes([appToken.address], [adjustment]);
+    await propsController.connect(alice).adjustStakes([appToken.address], [adjustment]);
 
     // Check that the staked amount was properly rebalanced and
     // the remaining Props are back into the staker's wallet
@@ -134,8 +134,8 @@ describe("AppTokenManager", () => {
     // Stake to two apps
     const [stakeAmount1, stakeAmount2] = [bn(100), bn(50)];
     await propsToken.connect(propsTreasury).transfer(alice.address, bn(150));
-    await propsToken.connect(alice).approve(appTokenManager.address, bn(150));
-    await appTokenManager.connect(alice).adjustStakes(
+    await propsToken.connect(alice).approve(propsController.address, bn(150));
+    await propsController.connect(alice).adjustStakes(
       [appToken1.address, appToken2.address],
       [stakeAmount1, stakeAmount2]
     );
@@ -147,8 +147,8 @@ describe("AppTokenManager", () => {
     // Rebalance
     const [adjustment1, adjustment2] = [bn(-80), bn(100)];
     await propsToken.connect(propsTreasury).transfer(alice.address, bn(20));
-    await propsToken.connect(alice).approve(appTokenManager.address, bn(20));
-    await appTokenManager.connect(alice).adjustStakes(
+    await propsToken.connect(alice).approve(propsController.address, bn(20));
+    await propsController.connect(alice).adjustStakes(
       [appToken1.address, appToken2.address],
       [adjustment1, adjustment2]
     );
@@ -166,8 +166,8 @@ describe("AppTokenManager", () => {
     // Stake to three apps
     const [stakeAmount1, stakeAmount2, stakeAmount3] = [bn(100), bn(50), bn(80)];
     await propsToken.connect(propsTreasury).transfer(alice.address, bn(230));
-    await propsToken.connect(alice).approve(appTokenManager.address, bn(230));
-    await appTokenManager.connect(alice).adjustStakes(
+    await propsToken.connect(alice).approve(propsController.address, bn(230));
+    await propsController.connect(alice).adjustStakes(
       [appToken1.address, appToken2.address, appToken3.address],
       [stakeAmount1, stakeAmount2, stakeAmount3]
     );
@@ -179,7 +179,7 @@ describe("AppTokenManager", () => {
 
     // Rebalance
     const [adjustment1, adjustment2, adjustment3] = [bn(-50), bn(-50), bn(-70)];
-    await appTokenManager.connect(alice).adjustStakes(
+    await propsController.connect(alice).adjustStakes(
       [appToken1.address, appToken2.address, appToken3.address],
       [adjustment1, adjustment2, adjustment3]
     );
@@ -197,12 +197,12 @@ describe("AppTokenManager", () => {
 
     // No approval to transfer tokens
     await expect(
-      appTokenManager.connect(alice).adjustStakes([appToken.address], [bn(100)])
+      propsController.connect(alice).adjustStakes([appToken.address], [bn(100)])
     ).to.be.reverted;
 
     // Stake amount underflow
     await expect(
-      appTokenManager.connect(alice).adjustStakes([appToken.address], [bn(-100)])
+      propsController.connect(alice).adjustStakes([appToken.address], [bn(-100)])
     ).to.be.reverted;
   });
 
@@ -212,16 +212,16 @@ describe("AppTokenManager", () => {
     // Stake
     const stakeAmount = bn(100);
     await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
-    await propsToken.connect(alice).approve(appTokenManager.address, stakeAmount);
-    await appTokenManager.connect(alice).adjustStakes([appToken.address], [stakeAmount]);
+    await propsToken.connect(alice).approve(propsController.address, stakeAmount);
+    await propsController.connect(alice).adjustStakes([appToken.address], [stakeAmount]);
 
-    expect(await appTokenManager.balanceOf(alice.address)).to.eq(stakeAmount);
+    expect(await propsController.balanceOf(alice.address)).to.eq(stakeAmount);
 
     // Rebalance
     const adjustment = bn(-70);
-    await appTokenManager.connect(alice).adjustStakes([appToken.address], [adjustment]);
+    await propsController.connect(alice).adjustStakes([appToken.address], [adjustment]);
 
-    expect(await appTokenManager.balanceOf(alice.address)).to.eq(bn(30));
+    expect(await propsController.balanceOf(alice.address)).to.eq(bn(30));
   });
 
   it("sProps are not transferrable", async () => {
@@ -230,15 +230,15 @@ describe("AppTokenManager", () => {
     // Stake
     const stakeAmount = bn(100);
     await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
-    await propsToken.connect(alice).approve(appTokenManager.address, stakeAmount);
-    await appTokenManager.connect(alice).adjustStakes([appToken.address], [stakeAmount]);
+    await propsToken.connect(alice).approve(propsController.address, stakeAmount);
+    await propsController.connect(alice).adjustStakes([appToken.address], [stakeAmount]);
 
     await expect(
-      appTokenManager.connect(alice).transfer(bob.address, stakeAmount)
+      propsController.connect(alice).transfer(bob.address, stakeAmount)
     ).to.be.revertedWith("sProps are not transferrable");
 
     await expect(
-      appTokenManager.connect(alice).approve(bob.address, stakeAmount)
+      propsController.connect(alice).approve(bob.address, stakeAmount)
     ).to.be.revertedWith("sProps are not transferrable");
   });
 });

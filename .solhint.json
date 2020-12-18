@@ -3,13 +3,15 @@
   "rules": {
     "compiler-version": "off",
     "prettier/prettier": "error",
-    "avoid-throw": "off",
-    "avoid-suicide": "error",
     "avoid-sha3": "warn",
+    "avoid-suicide": "error",
+    "avoid-throw": "off",
     "quotes": "off",
-    "reason-string": "off",
+    "max-states-count": "off",
+    "no-inline-assembly": "off",
+    "no-empty-blocks": "off",
     "not-rely-on-time": "off",
-    "no-inline-assembly": "off"
+    "reason-string": "off"
   },
   "plugins": ["prettier"]
 }

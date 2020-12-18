@@ -6,7 +6,7 @@ import { ethers } from "hardhat";
 
 import type {
   AppToken,
-  AppTokenManager,
+  PropsController,
   AppTokenStaking,
   GovernorAlpha,
   TestErc20,
@@ -35,7 +35,7 @@ describe("GovernorAlpha", () => {
   let bob: SignerWithAddress;
   
   let propsToken: TestErc20;
-  let appTokenManager: AppTokenManager;
+  let propsController: PropsController;
   let timelock: Timelock;
   let governorAlpha: GovernorAlpha;
 
@@ -57,7 +57,7 @@ describe("GovernorAlpha", () => {
   const GOVERNANCE_VOTING_PERIOD = bn(5);
 
   const deployAppToken = async (): Promise<[AppToken, AppTokenStaking]> => {
-    const tx = await appTokenManager.connect(appTokenOwner)
+    const tx = await propsController.connect(appTokenOwner)
       .deployAppToken(
         APP_TOKEN_NAME,
         APP_TOKEN_SYMBOL,
@@ -69,7 +69,7 @@ describe("GovernorAlpha", () => {
     const [appTokenAddress, appTokenStakingAddress, ] = await getEvent(
       await tx.wait(),
       "AppTokenDeployed(address,address,string,uint256)",
-      "AppTokenManager"
+      "PropsController"
     );
     
     return [
@@ -92,8 +92,8 @@ describe("GovernorAlpha", () => {
       PROPS_TOKEN_AMOUNT
     );
 
-    appTokenManager = await deployContract<AppTokenManager>("AppTokenManager", propsTreasury);
-    await appTokenManager.connect(propsTreasury)
+    propsController = await deployContract<PropsController>("PropsController", propsTreasury);
+    await propsController.connect(propsTreasury)
       .initialize(
         propsToken.address,
         appTokenLogic.address,
@@ -116,25 +116,25 @@ describe("GovernorAlpha", () => {
       "GovernorAlpha",
       governance,
       timelock.address,
-      appTokenManager.address,
+      propsController.address,
       GOVERNANCE_VOTING_DELAY,
       GOVERNANCE_VOTING_PERIOD
     );
   });
 
   it("basic governance flow", async () => {
-    const [appToken, appTokenStaking] = await deployAppToken();
+    const [appToken, ] = await deployAppToken();
 
     // Stake and get sProps
     const stakeAmount = bn(100);
     await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
-    await propsToken.connect(alice).approve(appTokenManager.address, stakeAmount);
-    await appTokenManager.connect(alice).adjustStakes([appToken.address], [stakeAmount]);
+    await propsToken.connect(alice).approve(propsController.address, stakeAmount);
+    await propsController.connect(alice).adjustStakes([appToken.address], [stakeAmount]);
 
-    expect(await appTokenManager.balanceOf(alice.address)).to.eq(stakeAmount);
+    expect(await propsController.balanceOf(alice.address)).to.eq(stakeAmount);
 
     // Delegate voting power
-    await appTokenManager.connect(alice).delegate(bob.address);
+    await propsController.connect(alice).delegate(bob.address);
 
     let tx: ContractTransaction;
 
@@ -180,7 +180,7 @@ describe("GovernorAlpha", () => {
     );
     expect(voter).to.eq(alice.address);
     expect(support).to.eq(true);
-    expect(votes).to.eq(await appTokenManager.getPriorVotes(alice.address, proposalStartBlock));
+    expect(votes).to.eq(await propsController.getPriorVotes(alice.address, proposalStartBlock));
 
     // Vote once again on proposal, this time from an account that has voting power
     tx = await governorAlpha.connect(bob).castVote(proposalId, true);
@@ -191,7 +191,7 @@ describe("GovernorAlpha", () => {
     );
     expect(voter).to.eq(bob.address);
     expect(support).to.eq(true);
-    expect(votes).to.eq(await appTokenManager.getPriorVotes(bob.address, proposalStartBlock));
+    expect(votes).to.eq(await propsController.getPriorVotes(bob.address, proposalStartBlock));
 
     // Fast forward until the start of the voting period
     await mineBlocks(proposalEndBlock - proposalStartBlock + 1);

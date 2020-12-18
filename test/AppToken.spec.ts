@@ -63,7 +63,7 @@ describe("AppToken", () => {
     await appToken.connect(appTokenOwner).changeInflationRate(bn(1));
   });
 
-  it("can handle mints according to an inflation rate", async () => {
+  it("handles mints according to an inflation rate", async () => {
     // Initially, the inflation rate is 0
     expect(await appToken.inflationRate()).to.eq(bn(0));
 

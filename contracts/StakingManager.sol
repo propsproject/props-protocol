@@ -6,8 +6,8 @@ import "@openzeppelin/contracts-upgradeable/math/SignedSafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
-import "./AppTokenStaking.sol";
 import "./SProps.sol";
+import "./staking/AppTokenStaking.sol";
 
 abstract contract StakingManager is Initializable, SProps {
     using SafeMathUpgradeable for uint256;
@@ -18,8 +18,8 @@ abstract contract StakingManager is Initializable, SProps {
     mapping(address => mapping(address => uint256)) public userStakes;
     mapping(address => uint256) public appStakes;
 
-    function __StakingManager_init(address _propsToken) public initializer {
-        SProps.__SProps_init();
+    function stakingManagerInitialize(address _propsToken) public initializer {
+        super.sPropsInitialize();
 
         propsToken = IERC20Upgradeable(_propsToken);
     }
@@ -45,7 +45,9 @@ abstract contract StakingManager is Initializable, SProps {
             propsToken.approve(address(appTokenStaking), _amounts[i]);
             appTokenStaking.stake(_account, _amounts[i]);
 
-            // TODO Also stake user sProps and app sProps
+            // TODO Stake user sProps
+
+            // TODO Stake app sProps
         }
     }
 
@@ -94,20 +96,23 @@ abstract contract StakingManager is Initializable, SProps {
 
                     // TODO Stake user sProps
 
+                    // TODO Stake app sProps
+
                     unstakedAmount = 0;
                 }
 
                 propsToken.approve(address(appTokenStaking), amountToStake);
                 appTokenStaking.stake(msg.sender, amountToStake);
-
-                // TODO Stake app sProps
             }
         }
 
         if (unstakedAmount > 0) {
-            // TODO: unstake user sProps
             propsToken.transfer(msg.sender, unstakedAmount);
             super.burn(msg.sender, unstakedAmount);
+
+            // TODO Unstake any user sProps
+
+            // TODO Unstake any app sProps
         }
     }
 }

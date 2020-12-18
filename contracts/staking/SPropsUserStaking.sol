@@ -8,16 +8,13 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
-import "./SProps.sol";
-
-// Staking contract for individual users' sProps
+// Staking contract for individual users' sProps for earning Props rewards
 contract SPropsUserStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     address public rewardsDistribution;
 
-    // TODO: Change to rProps
     IERC20Upgradeable public rewardsToken;
     IERC20Upgradeable public stakingToken;
 
@@ -104,7 +101,7 @@ contract SPropsUserStaking is Initializable, OwnableUpgradeable, ReentrancyGuard
         updateReward(account)
         updateRewardRate
     {
-        // The staked amount is the staking token (sProps) balance
+        // The staked amount is the staking token balance
         uint256 amount = stakingToken.balanceOf(account);
 
         require(amount > 0, "Cannot stake 0");
@@ -124,7 +121,7 @@ contract SPropsUserStaking is Initializable, OwnableUpgradeable, ReentrancyGuard
         nonReentrant
         updateReward(account)
     {
-        // The withdrawn amount cannot exceed the account's total balance of the staking token (sProps)
+        // The withdrawn amount cannot exceed the account's total balance of the staking token
         require(amount <= stakingToken.balanceOf(account), "Withdrawn amount overflow");
         require(amount > 0, "Cannot withdraw 0");
 
@@ -152,7 +149,7 @@ contract SPropsUserStaking is Initializable, OwnableUpgradeable, ReentrancyGuard
 
         // Rewards are only claimable after the maturity date
         require(block.timestamp.sub(_firstStakeTime[account]) > rewardsLockDuration, "No rewards");
-        
+
         uint256 stakeDuration;
         if (_exitTime[account] != 0) {
             stakeDuration = _exitTime[account].sub(_firstStakeTime[account]);
@@ -173,9 +170,9 @@ contract SPropsUserStaking is Initializable, OwnableUpgradeable, ReentrancyGuard
         _claimedRewards[account] = _claimedRewards[account].add(reward);
 
         if (reward > 0) {
-          rewardsToken.safeTransfer(account, reward);
-          // TODO Redeem rProps for Props
-          emit RewardPaid(account, reward);
+            // TODO Transfer to StakingManager and redeem Props
+            rewardsToken.safeTransfer(account, reward);
+            emit RewardPaid(account, reward);
         }
     }
 

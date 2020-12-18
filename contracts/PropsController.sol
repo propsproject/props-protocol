@@ -7,7 +7,7 @@ import "../temp-oz-contracts-for-proxy/upgradeability/ProxyFactory.sol";
 
 import "./StakingManager.sol";
 
-contract AppTokenManager is Initializable, ProxyFactory, StakingManager {
+contract PropsController is Initializable, ProxyFactory, StakingManager {
     address public appTokenImplementationContract;
     address public appTokenStakingImplementationContract;
 
@@ -25,7 +25,7 @@ contract AppTokenManager is Initializable, ProxyFactory, StakingManager {
         address _appTokenImplementationContract,
         address _appTokenStakingImplementationContract
     ) public initializer {
-        StakingManager.__StakingManager_init(_propsToken);
+        super.stakingManagerInitialize(_propsToken);
 
         appTokenImplementationContract = _appTokenImplementationContract;
         appTokenStakingImplementationContract = _appTokenStakingImplementationContract;

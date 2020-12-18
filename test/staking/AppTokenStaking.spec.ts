@@ -3,14 +3,14 @@ import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import { ethers } from "hardhat";
 
-import type { AppTokenStaking, TestErc20 } from "../typechain";
+import type { AppTokenStaking, TestErc20 } from "../../typechain";
 import {
   bn,
   daysToTimestamp,
   deployContract,
   expandTo18Decimals,
   mineBlock,
-} from "./utils";
+} from "../utils";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -26,12 +26,12 @@ describe("AppTokenStaking", () => {
   let stakingToken: TestErc20;
   let appTokenStaking: AppTokenStaking;
 
-  const REWARDS_TOKEN_NAME = "Rewards";
-  const REWARDS_TOKEN_SYMBOL = "Rewards";
+  const REWARDS_TOKEN_NAME = "AppToken";
+  const REWARDS_TOKEN_SYMBOL = "AppToken";
   const REWARDS_TOKEN_AMOUNT = expandTo18Decimals(1000);
 
-  const STAKING_TOKEN_NAME = "Staking";
-  const STAKING_TOKEN_SYMBOL = "Staking";
+  const STAKING_TOKEN_NAME = "Props";
+  const STAKING_TOKEN_SYMBOL = "Props";
   const STAKING_TOKEN_AMOUNT = expandTo18Decimals(1000);
 
   // Corresponds to 0.0003658 - taken from old Props rewards formula
@@ -70,7 +70,7 @@ describe("AppTokenStaking", () => {
   it("distributing new rewards correctly sets different parameters", async () => {
     const reward = expandTo18Decimals(100);
 
-    // Distribute rewards
+    // Distribute reward
     await rewardsToken.connect(rewardsDistribution).transfer(appTokenStaking.address, reward);
     await appTokenStaking.connect(rewardsDistribution).notifyRewardAmount(reward);
 
@@ -93,7 +93,7 @@ describe("AppTokenStaking", () => {
   it("staking adjusts the reward rate and finish time", async () => {
     const reward = expandTo18Decimals(100);
 
-    // Distribute rewards
+    // Distribute reward
     await rewardsToken.connect(rewardsDistribution).transfer(appTokenStaking.address, reward);
     await appTokenStaking.connect(rewardsDistribution).notifyRewardAmount(reward);
 
@@ -120,7 +120,7 @@ describe("AppTokenStaking", () => {
     const newRewardRate = await appTokenStaking.rewardRate();
     const newPeriodFinish = await appTokenStaking.periodFinish();
 
-    // Further staking adjusts the reward rate and updates the rewards duration
+    // Further staking adjusts the reward rate and rewards duration
     expect(newRewardRate).to.not.eq(initialRewardRate);
     expect(newPeriodFinish).to.not.eq(initialPeriodFinish);
 
@@ -135,4 +135,6 @@ describe("AppTokenStaking", () => {
     expect(await appTokenStaking.rewardRate()).to.eq(newRewardRate);
     expect(await appTokenStaking.periodFinish()).to.eq(newPeriodFinish);
   });
+
+  // TODO Add more tests for checking the perpetual rewards changes
 });

@@ -8,19 +8,19 @@ abstract contract SProps is Initializable {
     using SafeMathUpgradeable for uint256;
 
     /// @notice EIP-20 token name for this token
-    string public constant name = "sProps";
+    string private _name = "sProps";
 
     /// @notice EIP-20 token symbol for this token
-    string public constant symbol = "sProps";
+    string private _symbol = "sProps";
 
     /// @notice EIP-20 token decimals for this token
-    uint8 public constant decimals = 18;
+    uint8 private _decimals = 18;
 
     /// @notice Total number of tokens in circulation
-    uint256 public totalSupply;
+    uint256 private _totalSupply;
 
     /// @notice Official record of token balances for each account
-    mapping(address => uint96) internal balances;
+    mapping(address => uint96) internal _balances;
 
     /// @notice A record of each accounts delegate
     mapping(address => address) public delegates;
@@ -71,8 +71,28 @@ abstract contract SProps is Initializable {
     /// @notice The standard EIP-20 transfer event
     event Transfer(address indexed from, address indexed to, uint256 amount);
 
-    function __SProps_init() public initializer {
+    function sPropsInitialize() public initializer {
         // Nothing to initialize
+    }
+
+    /// @notice EIP-20 token name for this token
+    function name() public view returns (string memory) {
+        return _name;
+    }
+
+    /// @notice EIP-20 token symbol for this token
+    function symbol() public view returns (string memory) {
+        return _symbol;
+    }
+
+    /// @notice EIP-20 token decimals for this token
+    function decimals() public view returns (uint8) {
+        return _decimals;
+    }
+
+    /// @notice Total number of tokens in circulation
+    function totalSupply() public view returns (uint256) {
+        return _totalSupply;
     }
 
     /**
@@ -85,10 +105,10 @@ abstract contract SProps is Initializable {
 
         // Mint the amount
         uint96 amount = safe96(rawAmount, "Amount exceeds 96 bits");
-        totalSupply = safe96(totalSupply.add(amount), "totalSupply exceeds 96 bits");
+        _totalSupply = safe96(_totalSupply.add(amount), "totalSupply exceeds 96 bits");
 
         // Transfer the amount to the destination account
-        balances[dst] = add96(balances[dst], amount, "Mint amount overflows");
+        _balances[dst] = add96(_balances[dst], amount, "Mint amount overflows");
         emit Transfer(address(0), dst, amount);
 
         // Move delegates
@@ -105,10 +125,10 @@ abstract contract SProps is Initializable {
 
         // Burn the amount
         uint96 amount = safe96(rawAmount, "Amount exceeds 96 bits");
-        totalSupply = safe96(totalSupply.sub(amount), "totalSupply exceeds 96 bits");
+        _totalSupply = safe96(_totalSupply.sub(amount), "totalSupply exceeds 96 bits");
 
         // Transfer the amount from the source account
-        balances[src] = sub96(balances[src], amount, "Transfer amount overflows");
+        _balances[src] = sub96(_balances[src], amount, "Transfer amount overflows");
         emit Transfer(src, address(0), amount);
 
         // Move delegates
@@ -121,18 +141,18 @@ abstract contract SProps is Initializable {
      * @return The number of tokens held
      */
     function balanceOf(address account) external view returns (uint256) {
-        return balances[account];
+        return _balances[account];
     }
 
-    function allowance(address, address) external view returns (uint256) {
+    function allowance(address, address) external pure returns (uint256) {
         revert("sProps are not transferrable");
     }
 
-    function approve(address, uint256) external returns (bool) {
+    function approve(address, uint256) external pure returns (bool) {
         revert("sProps are not transferrable");
     }
 
-    function transfer(address, uint256) external returns (bool) {
+    function transfer(address, uint256) external pure returns (bool) {
         revert("sProps are not transferrable");
     }
 
@@ -140,7 +160,7 @@ abstract contract SProps is Initializable {
         address,
         address,
         uint256
-    ) external returns (bool) {
+    ) external pure returns (bool) {
         revert("sProps are not transferrable");
     }
 
@@ -171,7 +191,7 @@ abstract contract SProps is Initializable {
     ) public {
         bytes32 domainSeparator =
             keccak256(
-                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), getChainId(), address(this))
+                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name())), getChainId(), address(this))
             );
         bytes32 structHash = keccak256(abi.encode(DELEGATION_TYPEHASH, delegatee, nonce, expiry));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
@@ -235,8 +255,10 @@ abstract contract SProps is Initializable {
     }
 
     function _delegate(address delegator, address delegatee) internal {
+        // TODO The rProps rewards should also count towards governance
+
         address currentDelegate = delegates[delegator];
-        uint96 delegatorBalance = balances[delegator];
+        uint96 delegatorBalance = _balances[delegator];
         delegates[delegator] = delegatee;
 
         emit DelegateChanged(delegator, currentDelegate, delegatee);

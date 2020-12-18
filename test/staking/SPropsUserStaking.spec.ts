@@ -6,7 +6,7 @@ import { ethers } from "hardhat";
 import type {
   TestErc20,
   SPropsUserStaking
-} from "../typechain";
+} from "../../typechain";
 import {
   bn,
   daysToTimestamp,
@@ -14,7 +14,7 @@ import {
   expandTo18Decimals,
   mineBlock,
   now,
-} from "./utils";
+} from "../utils";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -23,8 +23,6 @@ describe("SPropsUserStaking", () => {
   let stakingManager: SignerWithAddress;
   let rewardsDistribution: SignerWithAddress;
   let alice: SignerWithAddress;
-  let bob: SignerWithAddress;
-  let carol: SignerWithAddress;
   
   let rewardsToken: TestErc20;
   let stakingToken: TestErc20;
@@ -44,7 +42,7 @@ describe("SPropsUserStaking", () => {
   const REWARDS_LOCK_DURATION = daysToTimestamp(365);
 
   beforeEach(async () => {
-    [stakingManager, rewardsDistribution, alice, bob, carol, ] = await ethers.getSigners();
+    [stakingManager, rewardsDistribution, alice, ] = await ethers.getSigners();
 
     rewardsToken = await deployContract<TestErc20>(
       "TestERC20",
