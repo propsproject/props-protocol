@@ -6,8 +6,7 @@ import "@openzeppelin/contracts-upgradeable/math/SignedSafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
-import "./interfaces/IStaking.sol";
-
+import "./AppTokenStaking.sol";
 import "./SProps.sol";
 
 abstract contract StakingManager is Initializable, SProps {
@@ -33,7 +32,7 @@ abstract contract StakingManager is Initializable, SProps {
         for (uint256 i = 0; i < _appTokens.length; i++) {
             require(appTokenToStaking[_appTokens[i]] != address(0), "Invalid app token");
 
-            IStaking appTokenStaking = IStaking(appTokenToStaking[_appTokens[i]]);
+            AppTokenStaking appTokenStaking = AppTokenStaking(appTokenToStaking[_appTokens[i]]);
 
             userStakes[msg.sender][_appTokens[i]] = userStakes[msg.sender][_appTokens[i]].add(
                 _amounts[i]
@@ -57,7 +56,7 @@ abstract contract StakingManager is Initializable, SProps {
         for (uint256 i = 0; i < _appTokens.length; i++) {
             require(appTokenToStaking[_appTokens[i]] != address(0), "Invalid app token");
 
-            IStaking appTokenStaking = IStaking(appTokenToStaking[_appTokens[i]]);
+            AppTokenStaking appTokenStaking = AppTokenStaking(appTokenToStaking[_appTokens[i]]);
             if (_amounts[i] < 0) {
                 uint256 amountToUnstake = uint256(SignedSafeMathUpgradeable.mul(_amounts[i], -1));
 
@@ -67,14 +66,14 @@ abstract contract StakingManager is Initializable, SProps {
                 );
                 appStakes[_appTokens[i]] = appStakes[_appTokens[i]].sub(amountToUnstake);
 
-                // TODO Also unstake user sProps and app sProps
+                // TODO Unstake app sProps
 
                 unstakedAmount = unstakedAmount.add(amountToUnstake);
             }
         }
 
         for (uint256 i = 0; i < _appTokens.length; i++) {
-            IStaking appTokenStaking = IStaking(appTokenToStaking[_appTokens[i]]);
+            AppTokenStaking appTokenStaking = AppTokenStaking(appTokenToStaking[_appTokens[i]]);
             if (_amounts[i] > 0) {
                 uint256 amountToStake = uint256(_amounts[i]);
 
@@ -93,17 +92,20 @@ abstract contract StakingManager is Initializable, SProps {
                     );
                     super.mint(msg.sender, amountToStake.sub(unstakedAmount));
 
+                    // TODO Stake user sProps
+
                     unstakedAmount = 0;
                 }
 
                 propsToken.approve(address(appTokenStaking), amountToStake);
                 appTokenStaking.stake(msg.sender, amountToStake);
 
-                // TODO Also stake user sProps and app sProps
+                // TODO Stake app sProps
             }
         }
 
         if (unstakedAmount > 0) {
+            // TODO: unstake user sProps
             propsToken.transfer(msg.sender, unstakedAmount);
             super.burn(msg.sender, unstakedAmount);
         }

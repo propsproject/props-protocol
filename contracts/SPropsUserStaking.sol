@@ -8,12 +8,16 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
-contract AppTokenStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+import "./SProps.sol";
+
+// Staking contract for individual users' sProps
+contract SPropsUserStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     address public rewardsDistribution;
 
+    // TODO: Change to rProps
     IERC20Upgradeable public rewardsToken;
     IERC20Upgradeable public stakingToken;
 
@@ -23,9 +27,14 @@ contract AppTokenStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUp
     uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
     uint256 public lastStakeTime;
+    uint256 public rewardsLockDuration;
 
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
+
+    mapping(address => uint256) private _firstStakeTime;
+    mapping(address => uint256) private _exitTime;
+    mapping(address => uint256) private _claimedRewards;
 
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
@@ -39,7 +48,8 @@ contract AppTokenStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUp
         address _rewardsDistribution,
         address _rewardsToken,
         address _stakingToken,
-        uint256 _dailyRewardsEmission
+        uint256 _dailyRewardsEmission,
+        uint256 _rewardsLockDuration
     ) public initializer {
         OwnableUpgradeable.__Ownable_init();
         ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
@@ -48,6 +58,7 @@ contract AppTokenStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUp
         rewardsToken = IERC20Upgradeable(_rewardsToken);
         stakingToken = IERC20Upgradeable(_stakingToken);
         rewardsDuration = uint256(1e18).div(_dailyRewardsEmission).mul(1 days);
+        rewardsLockDuration = _rewardsLockDuration;
     }
 
     function totalSupply() external view returns (uint256) {
@@ -86,17 +97,24 @@ contract AppTokenStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUp
         return rewardRate.mul(rewardsDuration);
     }
 
-    function stake(address account, uint256 amount)
+    function stake(address account)
         external
         onlyOwner
         nonReentrant
         updateReward(account)
         updateRewardRate
     {
+        // The staked amount is the staking token (sProps) balance
+        uint256 amount = stakingToken.balanceOf(account);
+
         require(amount > 0, "Cannot stake 0");
+        // Once fully exiting staking there is no way to get back in via the same address
+        require(_firstStakeTime[account] == 0, "Cannot reenter staking");
+
         _totalSupply = _totalSupply.add(amount);
         _balances[account] = _balances[account].add(amount);
-        stakingToken.safeTransferFrom(super.owner(), address(this), amount);
+        _firstStakeTime[account] = block.timestamp;
+
         emit Staked(account, amount);
     }
 
@@ -106,19 +124,58 @@ contract AppTokenStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUp
         nonReentrant
         updateReward(account)
     {
+        // The withdrawn amount cannot exceed the account's total balance of the staking token (sProps)
+        require(amount <= stakingToken.balanceOf(account), "Withdrawn amount overflow");
         require(amount > 0, "Cannot withdraw 0");
+
         _totalSupply = _totalSupply.sub(amount);
         _balances[account] = _balances[account].sub(amount);
-        stakingToken.safeTransfer(super.owner(), amount);
+        // Check if this is a full exit from staking
+        if (_balances[account] == 0) {
+            _exitTime[account] = block.timestamp;
+        }
+
         emit Withdrawn(account, amount);
     }
 
     function getReward(address account) external onlyOwner nonReentrant updateReward(account) {
-        uint256 reward = rewards[account];
+        // Cannot earn any rewards without staking first
+        require(_firstStakeTime[account] != 0, "No staking");
+
+        if (_exitTime[account] != 0) {
+            // No rewards are given if fully exiting before the maturity date
+            require(
+                _exitTime[account].sub(_firstStakeTime[account]) > rewardsLockDuration,
+                "No rewards"
+            );
+        }
+
+        // Rewards are only claimable after the maturity date
+        require(block.timestamp.sub(_firstStakeTime[account]) > rewardsLockDuration, "No rewards");
+        
+        uint256 stakeDuration;
+        if (_exitTime[account] != 0) {
+            stakeDuration = _exitTime[account].sub(_firstStakeTime[account]);
+        } else {
+            stakeDuration = block.timestamp.sub(_firstStakeTime[account]);
+        }
+
+        uint256 availableRewards =
+            MathUpgradeable
+                .min(
+                stakeDuration,
+                block.timestamp.sub(_firstStakeTime[account].add(rewardsLockDuration))
+            )
+                .div(stakeDuration)
+                .mul(rewards[account]);
+
+        uint256 reward = availableRewards.sub(_claimedRewards[account]);
+        _claimedRewards[account] = _claimedRewards[account].add(reward);
+
         if (reward > 0) {
-            rewards[account] = 0;
-            rewardsToken.safeTransfer(account, reward);
-            emit RewardPaid(account, reward);
+          rewardsToken.safeTransfer(account, reward);
+          // TODO Redeem rProps for Props
+          emit RewardPaid(account, reward);
         }
     }
 
