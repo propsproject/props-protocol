@@ -1,22 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.0;
 
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
-abstract contract SProps is Initializable {
+contract SPropsUserToken is Initializable, OwnableUpgradeable {
     using SafeMathUpgradeable for uint256;
 
-    /// @notice EIP-20 token name for this token
-    string private _name = "sProps";
-
-    /// @notice EIP-20 token symbol for this token
-    string private _symbol = "sProps";
-
-    /// @notice EIP-20 token decimals for this token
-    uint8 private _decimals = 18;
-
-    /// @notice Total number of tokens in circulation
+    string private _name;
+    string private _symbol;
+    uint8 private _decimals;
     uint256 private _totalSupply;
 
     /// @notice Official record of token balances for each account
@@ -45,12 +39,6 @@ abstract contract SProps is Initializable {
     bytes32 public constant DELEGATION_TYPEHASH =
         keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)");
 
-    /// @notice The EIP-712 typehash for the permit struct used by the contract
-    bytes32 public constant PERMIT_TYPEHASH =
-        keccak256(
-            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-        );
-
     /// @notice A record of states for signing / validating signatures
     mapping(address => uint256) public nonces;
 
@@ -71,8 +59,13 @@ abstract contract SProps is Initializable {
     /// @notice The standard EIP-20 transfer event
     event Transfer(address indexed from, address indexed to, uint256 amount);
 
-    function sPropsInitialize() public initializer {
-        // Nothing to initialize
+    function initialize() public initializer {
+        OwnableUpgradeable.__Ownable_init();
+
+        _name = "sPropsUser";
+        _symbol = "sPropsUser";
+        _decimals = 18;
+        _totalSupply = 0;
     }
 
     /// @notice EIP-20 token name for this token
@@ -90,7 +83,7 @@ abstract contract SProps is Initializable {
         return _decimals;
     }
 
-    /// @notice Total number of tokens in circulation
+    /// @notice EIP-20 total token supply for this token
     function totalSupply() public view returns (uint256) {
         return _totalSupply;
     }
@@ -100,7 +93,7 @@ abstract contract SProps is Initializable {
      * @param dst The address of the destination account
      * @param rawAmount The number of tokens to be minted
      */
-    function mint(address dst, uint256 rawAmount) internal {
+    function mint(address dst, uint256 rawAmount) public onlyOwner {
         require(dst != address(0), "Cannot mint to the zero address");
 
         // Mint the amount
@@ -120,7 +113,7 @@ abstract contract SProps is Initializable {
      * @param src The address of the source account
      * @param rawAmount The number of tokens to be burned
      */
-    function burn(address src, uint256 rawAmount) internal {
+    function burn(address src, uint256 rawAmount) public onlyOwner {
         require(src != address(0), "Cannot burn from the zero address");
 
         // Burn the amount
@@ -145,15 +138,15 @@ abstract contract SProps is Initializable {
     }
 
     function allowance(address, address) external pure returns (uint256) {
-        revert("sProps are not transferrable");
+        revert("sPropsUser are not transferrable");
     }
 
     function approve(address, uint256) external pure returns (bool) {
-        revert("sProps are not transferrable");
+        revert("sPropsUser are not transferrable");
     }
 
     function transfer(address, uint256) external pure returns (bool) {
-        revert("sProps are not transferrable");
+        revert("sPropsUser are not transferrable");
     }
 
     function transferFrom(
@@ -161,7 +154,7 @@ abstract contract SProps is Initializable {
         address,
         uint256
     ) external pure returns (bool) {
-        revert("sProps are not transferrable");
+        revert("sPropsUser are not transferrable");
     }
 
     /**

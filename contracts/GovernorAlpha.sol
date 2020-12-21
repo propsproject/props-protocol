@@ -4,7 +4,7 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 
-import "./SProps.sol";
+import "./SPropsUserToken.sol";
 
 contract GovernorAlpha {
     using SafeMathUpgradeable for uint256;
@@ -16,14 +16,14 @@ contract GovernorAlpha {
 
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
     function quorumVotes() public view returns (uint256) {
-        // TODO Handle non-fixed total supply of sProps
-        return sProps.totalSupply() / 25;
+        // TODO Handle non-fixed total supply of user sProps
+        return sPropsUserToken.totalSupply() / 25;
     } // 4% of supply
 
     /// @notice The number of votes required in order for a voter to become a proposer
     function proposalThreshold() public view returns (uint256) {
-        // TODO Handle non-fixed total supply of sProps
-        return sProps.totalSupply() / 100;
+        // TODO Handle non-fixed total supply of user sProps
+        return sPropsUserToken.totalSupply() / 100;
     } // 1% of supply
 
     /// @notice The maximum number of actions that can be included in a proposal
@@ -40,8 +40,8 @@ contract GovernorAlpha {
     /// @notice The address of the Props Protocol Timelock
     TimelockInterface public timelock;
 
-    /// @notice The address of the sProps governance token
-    SProps public sProps;
+    /// @notice The address of the user sProps governance token
+    SPropsUserToken public sPropsUserToken;
 
     /// @notice The total number of proposals
     uint256 public proposalCount;
@@ -130,12 +130,12 @@ contract GovernorAlpha {
 
     constructor(
         address timelock_,
-        address sProps_,
+        address sPropsUserToken_,
         uint256 votingDelay_,
         uint256 votingPeriod_
     ) public {
         timelock = TimelockInterface(timelock_);
-        sProps = SProps(sProps_);
+        sPropsUserToken = SPropsUserToken(sPropsUserToken_);
         votingDelay = votingDelay_;
         votingPeriod = votingPeriod_;
     }
@@ -148,7 +148,7 @@ contract GovernorAlpha {
         string memory description
     ) public returns (uint256) {
         require(
-            sProps.getPriorVotes(msg.sender, block.number.sub(1)) > proposalThreshold(),
+            sPropsUserToken.getPriorVotes(msg.sender, block.number.sub(1)) > proposalThreshold(),
             "Proposer votes below proposal threshold"
         );
         require(
@@ -272,7 +272,7 @@ contract GovernorAlpha {
 
         Proposal storage proposal = proposals[proposalId];
         require(
-            sProps.getPriorVotes(proposal.proposer, block.number.sub(1)) < proposalThreshold(),
+            sPropsUserToken.getPriorVotes(proposal.proposer, block.number.sub(1)) < proposalThreshold(),
             "Proposer above threshold"
         );
 
@@ -363,7 +363,7 @@ contract GovernorAlpha {
         Proposal storage proposal = proposals[proposalId];
         Receipt storage receipt = proposal.receipts[voter];
         require(receipt.hasVoted == false, "Voter already voted");
-        uint256 votes = sProps.getPriorVotes(voter, proposal.startBlock);
+        uint256 votes = sPropsUserToken.getPriorVotes(voter, proposal.startBlock);
 
         if (support) {
             proposal.forVotes = proposal.forVotes.add(votes);

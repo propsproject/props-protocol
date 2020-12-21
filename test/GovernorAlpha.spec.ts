@@ -10,7 +10,8 @@ import type {
   AppTokenStaking,
   GovernorAlpha,
   TestErc20,
-  Timelock
+  Timelock,
+  SPropsUserToken
 } from "../typechain";
 import {
   bn,
@@ -36,6 +37,7 @@ describe("GovernorAlpha", () => {
   
   let propsToken: TestErc20;
   let propsController: PropsController;
+  let sPropsUserToken: SPropsUserToken;
   let timelock: Timelock;
   let governorAlpha: GovernorAlpha;
 
@@ -100,6 +102,10 @@ describe("GovernorAlpha", () => {
         appTokenStakingLogic.address
       );
 
+    sPropsUserToken =
+      (await ethers.getContractFactory("SPropsUserToken"))
+        .attach(await propsController.sPropsUserToken()) as SPropsUserToken;
+
     const governorAlphaAddress = getFutureAddress(
       governance.address,
       (await governance.getTransactionCount()) + 1
@@ -116,7 +122,7 @@ describe("GovernorAlpha", () => {
       "GovernorAlpha",
       governance,
       timelock.address,
-      propsController.address,
+      sPropsUserToken.address,
       GOVERNANCE_VOTING_DELAY,
       GOVERNANCE_VOTING_PERIOD
     );
@@ -129,12 +135,12 @@ describe("GovernorAlpha", () => {
     const stakeAmount = bn(100);
     await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
     await propsToken.connect(alice).approve(propsController.address, stakeAmount);
-    await propsController.connect(alice).adjustStakes([appToken.address], [stakeAmount]);
+    await propsController.connect(alice).stake([appToken.address], [stakeAmount]);
 
-    expect(await propsController.balanceOf(alice.address)).to.eq(stakeAmount);
+    expect(await sPropsUserToken.balanceOf(alice.address)).to.eq(stakeAmount);
 
     // Delegate voting power
-    await propsController.connect(alice).delegate(bob.address);
+    await sPropsUserToken.connect(alice).delegate(bob.address);
 
     let tx: ContractTransaction;
 
@@ -180,7 +186,7 @@ describe("GovernorAlpha", () => {
     );
     expect(voter).to.eq(alice.address);
     expect(support).to.eq(true);
-    expect(votes).to.eq(await propsController.getPriorVotes(alice.address, proposalStartBlock));
+    expect(votes).to.eq(await sPropsUserToken.getPriorVotes(alice.address, proposalStartBlock));
 
     // Vote once again on proposal, this time from an account that has voting power
     tx = await governorAlpha.connect(bob).castVote(proposalId, true);
@@ -191,7 +197,7 @@ describe("GovernorAlpha", () => {
     );
     expect(voter).to.eq(bob.address);
     expect(support).to.eq(true);
-    expect(votes).to.eq(await propsController.getPriorVotes(bob.address, proposalStartBlock));
+    expect(votes).to.eq(await sPropsUserToken.getPriorVotes(bob.address, proposalStartBlock));
 
     // Fast forward until the start of the voting period
     await mineBlocks(proposalEndBlock - proposalStartBlock + 1);

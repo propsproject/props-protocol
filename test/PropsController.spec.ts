@@ -7,7 +7,9 @@ import type {
   AppToken,
   PropsController,
   AppTokenStaking,
-  TestErc20
+  TestErc20,
+  SPropsUserToken,
+  SPropsAppToken
 } from "../typechain";
 import {
   bn,
@@ -112,14 +114,14 @@ describe("PropsController", () => {
     const stakeAmount = bn(100);
     await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
     await propsToken.connect(alice).approve(propsController.address, stakeAmount);
-    await propsController.connect(alice).adjustStakes([appToken.address], [stakeAmount]);
+    await propsController.connect(alice).stake([appToken.address], [stakeAmount]);
 
     // Check that the Props were indeed staked in the app token staking contract
     expect(await appTokenStaking.balanceOf(alice.address)).to.eq(stakeAmount);
 
     // Rebalance
     const adjustment = bn(-70);
-    await propsController.connect(alice).adjustStakes([appToken.address], [adjustment]);
+    await propsController.connect(alice).stake([appToken.address], [adjustment]);
 
     // Check that the staked amount was properly rebalanced and
     // the remaining Props are back into the staker's wallet
@@ -135,7 +137,7 @@ describe("PropsController", () => {
     const [stakeAmount1, stakeAmount2] = [bn(100), bn(50)];
     await propsToken.connect(propsTreasury).transfer(alice.address, bn(150));
     await propsToken.connect(alice).approve(propsController.address, bn(150));
-    await propsController.connect(alice).adjustStakes(
+    await propsController.connect(alice).stake(
       [appToken1.address, appToken2.address],
       [stakeAmount1, stakeAmount2]
     );
@@ -148,7 +150,7 @@ describe("PropsController", () => {
     const [adjustment1, adjustment2] = [bn(-80), bn(100)];
     await propsToken.connect(propsTreasury).transfer(alice.address, bn(20));
     await propsToken.connect(alice).approve(propsController.address, bn(20));
-    await propsController.connect(alice).adjustStakes(
+    await propsController.connect(alice).stake(
       [appToken1.address, appToken2.address],
       [adjustment1, adjustment2]
     );
@@ -167,7 +169,7 @@ describe("PropsController", () => {
     const [stakeAmount1, stakeAmount2, stakeAmount3] = [bn(100), bn(50), bn(80)];
     await propsToken.connect(propsTreasury).transfer(alice.address, bn(230));
     await propsToken.connect(alice).approve(propsController.address, bn(230));
-    await propsController.connect(alice).adjustStakes(
+    await propsController.connect(alice).stake(
       [appToken1.address, appToken2.address, appToken3.address],
       [stakeAmount1, stakeAmount2, stakeAmount3]
     );
@@ -179,7 +181,7 @@ describe("PropsController", () => {
 
     // Rebalance
     const [adjustment1, adjustment2, adjustment3] = [bn(-50), bn(-50), bn(-70)];
-    await propsController.connect(alice).adjustStakes(
+    await propsController.connect(alice).stake(
       [appToken1.address, appToken2.address, appToken3.address],
       [adjustment1, adjustment2, adjustment3]
     );
@@ -197,48 +199,39 @@ describe("PropsController", () => {
 
     // No approval to transfer tokens
     await expect(
-      propsController.connect(alice).adjustStakes([appToken.address], [bn(100)])
+      propsController.connect(alice).stake([appToken.address], [bn(100)])
     ).to.be.reverted;
 
     // Stake amount underflow
     await expect(
-      propsController.connect(alice).adjustStakes([appToken.address], [bn(-100)])
+      propsController.connect(alice).stake([appToken.address], [bn(-100)])
     ).to.be.reverted;
   });
 
   it("staking adjusts sProps balances", async () => {
     const [appToken, ] = await deployAppToken();
 
+    const sPropsAppToken =
+    (await ethers.getContractFactory("SPropsAppToken"))
+      .attach(await propsController.sPropsAppToken()) as SPropsAppToken;
+    const sPropsUserToken =
+      (await ethers.getContractFactory("SPropsUserToken"))
+        .attach(await propsController.sPropsUserToken()) as SPropsUserToken;
+
     // Stake
     const stakeAmount = bn(100);
     await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
     await propsToken.connect(alice).approve(propsController.address, stakeAmount);
-    await propsController.connect(alice).adjustStakes([appToken.address], [stakeAmount]);
+    await propsController.connect(alice).stake([appToken.address], [stakeAmount]);
 
-    expect(await propsController.balanceOf(alice.address)).to.eq(stakeAmount);
+    expect(await sPropsAppToken.balanceOf(appToken.address)).to.eq(stakeAmount);
+    expect(await sPropsUserToken.balanceOf(alice.address)).to.eq(stakeAmount);
 
     // Rebalance
     const adjustment = bn(-70);
-    await propsController.connect(alice).adjustStakes([appToken.address], [adjustment]);
+    await propsController.connect(alice).stake([appToken.address], [adjustment]);
 
-    expect(await propsController.balanceOf(alice.address)).to.eq(bn(30));
-  });
-
-  it("sProps are not transferrable", async () => {
-    const [appToken, ] = await deployAppToken();
-
-    // Stake
-    const stakeAmount = bn(100);
-    await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
-    await propsToken.connect(alice).approve(propsController.address, stakeAmount);
-    await propsController.connect(alice).adjustStakes([appToken.address], [stakeAmount]);
-
-    await expect(
-      propsController.connect(alice).transfer(bob.address, stakeAmount)
-    ).to.be.revertedWith("sProps are not transferrable");
-
-    await expect(
-      propsController.connect(alice).approve(bob.address, stakeAmount)
-    ).to.be.revertedWith("sProps are not transferrable");
+    expect(await sPropsAppToken.balanceOf(appToken.address)).to.eq(bn(30));
+    expect(await sPropsUserToken.balanceOf(alice.address)).to.eq(bn(30));
   });
 });

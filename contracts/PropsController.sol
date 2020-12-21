@@ -25,7 +25,7 @@ contract PropsController is Initializable, ProxyFactory, StakingManager {
         address _appTokenImplementationContract,
         address _appTokenStakingImplementationContract
     ) public initializer {
-        super.stakingManagerInitialize(_propsToken);
+        StakingManager.stakingManagerInitialize(_propsToken);
 
         appTokenImplementationContract = _appTokenImplementationContract;
         appTokenStakingImplementationContract = _appTokenStakingImplementationContract;
@@ -62,7 +62,7 @@ contract PropsController is Initializable, ProxyFactory, StakingManager {
             deployMinimal(appTokenStakingImplementationContract, appTokenStakingPayload);
 
         appTokens.push(appTokenProxy);
-        appTokenToStaking[appTokenProxy] = appTokenStakingProxy;
+        super.saveAppToken(appTokenProxy, appTokenStakingProxy);
 
         emit AppTokenDeployed(appTokenProxy, appTokenStakingProxy, _name, _amount);
 
