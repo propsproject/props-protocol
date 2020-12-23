@@ -8,29 +8,53 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
-// Staking contract for individual users' sProps for earning Props rewards
-contract SPropsUserStaking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+import "../interfaces/IStaking.sol";
+
+/**
+ * @dev The SPropsUserStaking contract is used for staking sProps and earning
+ *   rProps rewards. This particular contract is used by the StakingManager
+ *   to stake individual users' sProps in order to earn them Props rewards.
+ *   The staked amounts are implicit (that is, no staking token is actually
+ *   transferred to this contract) and fully handled by the contract's owner
+ *   (which is the StakingManager). The rewards are distributed in a perpetual
+ *   fashion, with more rewards getting distributed at the beginning of the
+ *   rewards period and then the rate is slowly decreasing. Also, the staking
+ *   rewards are escrowed and only progressively unlocked over time based on
+ *   the lock duration.
+ */
+contract SPropsUserStaking is
+    Initializable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    IStaking
+{
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
+    /// @dev The address responsible for distributing the staking rewards
     address public rewardsDistribution;
 
+    /// @dev The token the staking rewards are denominated in (this is the rProps token)
     IERC20Upgradeable public rewardsToken;
-    IERC20Upgradeable public stakingToken;
 
     uint256 public periodFinish;
     uint256 public rewardRate;
     uint256 public rewardsDuration;
     uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
+    /// @dev The most recent timestamp when a stake occured
     uint256 public lastStakeTime;
+    /// @dev The lock duration for the staking rewards
     uint256 public rewardsLockDuration;
 
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
 
-    mapping(address => uint256) private _firstStakeTime;
+    /// @dev Keeps track of the staking enter time
+    mapping(address => uint256) private _enterTime;
+    /// @dev Keeps track of the staking exit time (staking exit = unstake everything)
     mapping(address => uint256) private _exitTime;
+    /// @dev Keeps track of the amount of rewards claimed so far
     mapping(address => uint256) private _claimedRewards;
 
     uint256 private _totalSupply;
@@ -42,27 +66,31 @@ contract SPropsUserStaking is Initializable, OwnableUpgradeable, ReentrancyGuard
     event RewardPaid(address indexed user, uint256 reward);
 
     function initialize(
+        address _owner,
         address _rewardsDistribution,
         address _rewardsToken,
-        address _stakingToken,
         uint256 _dailyRewardsEmission,
         uint256 _rewardsLockDuration
     ) public initializer {
         OwnableUpgradeable.__Ownable_init();
         ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
+        // Set the proper owner
+        if (_owner != msg.sender) {
+            super.transferOwnership(_owner);
+        }
+
         rewardsDistribution = _rewardsDistribution;
         rewardsToken = IERC20Upgradeable(_rewardsToken);
-        stakingToken = IERC20Upgradeable(_stakingToken);
         rewardsDuration = uint256(1e18).div(_dailyRewardsEmission).mul(1 days);
         rewardsLockDuration = _rewardsLockDuration;
     }
 
-    function totalSupply() external view returns (uint256) {
+    function totalSupply() external view override returns (uint256) {
         return _totalSupply;
     }
 
-    function balanceOf(address account) external view returns (uint256) {
+    function balanceOf(address account) external view override returns (uint256) {
         return _balances[account];
     }
 
@@ -82,7 +110,7 @@ contract SPropsUserStaking is Initializable, OwnableUpgradeable, ReentrancyGuard
             );
     }
 
-    function earned(address account) public view returns (uint256) {
+    function earned(address account) public view override returns (uint256) {
         return
             _balances[account]
                 .mul(rewardPerToken().sub(userRewardPerTokenPaid[account]))
@@ -90,44 +118,43 @@ contract SPropsUserStaking is Initializable, OwnableUpgradeable, ReentrancyGuard
                 .add(rewards[account]);
     }
 
-    function getRewardForDuration() external view returns (uint256) {
+    function getRewardForDuration() external view override returns (uint256) {
         return rewardRate.mul(rewardsDuration);
     }
 
-    function stake(address account)
+    function stake(address account, uint256 amount)
         external
+        override
         onlyOwner
         nonReentrant
         updateReward(account)
         updateRewardRate
     {
-        // The staked amount is the staking token balance
-        uint256 amount = stakingToken.balanceOf(account);
-
         require(amount > 0, "Cannot stake 0");
-        // Once fully exiting staking there is no way to get back in via the same address
-        require(_firstStakeTime[account] == 0, "Cannot reenter staking");
 
         _totalSupply = _totalSupply.add(amount);
         _balances[account] = _balances[account].add(amount);
-        _firstStakeTime[account] = block.timestamp;
+
+        if (_enterTime[account] == 0 || _exitTime[account] != 0) {
+            _enterTime[account] = block.timestamp;
+            _exitTime[account] = 0;
+        }
 
         emit Staked(account, amount);
     }
 
     function withdraw(address account, uint256 amount)
         external
+        override
         onlyOwner
         nonReentrant
         updateReward(account)
     {
-        // The withdrawn amount cannot exceed the account's total balance of the staking token
-        require(amount <= stakingToken.balanceOf(account), "Withdrawn amount overflow");
         require(amount > 0, "Cannot withdraw 0");
 
         _totalSupply = _totalSupply.sub(amount);
         _balances[account] = _balances[account].sub(amount);
-        // Check if this is a full exit from staking
+
         if (_balances[account] == 0) {
             _exitTime[account] = block.timestamp;
         }
@@ -135,49 +162,47 @@ contract SPropsUserStaking is Initializable, OwnableUpgradeable, ReentrancyGuard
         emit Withdrawn(account, amount);
     }
 
-    function getReward(address account) external onlyOwner nonReentrant updateReward(account) {
-        // Cannot earn any rewards without staking first
-        require(_firstStakeTime[account] != 0, "No staking");
+    function getReward(address account)
+        external
+        override
+        onlyOwner
+        nonReentrant
+        updateReward(account)
+    {
+        if (
+            _enterTime[account] != 0 &&
+            block.timestamp.sub(_enterTime[account]) > rewardsLockDuration
+        ) {
+            uint256 stakeDuration;
+            if (_exitTime[account] != 0) {
+                stakeDuration = _exitTime[account].sub(_enterTime[account]);
+            } else {
+                stakeDuration = block.timestamp.sub(_enterTime[account]);
+            }
 
-        if (_exitTime[account] != 0) {
-            // No rewards are given if fully exiting before the maturity date
-            require(
-                _exitTime[account].sub(_firstStakeTime[account]) > rewardsLockDuration,
-                "No rewards"
-            );
-        }
+            uint256 availableRewards =
+                MathUpgradeable
+                    .min(
+                    stakeDuration,
+                    block.timestamp.sub(_enterTime[account].add(rewardsLockDuration))
+                )
+                    .div(stakeDuration)
+                    .mul(rewards[account]);
 
-        // Rewards are only claimable after the maturity date
-        require(block.timestamp.sub(_firstStakeTime[account]) > rewardsLockDuration, "No rewards");
+            uint256 reward = availableRewards.sub(_claimedRewards[account]);
+            _claimedRewards[account] = _claimedRewards[account].add(reward);
 
-        uint256 stakeDuration;
-        if (_exitTime[account] != 0) {
-            stakeDuration = _exitTime[account].sub(_firstStakeTime[account]);
-        } else {
-            stakeDuration = block.timestamp.sub(_firstStakeTime[account]);
-        }
-
-        uint256 availableRewards =
-            MathUpgradeable
-                .min(
-                stakeDuration,
-                block.timestamp.sub(_firstStakeTime[account].add(rewardsLockDuration))
-            )
-                .div(stakeDuration)
-                .mul(rewards[account]);
-
-        uint256 reward = availableRewards.sub(_claimedRewards[account]);
-        _claimedRewards[account] = _claimedRewards[account].add(reward);
-
-        if (reward > 0) {
-            // TODO Transfer to StakingManager and redeem Props
-            rewardsToken.safeTransfer(account, reward);
-            emit RewardPaid(account, reward);
+            if (reward > 0) {
+                // TODO Transfer and swap rProps
+                rewardsToken.transfer(account, reward);
+                emit RewardPaid(account, reward);
+            }
         }
     }
 
     function notifyRewardAmount(uint256 reward)
         external
+        override
         onlyRewardsDistribution
         updateReward(address(0))
     {

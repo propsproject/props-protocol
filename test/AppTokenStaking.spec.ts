@@ -3,14 +3,17 @@ import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import { ethers } from "hardhat";
 
-import type { AppTokenStaking, TestErc20 } from "../../typechain";
+import type {
+  AppTokenStaking,
+  TestErc20
+} from "../typechain";
 import {
   bn,
   daysToTimestamp,
   deployContract,
   expandTo18Decimals,
   mineBlock,
-} from "../utils";
+} from "./utils";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -41,25 +44,26 @@ describe("AppTokenStaking", () => {
   beforeEach(async () => {
     [stakingManager, rewardsDistribution, alice, bob, carol, ] = await ethers.getSigners();
 
-    rewardsToken = await deployContract<TestErc20>(
-      "TestERC20",
-      rewardsDistribution,
-      REWARDS_TOKEN_NAME,
-      REWARDS_TOKEN_SYMBOL,
-      REWARDS_TOKEN_AMOUNT
-    );
+    rewardsToken = await deployContract<TestErc20>("TestERC20", rewardsDistribution);
+    await rewardsToken.connect(rewardsDistribution)
+      .initialize(
+        REWARDS_TOKEN_NAME,
+        REWARDS_TOKEN_SYMBOL,
+        REWARDS_TOKEN_AMOUNT
+      );
 
-    stakingToken = await deployContract<TestErc20>(
-      "TestERC20",
-      stakingManager,
-      STAKING_TOKEN_NAME,
-      STAKING_TOKEN_SYMBOL,
-      STAKING_TOKEN_AMOUNT
-    );
+    stakingToken = await deployContract<TestErc20>("TestERC20", stakingManager);
+    await stakingToken.connect(stakingManager)
+      .initialize(
+        STAKING_TOKEN_NAME,
+        STAKING_TOKEN_SYMBOL,
+        STAKING_TOKEN_AMOUNT
+      );
 
     appTokenStaking = await deployContract("AppTokenStaking", stakingManager);
     await appTokenStaking.connect(stakingManager)
       .initialize(
+        stakingManager.address,
         rewardsDistribution.address,
         rewardsToken.address,
         stakingToken.address,

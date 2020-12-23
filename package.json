@@ -8,7 +8,7 @@
     "clean": "hardhat clean",
     "compile": "hardhat compile",
     "test": "hardhat test",
-    "coverage": "npm run build && hardhat coverage --temp artifacts --network coverage",
+    "coverage": "npm run build && hardhat coverage --network coverage  --solcoverjs ./.solcover.js",
     "solhint": "solhint -f table contracts/*.sol contract/**/*.sol",
     "prettier:solidity": "prettier --write contracts"
   },

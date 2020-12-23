@@ -9,9 +9,11 @@ import type {
   PropsController,
   AppTokenStaking,
   GovernorAlpha,
-  TestErc20,
-  Timelock,
-  SPropsUserToken
+  RPropsToken,
+  SPropsAppStaking,
+  SPropsUserStaking,
+  TestPropsToken,
+  Timelock
 } from "../typechain";
 import {
   bn,
@@ -35,14 +37,11 @@ describe("GovernorAlpha", () => {
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
   
-  let propsToken: TestErc20;
+  let propsToken: TestPropsToken;
   let propsController: PropsController;
-  let sPropsUserToken: SPropsUserToken;
   let timelock: Timelock;
   let governorAlpha: GovernorAlpha;
 
-  const PROPS_TOKEN_NAME = "Props";
-  const PROPS_TOKEN_SYMBOL = "Props";
   const PROPS_TOKEN_AMOUNT = expandTo18Decimals(1000);
 
   const APP_TOKEN_NAME = "AppToken";
@@ -52,6 +51,7 @@ describe("GovernorAlpha", () => {
   // Corresponds to 0.0003658 - taken from old Props rewards formula
   // Distributes 12.5% of the remaining rewards pool each year
   const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
+  const REWARDS_LOCK_DURATION = daysToTimestamp(365);
 
   const TIMELOCK_DELAY = daysToTimestamp(3);
 
@@ -65,7 +65,6 @@ describe("GovernorAlpha", () => {
         APP_TOKEN_SYMBOL,
         APP_TOKEN_AMOUNT,
         appTokenOwner.address,
-        propsTreasury.address,
         DAILY_REWARDS_EMISSION
       );
     const [appTokenAddress, appTokenStakingAddress, ] = await getEvent(
@@ -86,25 +85,59 @@ describe("GovernorAlpha", () => {
     const appTokenLogic = await deployContract<AppToken>("AppToken", propsTreasury);
     const appTokenStakingLogic = await deployContract<AppTokenStaking>("AppTokenStaking", propsTreasury);
 
-    propsToken = await deployContract<TestErc20>(
-      "TestERC20",
-      propsTreasury,
-      PROPS_TOKEN_NAME,
-      PROPS_TOKEN_SYMBOL,
-      PROPS_TOKEN_AMOUNT
+    propsToken = await deployContract<TestPropsToken>("TestPropsToken", propsTreasury);
+    await propsToken.connect(propsTreasury).initialize(PROPS_TOKEN_AMOUNT);
+
+    const rPropsTokenAddress = getFutureAddress(
+      propsTreasury.address,
+      (await propsTreasury.getTransactionCount()) + 4
     );
+
+    const propsControllerAddress = getFutureAddress(
+      propsTreasury.address,
+      (await propsTreasury.getTransactionCount()) + 6
+    );
+
+    const sPropsAppStaking = await deployContract<SPropsAppStaking>("SPropsAppStaking", propsTreasury);
+    await sPropsAppStaking.connect(propsTreasury)
+      .initialize(
+        propsControllerAddress,
+        rPropsTokenAddress,
+        rPropsTokenAddress,
+        DAILY_REWARDS_EMISSION
+      );
+
+    const sPropsUserStaking = await deployContract<SPropsUserStaking>("SPropsUserStaking", propsTreasury);
+    await sPropsUserStaking.connect(propsTreasury)
+      .initialize(
+        propsControllerAddress,
+        rPropsTokenAddress,
+        rPropsTokenAddress,
+        DAILY_REWARDS_EMISSION,
+        REWARDS_LOCK_DURATION
+      );
+
+    const rPropsToken = await deployContract<RPropsToken>("RPropsToken", propsTreasury);
+    await rPropsToken.connect(propsTreasury)
+      .initialize(
+        propsToken.address,
+        sPropsAppStaking.address,
+        bn(800000),
+        sPropsUserStaking.address,
+        bn(200000)
+      );
 
     propsController = await deployContract<PropsController>("PropsController", propsTreasury);
     await propsController.connect(propsTreasury)
       .initialize(
+        propsTreasury.address,
         propsToken.address,
+        rPropsToken.address,
+        sPropsAppStaking.address,
+        sPropsUserStaking.address,
         appTokenLogic.address,
         appTokenStakingLogic.address
       );
-
-    sPropsUserToken =
-      (await ethers.getContractFactory("SPropsUserToken"))
-        .attach(await propsController.sPropsUserToken()) as SPropsUserToken;
 
     const governorAlphaAddress = getFutureAddress(
       governance.address,
@@ -122,7 +155,7 @@ describe("GovernorAlpha", () => {
       "GovernorAlpha",
       governance,
       timelock.address,
-      sPropsUserToken.address,
+      propsController.address,
       GOVERNANCE_VOTING_DELAY,
       GOVERNANCE_VOTING_PERIOD
     );
@@ -137,10 +170,10 @@ describe("GovernorAlpha", () => {
     await propsToken.connect(alice).approve(propsController.address, stakeAmount);
     await propsController.connect(alice).stake([appToken.address], [stakeAmount]);
 
-    expect(await sPropsUserToken.balanceOf(alice.address)).to.eq(stakeAmount);
+    expect(await propsController.balanceOf(alice.address)).to.eq(stakeAmount);
 
     // Delegate voting power
-    await sPropsUserToken.connect(alice).delegate(bob.address);
+    await propsController.connect(alice).delegate(bob.address);
 
     let tx: ContractTransaction;
 
@@ -186,7 +219,7 @@ describe("GovernorAlpha", () => {
     );
     expect(voter).to.eq(alice.address);
     expect(support).to.eq(true);
-    expect(votes).to.eq(await sPropsUserToken.getPriorVotes(alice.address, proposalStartBlock));
+    expect(votes).to.eq(await propsController.getPriorVotes(alice.address, proposalStartBlock));
 
     // Vote once again on proposal, this time from an account that has voting power
     tx = await governorAlpha.connect(bob).castVote(proposalId, true);
@@ -197,7 +230,7 @@ describe("GovernorAlpha", () => {
     );
     expect(voter).to.eq(bob.address);
     expect(support).to.eq(true);
-    expect(votes).to.eq(await sPropsUserToken.getPriorVotes(bob.address, proposalStartBlock));
+    expect(votes).to.eq(await propsController.getPriorVotes(bob.address, proposalStartBlock));
 
     // Fast forward until the start of the voting period
     await mineBlocks(proposalEndBlock - proposalStartBlock + 1);

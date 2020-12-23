@@ -11,15 +11,18 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "../interfaces/IStaking.sol";
 
 /**
- * @dev The AppTokenStaking contract is responsible for allowing users
- *   to stake Props while earning rewards in their app token of choice.
- *   Each app token has a corresponding staking contract. Users are not
- *   allowed to stake/unstake/claim rewards by directly interacting with
- *   instances of this contract. Instead, the StakingManager should be
- *   the owner of all app token staking contract instances and thus all
- *   actions should be proxied by it.
+ * @dev The SPropsAppStaking contract is used for staking sProps and earning
+ *   rProps rewards. This particular contract is used by the StakingManager
+ *   to stake individual apps' sProps (given by the total amount of Props
+ *   staked to the app) in order to earn them Props rewards. The staked amounts
+ *   are implicit (that is, no staking token is actually transferred to this
+ *   contract) and fully handled by the contract's owner (which is the
+ *   StakingManager). The rewards are distributed in a perpetual fashion,
+ *   with more rewards getting distributed at the beginning of the rewards
+ *   period and then the rate is slowly decreasing. As opposed to the
+ *   SPropsUserStaking contract, here there is no lock on the staking rewards.
  */
-contract AppTokenStaking is
+contract SPropsAppStaking is
     Initializable,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
@@ -31,16 +34,15 @@ contract AppTokenStaking is
     /// @dev The address responsible for distributing the staking rewards
     address public rewardsDistribution;
 
-    /// @dev The token the staking rewards are denominated in (will be an instance of the AppToken contract)
+    /// @dev The token the staking rewards are denominated in (this is the rProps token)
     IERC20Upgradeable public rewardsToken;
-    /// @dev The token the stakes are denominated in (will be the Props token)
-    IERC20Upgradeable public stakingToken;
 
     uint256 public periodFinish;
     uint256 public rewardRate;
     uint256 public rewardsDuration;
     uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
+    /// @dev The most recent timestamp when a stake occured
     uint256 public lastStakeTime;
 
     mapping(address => uint256) public userRewardPerTokenPaid;
@@ -58,7 +60,6 @@ contract AppTokenStaking is
         address _owner,
         address _rewardsDistribution,
         address _rewardsToken,
-        address _stakingToken,
         uint256 _dailyRewardsEmission
     ) public initializer {
         OwnableUpgradeable.__Ownable_init();
@@ -71,7 +72,6 @@ contract AppTokenStaking is
 
         rewardsDistribution = _rewardsDistribution;
         rewardsToken = IERC20Upgradeable(_rewardsToken);
-        stakingToken = IERC20Upgradeable(_stakingToken);
         rewardsDuration = uint256(1e18).div(_dailyRewardsEmission).mul(1 days);
     }
 
@@ -122,7 +122,6 @@ contract AppTokenStaking is
         require(amount > 0, "Cannot stake 0");
         _totalSupply = _totalSupply.add(amount);
         _balances[account] = _balances[account].add(amount);
-        stakingToken.safeTransferFrom(super.owner(), address(this), amount);
         emit Staked(account, amount);
     }
 
@@ -136,7 +135,6 @@ contract AppTokenStaking is
         require(amount > 0, "Cannot withdraw 0");
         _totalSupply = _totalSupply.sub(amount);
         _balances[account] = _balances[account].sub(amount);
-        stakingToken.safeTransfer(super.owner(), amount);
         emit Withdrawn(account, amount);
     }
 
@@ -150,7 +148,7 @@ contract AppTokenStaking is
         uint256 reward = rewards[account];
         if (reward > 0) {
             rewards[account] = 0;
-            // TODO Transfer and swap rProps
+            rewardsToken.safeTransfer(super.owner(), reward);
             emit RewardPaid(account, reward);
         }
     }
