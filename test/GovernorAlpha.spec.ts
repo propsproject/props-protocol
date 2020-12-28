@@ -9,22 +9,19 @@ import type {
   PropsController,
   AppTokenStaking,
   GovernorAlpha,
-  RPropsToken,
-  SPropsAppStaking,
-  SPropsUserStaking,
   TestPropsToken,
-  Timelock
+  Timelock,
 } from "../typechain";
 import {
   bn,
   daysToTimestamp,
   deployContract,
+  deployContractUpgradeable,
   encodeParameters,
   expandTo18Decimals,
   getEvent,
-  getFutureAddress,
   mineBlock,
-  mineBlocks
+  mineBlocks,
 } from "./utils";
 
 chai.use(solidity);
@@ -36,7 +33,7 @@ describe("GovernorAlpha", () => {
   let propsTreasury: SignerWithAddress;
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
-  
+
   let propsToken: TestPropsToken;
   let propsController: PropsController;
   let timelock: Timelock;
@@ -59,7 +56,8 @@ describe("GovernorAlpha", () => {
   const GOVERNANCE_VOTING_PERIOD = bn(5);
 
   const deployAppToken = async (): Promise<[AppToken, AppTokenStaking]> => {
-    const tx = await propsController.connect(appTokenOwner)
+    const tx = await propsController
+      .connect(appTokenOwner)
       .deployAppToken(
         APP_TOKEN_NAME,
         APP_TOKEN_SYMBOL,
@@ -67,89 +65,88 @@ describe("GovernorAlpha", () => {
         appTokenOwner.address,
         DAILY_REWARDS_EMISSION
       );
-    const [appTokenAddress, appTokenStakingAddress, ] = await getEvent(
+    const [appTokenAddress, appTokenStakingAddress] = await getEvent(
       await tx.wait(),
       "AppTokenDeployed(address,address,string,uint256)",
       "PropsController"
     );
-    
+
     return [
       (await ethers.getContractFactory("AppToken")).attach(appTokenAddress) as AppToken,
-      (await ethers.getContractFactory("AppTokenStaking")).attach(appTokenStakingAddress) as AppTokenStaking
+      (await ethers.getContractFactory("AppTokenStaking")).attach(
+        appTokenStakingAddress
+      ) as AppTokenStaking,
     ];
-  }
+  };
 
   beforeEach(async () => {
-    [governance, appTokenOwner, propsTreasury, alice, bob, ] = await ethers.getSigners();
+    [governance, appTokenOwner, propsTreasury, alice, bob] = await ethers.getSigners();
 
     const appTokenLogic = await deployContract<AppToken>("AppToken", propsTreasury);
-    const appTokenStakingLogic = await deployContract<AppTokenStaking>("AppTokenStaking", propsTreasury);
-
-    propsToken = await deployContract<TestPropsToken>("TestPropsToken", propsTreasury);
-    await propsToken.connect(propsTreasury).initialize(PROPS_TOKEN_AMOUNT);
-
-    const rPropsTokenAddress = getFutureAddress(
-      propsTreasury.address,
-      (await propsTreasury.getTransactionCount()) + 4
+    const appTokenStakingLogic = await deployContract<AppTokenStaking>(
+      "AppTokenStaking",
+      propsTreasury
     );
 
-    const propsControllerAddress = getFutureAddress(
+    propsToken = await deployContractUpgradeable("TestPropsToken", propsTreasury, [
+      PROPS_TOKEN_AMOUNT,
+    ]);
+
+    const rPropsTokenAddress = ethers.utils.getContractAddress({
+      from: propsTreasury.address,
+      nonce: (await propsTreasury.getTransactionCount()) + 5,
+    });
+
+    const propsControllerAddress = ethers.utils.getContractAddress({
+      from: propsTreasury.address,
+      nonce: (await propsTreasury.getTransactionCount()) + 8,
+    });
+
+    const sPropsAppStaking = await deployContractUpgradeable("SPropsAppStaking", propsTreasury, [
+      propsControllerAddress,
+      rPropsTokenAddress,
+      rPropsTokenAddress,
+      DAILY_REWARDS_EMISSION,
+    ]);
+
+    const sPropsUserStaking = await deployContractUpgradeable("SPropsUserStaking", propsTreasury, [
+      propsControllerAddress,
+      rPropsTokenAddress,
+      rPropsTokenAddress,
+      DAILY_REWARDS_EMISSION,
+      REWARDS_LOCK_DURATION,
+    ]);
+
+    const rPropsToken = await deployContractUpgradeable("RPropsToken", propsTreasury, [
       propsTreasury.address,
-      (await propsTreasury.getTransactionCount()) + 6
-    );
+      propsToken.address,
+    ]);
 
-    const sPropsAppStaking = await deployContract<SPropsAppStaking>("SPropsAppStaking", propsTreasury);
-    await sPropsAppStaking.connect(propsTreasury)
-      .initialize(
-        propsControllerAddress,
-        rPropsTokenAddress,
-        rPropsTokenAddress,
-        DAILY_REWARDS_EMISSION
-      );
-
-    const sPropsUserStaking = await deployContract<SPropsUserStaking>("SPropsUserStaking", propsTreasury);
-    await sPropsUserStaking.connect(propsTreasury)
-      .initialize(
-        propsControllerAddress,
-        rPropsTokenAddress,
-        rPropsTokenAddress,
-        DAILY_REWARDS_EMISSION,
-        REWARDS_LOCK_DURATION
-      );
-
-    const rPropsToken = await deployContract<RPropsToken>("RPropsToken", propsTreasury);
-    await rPropsToken.connect(propsTreasury)
-      .initialize(
-        propsToken.address,
+    await rPropsToken
+      .connect(propsTreasury)
+      .distributeRewards(
         sPropsAppStaking.address,
         bn(800000),
         sPropsUserStaking.address,
         bn(200000)
       );
 
-    propsController = await deployContract<PropsController>("PropsController", propsTreasury);
-    await propsController.connect(propsTreasury)
-      .initialize(
-        propsTreasury.address,
-        propsToken.address,
-        rPropsToken.address,
-        sPropsAppStaking.address,
-        sPropsUserStaking.address,
-        appTokenLogic.address,
-        appTokenStakingLogic.address
-      );
+    propsController = await deployContractUpgradeable("PropsController", propsTreasury, [
+      propsTreasury.address,
+      propsToken.address,
+      rPropsToken.address,
+      sPropsAppStaking.address,
+      sPropsUserStaking.address,
+      appTokenLogic.address,
+      appTokenStakingLogic.address,
+    ]);
 
-    const governorAlphaAddress = getFutureAddress(
-      governance.address,
-      (await governance.getTransactionCount()) + 1
-    );
+    const governorAlphaAddress = ethers.utils.getContractAddress({
+      from: governance.address,
+      nonce: (await governance.getTransactionCount()) + 1,
+    });
 
-    timelock = await deployContract(
-      "Timelock",
-      governance,
-      governorAlphaAddress,
-      TIMELOCK_DELAY
-    );
+    timelock = await deployContract("Timelock", governance, governorAlphaAddress, TIMELOCK_DELAY);
 
     governorAlpha = await deployContract(
       "GovernorAlpha",
@@ -162,7 +159,7 @@ describe("GovernorAlpha", () => {
   });
 
   it("basic governance flow", async () => {
-    const [appToken, ] = await deployAppToken();
+    const [appToken] = await deployAppToken();
 
     // Stake and get sProps
     const stakeAmount = bn(100);
@@ -190,13 +187,7 @@ describe("GovernorAlpha", () => {
       // description: description of the proposal
       "Change Timelock's admin"
     );
-    const [
-      proposalId,
-      proposer,
-      ,,,,
-      proposalStartBlock,
-      proposalEndBlock,
-    ] = await getEvent(
+    const [proposalId, proposer, , , , , proposalStartBlock, proposalEndBlock] = await getEvent(
       await tx.wait(),
       "ProposalCreated(uint256,address,address[],uint256[],string[],bytes[],uint256,uint256,string)",
       "GovernorAlpha"
@@ -219,6 +210,7 @@ describe("GovernorAlpha", () => {
     );
     expect(voter).to.eq(alice.address);
     expect(support).to.eq(true);
+    // TODO Change to hardcoded values
     expect(votes).to.eq(await propsController.getPriorVotes(alice.address, proposalStartBlock));
 
     // Vote once again on proposal, this time from an account that has voting power
@@ -230,6 +222,7 @@ describe("GovernorAlpha", () => {
     );
     expect(voter).to.eq(bob.address);
     expect(support).to.eq(true);
+    // TODO Change to hardcoded values
     expect(votes).to.eq(await propsController.getPriorVotes(bob.address, proposalStartBlock));
 
     // Fast forward until the start of the voting period

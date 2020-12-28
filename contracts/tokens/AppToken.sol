@@ -7,22 +7,25 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 
+// TODO Add high-level contract docs
 contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
+    /// @dev The Props protocol treasury address
     address public propsTreasury;
-    // Denoted in ppm
+    /// @dev The percentage of each mint that goes to the Props treasury (denoted in ppm)
     uint256 public propsTreasuryMintPercentage;
-    // Denoted in seconds
+    /// @dev The delay before a newly set inflation rate goes into effect
     uint256 public inflationRateChangeDelay;
-    // Denoted in tokens/second
+    /// @dev The inflation rate of the app token
     uint256 public inflationRate;
+    /// @dev The new inflation rate that will go into effect once the delay passes
     uint256 public pendingInflationRate;
-
-    // Denoted as timestamp
-    uint256 private _lastMint;
-    uint256 private _lastInflationRateChange;
+    /// @dev Time most recent mint occured at
+    uint256 public lastMint;
+    /// @dev Time most recent inflation rate change occured at
+    uint256 public lastInflationRateChange;
 
     // solhint-disable-next-line var-name-mixedcase
     bytes32 public DOMAIN_SEPARATOR;
@@ -52,19 +55,21 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
 
         // Set the proper owner
         if (_owner != msg.sender) {
-            super.transferOwnership(_owner);
+            transferOwnership(_owner);
         }
 
         propsTreasury = _propsTreasury;
-        propsTreasuryMintPercentage = 50000;
+        propsTreasuryMintPercentage = 50000; // 5%
         inflationRateChangeDelay = 7 days;
-        inflationRate = 0;
 
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
-                keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)"),
+                keccak256(
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                ),
                 keccak256(bytes(name())),
-                getChainId(),
+                keccak256(bytes("1")),
+                _getChainId(),
                 address(this)
             )
         );
@@ -77,35 +82,50 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
         uint256 ownerAmount = _amount.sub(propsTreasuryAmount);
 
         _mint(propsTreasury, propsTreasuryAmount);
-        _mint(super.owner(), ownerAmount);
+        _mint(owner(), ownerAmount);
 
-        _lastMint = block.timestamp;
+        lastMint = block.timestamp;
     }
 
+    /**
+     * @dev Mint additional tokens according to the current inflation rate.
+     *   The amount of tokens to get minted is determined by both the last
+     *   mint time and the inflation rate (`lastMint` * `inflationRate`).
+     */
     function mint() external onlyOwner {
-        if (block.timestamp.sub(_lastInflationRateChange) > inflationRateChangeDelay) {
-            inflationRate = pendingInflationRate;
-        }
+        _updateInflationRate();
 
-        uint256 amount = inflationRate.mul(block.timestamp.sub(_lastMint));
+        uint256 amount = inflationRate.mul(block.timestamp.sub(lastMint));
         if (amount != 0) {
             uint256 propsTreasuryAmount = amount.mul(propsTreasuryMintPercentage).div(1e6);
             uint256 ownerAmount = amount.sub(propsTreasuryAmount);
 
             _mint(propsTreasury, propsTreasuryAmount);
-            _mint(super.owner(), ownerAmount);
+            _mint(owner(), ownerAmount);
 
-            _lastMint = block.timestamp;
+            lastMint = block.timestamp;
         }
     }
 
+    /**
+     * @dev Set a new inflation rate. Once a new inflation rate is set, it
+     *   takes some time before it goes into effect (the delay is determined
+     *   by `inflationRateChangeDelay`).
+     * @param _inflationRate The new inflation rate
+     */
     function changeInflationRate(uint256 _inflationRate) external onlyOwner {
         pendingInflationRate = _inflationRate;
-        _lastInflationRateChange = block.timestamp;
+        lastInflationRateChange = block.timestamp;
 
         emit InflationRateChanged(inflationRate, pendingInflationRate);
     }
 
+    /**
+     * @dev Recover tokens accidentally sent to this contract.
+     * @param _token The address of the token to be recovered
+     * @param _to The address to recover the tokens for
+     * @param _amount The amount to recover
+     */
     function recoverTokens(
         IERC20Upgradeable _token,
         address _to,
@@ -119,6 +139,16 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
         _token.safeTransfer(_to, _amount);
     }
 
+    /**
+     * @dev Allows for approvals to be made via secp256k1 signatures
+     * @param _owner The approver of the tokens
+     * @param _spender The spender of the tokens
+     * @param _amount Approved amount
+     * @param _deadline Approval deadline
+     * @param _v Part of signature
+     * @param _r Part of signature
+     * @param _s Part of signature
+     */
     function permit(
         address _owner,
         address _spender,
@@ -154,9 +184,11 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
         _approve(_owner, _spender, _amount);
     }
 
-    function getTotalSupply() external view returns (uint256) {
-        return super.totalSupply().add(block.timestamp.sub(_lastMint).mul(inflationRate));
-    }
+    // function getTotalSupply() external returns (uint256) {
+    //     _updateInflationRate();
+
+    //     return super.totalSupply().add(block.timestamp.sub(lastMint).mul(inflationRate));
+    // }
 
     // TODO Handle non-overridable `totalSupply`
     // OZ's ERC20 `totalSupply` function is not virtual so it can't be overriden
@@ -164,7 +196,16 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
     //     return super.totalSupply().add(block.timestamp.sub(lastMint).mul(inflationRate));
     // }
 
-    function getChainId() internal pure returns (uint256) {
+    /// @dev Internal function for making sure the inflation rate is up-todate
+    function _updateInflationRate() internal {
+        // If the delay for the new inflation rate passed, update the inflation rate
+        if (block.timestamp.sub(lastInflationRateChange) > inflationRateChangeDelay) {
+            inflationRate = pendingInflationRate;
+        }
+    }
+
+    /// @dev Internal function for getting the current chain id
+    function _getChainId() internal pure returns (uint256) {
         uint256 chainId;
         assembly {
             chainId := chainid()

@@ -1,15 +1,21 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import chai from "chai";
+import * as ethUtil from "ethereumjs-util";
 import { solidity } from "ethereum-waffle";
 import { ethers } from "hardhat";
 
-import type { AppToken } from "../typechain";
+import accounts from "../test-accounts";
+import type { AppToken, TestErc20 } from "../typechain";
 import {
   bn,
-  deployContract,
+  daysToTimestamp,
+  deployContractUpgradeable,
   expandTo18Decimals,
+  getApprovalDigest,
+  getPublicKey,
+  getTxTimestamp,
   mineBlock,
-  now
+  now,
 } from "./utils";
 
 chai.use(solidity);
@@ -18,6 +24,7 @@ const { expect } = chai;
 describe("AppToken", () => {
   let appTokenOwner: SignerWithAddress;
   let propsTreasury: SignerWithAddress;
+  let alice: SignerWithAddress;
 
   let appToken: AppToken;
 
@@ -26,17 +33,15 @@ describe("AppToken", () => {
   const APP_TOKEN_AMOUNT = expandTo18Decimals(1000);
 
   beforeEach(async () => {
-    [appTokenOwner, propsTreasury, ] = await ethers.getSigners();
+    [appTokenOwner, propsTreasury, alice] = await ethers.getSigners();
 
-    appToken = await deployContract<AppToken>("AppToken", appTokenOwner);
-    await appToken.connect(appTokenOwner)
-      .initialize(
-        APP_TOKEN_NAME,
-        APP_TOKEN_SYMBOL,
-        APP_TOKEN_AMOUNT,
-        appTokenOwner.address,
-        propsTreasury.address
-      );
+    appToken = await deployContractUpgradeable("AppToken", appTokenOwner, [
+      APP_TOKEN_NAME,
+      APP_TOKEN_SYMBOL,
+      APP_TOKEN_AMOUNT,
+      appTokenOwner.address,
+      propsTreasury.address,
+    ]);
   });
 
   it("correctly mints and distributes initial token amounts on initialization", async () => {
@@ -49,18 +54,27 @@ describe("AppToken", () => {
     expect(propsTreasuryBalance).to.eq(APP_TOKEN_AMOUNT.mul(propsTreasuryMintPercentage).div(1e6));
   });
 
-  it("only allows the app token owner to make state changes", async () => {
+  it("proper permissioning", async () => {
     // Only the app token owner can mint
-    await expect(
-      appToken.connect(propsTreasury).mint()
-    ).to.be.revertedWith("Ownable: caller is not the owner");
+    await expect(appToken.connect(propsTreasury).mint()).to.be.revertedWith(
+      "Ownable: caller is not the owner"
+    );
     await appToken.connect(appTokenOwner).mint();
 
     // Only the app token owner can change the inflation rate
-    await expect(
-      appToken.connect(propsTreasury).changeInflationRate(bn(1))
-    ).to.be.revertedWith("Ownable: caller is not the owner");
+    await expect(appToken.connect(propsTreasury).changeInflationRate(bn(1))).to.be.revertedWith(
+      "Ownable: caller is not the owner"
+    );
     await appToken.connect(appTokenOwner).changeInflationRate(bn(1));
+
+    // Only the app token owner can recover tokens
+    await appToken.connect(propsTreasury).transfer(appToken.address, bn(1));
+    await expect(
+      appToken.connect(propsTreasury).recoverTokens(appToken.address, propsTreasury.address, bn(1))
+    ).to.be.revertedWith("Ownable: caller is not the owner");
+    await appToken
+      .connect(appTokenOwner)
+      .recoverTokens(appToken.address, propsTreasury.address, bn(1));
   });
 
   it("handles mints according to an inflation rate", async () => {
@@ -71,8 +85,10 @@ describe("AppToken", () => {
     await appToken.connect(appTokenOwner).mint();
     expect(await appToken.totalSupply()).to.eq(APP_TOKEN_AMOUNT);
 
+    const newInflationRate = bn(100);
+
     // There is a delay before a change in the inflation rate goes into effect
-    await appToken.connect(appTokenOwner).changeInflationRate(bn(100));
+    await appToken.connect(appTokenOwner).changeInflationRate(newInflationRate);
     await appToken.connect(appTokenOwner).mint();
     expect(await appToken.totalSupply()).to.eq(APP_TOKEN_AMOUNT);
 
@@ -80,7 +96,85 @@ describe("AppToken", () => {
     await mineBlock((await now()).add(await appToken.inflationRateChangeDelay()).add(1));
 
     // New tokens can get minted once the delay for the inflation rate passed
-    await appToken.connect(appTokenOwner).mint();
-    expect((await appToken.totalSupply()).gt(APP_TOKEN_AMOUNT)).to.be.true;
+    const initialMintTime = await appToken.lastMint();
+    const newMintTime = await getTxTimestamp(await appToken.connect(appTokenOwner).mint());
+    expect(await appToken.totalSupply()).to.eq(
+      APP_TOKEN_AMOUNT.add(newInflationRate.mul(newMintTime.sub(initialMintTime)))
+    );
   });
+
+  it("recover tokens accidentally sent to contract", async () => {
+    const erc20: TestErc20 = await deployContractUpgradeable("TestERC20", alice, [
+      "Test",
+      "Test",
+      bn(100),
+    ]);
+
+    // Transfer to app token contract
+    await erc20.connect(alice).transfer(appToken.address, bn(100));
+    expect(await erc20.balanceOf(alice.address)).to.eq(bn(0));
+
+    // Have the app token owner recover the tokens
+    await appToken.connect(appTokenOwner).recoverTokens(erc20.address, alice.address, bn(100));
+    expect(await erc20.balanceOf(alice.address)).to.eq(bn(100));
+  });
+
+  it("approve via off-chain signature (permit)", async () => {
+    const permitValue = bn(100);
+    const permitDeadline = (await now()).add(daysToTimestamp(1));
+    const approvalDigest = await getApprovalDigest(
+      appToken,
+      {
+        owner: appTokenOwner.address,
+        spender: alice.address,
+        value: permitValue,
+      },
+      await appToken.nonces(alice.address),
+      permitDeadline
+    );
+
+    // Sign the approval digest
+    const sig = ethUtil.ecsign(
+      Buffer.from(approvalDigest.slice(2), "hex"),
+      Buffer.from(
+        accounts
+          .find(({ privateKey }) => getPublicKey(privateKey) === appTokenOwner.address)!
+          .privateKey.slice(2),
+        "hex"
+      )
+    );
+
+    // Call permit
+    await appToken
+      .connect(alice)
+      .permit(
+        appTokenOwner.address,
+        alice.address,
+        permitValue,
+        permitDeadline,
+        sig.v,
+        sig.r,
+        sig.s
+      );
+
+    // The approval indeed took place
+    expect(await appToken.allowance(appTokenOwner.address, alice.address)).to.eq(permitValue);
+
+    // Replay attack fails
+    expect(
+      appToken
+        .connect(alice)
+        .permit(
+          appTokenOwner.address,
+          alice.address,
+          permitValue,
+          permitDeadline,
+          sig.v,
+          sig.r,
+          sig.s
+        )
+    ).to.be.revertedWith("Invalid signature");
+  });
+
+  // TODO Improve branch coverage
 });

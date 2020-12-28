@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.0;
 
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
+
 import "./InitializableAdminUpgradeabilityProxy.sol";
 import "../cryptography/ECDSA.sol";
 
-contract ProxyFactory {
+contract ProxyFactory is Initializable {
   
   event ProxyCreated(address proxy);
 
   bytes32 private contractCodeHash;
 
-  constructor() public {
+  // solhint-disable-next-line func-name-mixedcase
+  function __ProxyFactory_init() public initializer {
     contractCodeHash = keccak256(
       type(InitializableAdminUpgradeabilityProxy).creationCode
     );

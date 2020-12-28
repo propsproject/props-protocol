@@ -39,6 +39,7 @@ describe("SPropsUserStaking", () => {
   beforeEach(async () => {
     [stakingManager, rewardsDistribution, alice, ] = await ethers.getSigners();
 
+    // TODO Replace with rProps
     rewardsToken = await deployContract<TestErc20>("TestERC20", rewardsDistribution);
     await rewardsToken.connect(rewardsDistribution)
       .initialize(
@@ -69,16 +70,20 @@ describe("SPropsUserStaking", () => {
     const stakeAmount = bn(100000);
     await sPropsUserStaking.connect(stakingManager).stake(alice.address, stakeAmount);
 
+    // TODO Check that you can't claim before maturity date
+
     // Fast-forward until just after the maturity date and claim rewards
     await mineBlock((await now()).add(REWARDS_LOCK_DURATION).add(daysToTimestamp(1)));
     await sPropsUserStaking.connect(stakingManager).getReward(alice.address);
 
+    // TODO Calculate the exact value
     expect((await rewardsToken.balanceOf(alice.address)).lt(await sPropsUserStaking.earned(alice.address)));
 
     // Fast-forward until some time after the maturity date and claim rewards
     await mineBlock((await now()).add(REWARDS_LOCK_DURATION).add(daysToTimestamp(100)));
     await sPropsUserStaking.connect(stakingManager).getReward(alice.address);
 
+    // TODO Calculate the exact value
     expect((await rewardsToken.balanceOf(alice.address)).lt(await sPropsUserStaking.earned(alice.address)));
 
     // Exit staking
@@ -90,4 +95,7 @@ describe("SPropsUserStaking", () => {
 
     expect(await rewardsToken.balanceOf(alice.address)).to.eq(await sPropsUserStaking.earned(alice.address));
   });
+
+  // TODO Add the tests from app token staking (check if tests can be inherited from)
+  // TODO Test exit staking + restake
 });

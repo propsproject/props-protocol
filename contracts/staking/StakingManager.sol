@@ -233,7 +233,10 @@ abstract contract StakingManager is Initializable, SPropsToken {
 
     function claimAppRewards(address _appToken) external {
         require(address(appTokenToStaking[_appToken]) != address(0), "Invalid app token");
-        require(msg.sender == OwnableUpgradeable(_appToken).owner(), "Only app token owner's can claim rewards");
+        require(
+            msg.sender == OwnableUpgradeable(_appToken).owner(),
+            "Only app token owner's can claim rewards"
+        );
 
         uint256 reward = appTokenToStaking[_appToken].earned(_appToken);
         appTokenToStaking[_appToken].getReward(_appToken);

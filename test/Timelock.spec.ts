@@ -5,14 +5,7 @@ import { BigNumber, BigNumberish } from "ethers";
 import { ethers } from "hardhat";
 
 import type { Timelock } from "../typechain";
-import {
-  bn,
-  daysToTimestamp,
-  deployContract,
-  encodeParameters,
-  mineBlock,
-  now
-} from "./utils";
+import { bn, daysToTimestamp, deployContract, encodeParameters, mineBlock, now } from "./utils";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -24,7 +17,7 @@ interface TimelockTx {
   signature: string;
   data: string;
   eta: BigNumber;
-};
+}
 
 // Utility to allow for easily executing any transaction-related function
 const execute = (
@@ -41,20 +34,15 @@ const execute = (
 describe("Timelock", () => {
   let admin: SignerWithAddress;
   let alice: SignerWithAddress;
-  
+
   let timelock: Timelock;
 
   const TIMELOCK_DELAY = daysToTimestamp(3);
 
   beforeEach(async () => {
-    [admin, alice, ] = await ethers.getSigners();
+    [admin, alice] = await ethers.getSigners();
 
-    timelock = await deployContract(
-      "Timelock",
-      admin,
-      admin.address,
-      TIMELOCK_DELAY
-    );
+    timelock = await deployContract("Timelock", admin, admin.address, TIMELOCK_DELAY);
   });
 
   it("queue transactions", async () => {
@@ -63,13 +51,13 @@ describe("Timelock", () => {
       value: 0,
       signature: "setPendingAdmin(address)",
       data: encodeParameters(["address"], [alice.address]),
-      eta: (await now()).add(TIMELOCK_DELAY).add(daysToTimestamp(1))
+      eta: (await now()).add(TIMELOCK_DELAY).add(daysToTimestamp(1)),
     };
 
     // Only the admin can queue transactions
-    await expect(
-      execute(timelock.connect(alice).queueTransaction, timelockTx)
-    ).to.be.revertedWith("Call must come from admin");
+    await expect(execute(timelock.connect(alice).queueTransaction, timelockTx)).to.be.revertedWith(
+      "Call must come from admin"
+    );
 
     // The admin can queue transactions
     await execute(timelock.connect(admin).queueTransaction, timelockTx);
@@ -81,16 +69,16 @@ describe("Timelock", () => {
       value: 0,
       signature: "setPendingAdmin(address)",
       data: encodeParameters(["address"], [alice.address]),
-      eta: (await now()).add(TIMELOCK_DELAY).add(daysToTimestamp(1))
+      eta: (await now()).add(TIMELOCK_DELAY).add(daysToTimestamp(1)),
     };
 
     // Queue transaction
-    await execute(timelock.connect(admin).queueTransaction, timelockTx)
+    await execute(timelock.connect(admin).queueTransaction, timelockTx);
 
     // Only the admin can cancel transactions
-    await expect(
-      execute(timelock.connect(alice).cancelTransaction, timelockTx)
-    ).to.be.revertedWith("Call must come from admin");
+    await expect(execute(timelock.connect(alice).cancelTransaction, timelockTx)).to.be.revertedWith(
+      "Call must come from admin"
+    );
 
     // The admin can cancel transactions
     await execute(timelock.connect(admin).cancelTransaction, timelockTx);
@@ -108,11 +96,11 @@ describe("Timelock", () => {
       value: 0,
       signature: "setDelay(uint256)",
       data: encodeParameters(["uint256"], [newDelay]),
-      eta: (await now()).add(TIMELOCK_DELAY).add(daysToTimestamp(1))
+      eta: (await now()).add(TIMELOCK_DELAY).add(daysToTimestamp(1)),
     };
 
     // Queue transaction
-    await execute(timelock.connect(admin).queueTransaction, timelockTx)
+    await execute(timelock.connect(admin).queueTransaction, timelockTx);
 
     // Fast forward until after the transaction's timelock
     await mineBlock(timelockTx.eta.add(1));
@@ -135,13 +123,13 @@ describe("Timelock", () => {
       value: 0,
       signature: "setDelay(uint256)",
       data: encodeParameters(["uint256"], [TIMELOCK_DELAY.add(1)]),
-      eta: bn(0)
+      eta: bn(0),
     };
 
     // The transaction's eta must satisfy the Timelock's execution delay
-    await expect(
-      execute(timelock.connect(admin).queueTransaction, timelockTx)
-    ).to.be.revertedWith("Estimated execution block must satisfy delay");
+    await expect(execute(timelock.connect(admin).queueTransaction, timelockTx)).to.be.revertedWith(
+      "Estimated execution block must satisfy delay"
+    );
 
     // Set a valid eta and queue the transaction
     timelockTx.eta = (await now()).add(TIMELOCK_DELAY).add(daysToTimestamp(1));

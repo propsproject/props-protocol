@@ -35,7 +35,7 @@ contract SPropsAppStaking is
     address public rewardsDistribution;
 
     /// @dev The token the staking rewards are denominated in (this is the rProps token)
-    IERC20Upgradeable public rewardsToken;
+    address public rewardsToken;
 
     uint256 public periodFinish;
     uint256 public rewardRate;
@@ -67,11 +67,11 @@ contract SPropsAppStaking is
 
         // Set the proper owner
         if (_owner != msg.sender) {
-            super.transferOwnership(_owner);
+            transferOwnership(_owner);
         }
 
         rewardsDistribution = _rewardsDistribution;
-        rewardsToken = IERC20Upgradeable(_rewardsToken);
+        rewardsToken = _rewardsToken;
         rewardsDuration = uint256(1e18).div(_dailyRewardsEmission).mul(1 days);
     }
 
@@ -148,7 +148,7 @@ contract SPropsAppStaking is
         uint256 reward = rewards[account];
         if (reward > 0) {
             rewards[account] = 0;
-            rewardsToken.safeTransfer(super.owner(), reward);
+            IERC20Upgradeable(rewardsToken).safeTransfer(owner(), reward);
             emit RewardPaid(account, reward);
         }
     }
@@ -171,7 +171,7 @@ contract SPropsAppStaking is
         // This keeps the reward rate in the right range, preventing overflows due to
         // very high values of rewardRate in the earned and rewardsPerToken functions;
         // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
-        uint256 balance = rewardsToken.balanceOf(address(this));
+        uint256 balance = IERC20Upgradeable(rewardsToken).balanceOf(address(this));
         require(rewardRate <= balance.div(rewardsDuration), "Provided reward too high");
 
         lastUpdateTime = block.timestamp;

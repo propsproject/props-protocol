@@ -51,6 +51,7 @@ contract PropsController is Initializable, ProxyFactory, StakingManager {
         address _appTokenImplementationContract,
         address _appTokenStakingImplementationContract
     ) public initializer {
+        ProxyFactory.__ProxyFactory_init();
         StakingManager.__StakingManager_init(
             _propsToken,
             _rPropsToken,

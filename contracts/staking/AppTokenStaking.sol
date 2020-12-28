@@ -66,7 +66,7 @@ contract AppTokenStaking is
 
         // Set the proper owner
         if (_owner != msg.sender) {
-            super.transferOwnership(_owner);
+            transferOwnership(_owner);
         }
 
         rewardsDistribution = _rewardsDistribution;
@@ -122,7 +122,7 @@ contract AppTokenStaking is
         require(amount > 0, "Cannot stake 0");
         _totalSupply = _totalSupply.add(amount);
         _balances[account] = _balances[account].add(amount);
-        stakingToken.safeTransferFrom(super.owner(), address(this), amount);
+        stakingToken.safeTransferFrom(owner(), address(this), amount);
         emit Staked(account, amount);
     }
 
@@ -136,7 +136,7 @@ contract AppTokenStaking is
         require(amount > 0, "Cannot withdraw 0");
         _totalSupply = _totalSupply.sub(amount);
         _balances[account] = _balances[account].sub(amount);
-        stakingToken.safeTransfer(super.owner(), amount);
+        stakingToken.safeTransfer(owner(), amount);
         emit Withdrawn(account, amount);
     }
 
@@ -150,7 +150,7 @@ contract AppTokenStaking is
         uint256 reward = rewards[account];
         if (reward > 0) {
             rewards[account] = 0;
-            // TODO Transfer and swap rProps
+            rewardsToken.safeTransfer(account, reward);
             emit RewardPaid(account, reward);
         }
     }

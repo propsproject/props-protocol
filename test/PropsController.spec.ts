@@ -3,22 +3,14 @@ import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import { ethers } from "hardhat";
 
-import type {
-  AppToken,
-  AppTokenStaking,
-  PropsController,
-  RPropsToken,
-  SPropsAppStaking,
-  SPropsUserStaking,
-  TestPropsToken
-} from "../typechain";
+import type { AppToken, AppTokenStaking, PropsController, TestPropsToken } from "../typechain";
 import {
   bn,
   daysToTimestamp,
   deployContract,
+  deployContractUpgradeable,
   expandTo18Decimals,
   getEvent,
-  getFutureAddress
 } from "./utils";
 
 chai.use(solidity);
@@ -45,7 +37,8 @@ describe("PropsController", () => {
   const REWARDS_LOCK_DURATION = daysToTimestamp(365);
 
   const deployAppToken = async (): Promise<[AppToken, AppTokenStaking]> => {
-    const tx = await propsController.connect(appTokenOwner)
+    const tx = await propsController
+      .connect(appTokenOwner)
       .deployAppToken(
         APP_TOKEN_NAME,
         APP_TOKEN_SYMBOL,
@@ -53,98 +46,108 @@ describe("PropsController", () => {
         appTokenOwner.address,
         DAILY_REWARDS_EMISSION
       );
-    const [appTokenAddress, appTokenStakingAddress, ] = await getEvent(
+    const [appTokenAddress, appTokenStakingAddress] = await getEvent(
       await tx.wait(),
       "AppTokenDeployed(address,address,string,uint256)",
       "PropsController"
     );
-    
+
     return [
       (await ethers.getContractFactory("AppToken")).attach(appTokenAddress) as AppToken,
-      (await ethers.getContractFactory("AppTokenStaking")).attach(appTokenStakingAddress) as AppTokenStaking
+      (await ethers.getContractFactory("AppTokenStaking")).attach(
+        appTokenStakingAddress
+      ) as AppTokenStaking,
     ];
-  }
+  };
 
   beforeEach(async () => {
-    [propsTreasury, appTokenOwner, alice, bob, ] = await ethers.getSigners();
+    [propsTreasury, appTokenOwner, alice, bob] = await ethers.getSigners();
 
     const appTokenLogic = await deployContract<AppToken>("AppToken", propsTreasury);
-    const appTokenStakingLogic = await deployContract<AppTokenStaking>("AppTokenStaking", propsTreasury);
-
-    propsToken = await deployContract<TestPropsToken>("TestPropsToken", propsTreasury);
-    await propsToken.connect(propsTreasury).initialize(PROPS_TOKEN_AMOUNT);
-
-    const rPropsTokenAddress = getFutureAddress(
-      propsTreasury.address,
-      (await propsTreasury.getTransactionCount()) + 4
+    const appTokenStakingLogic = await deployContract<AppTokenStaking>(
+      "AppTokenStaking",
+      propsTreasury
     );
 
-    const propsControllerAddress = getFutureAddress(
+    propsToken = await deployContractUpgradeable("TestPropsToken", propsTreasury, [
+      PROPS_TOKEN_AMOUNT,
+    ]);
+
+    const rPropsTokenAddress = ethers.utils.getContractAddress({
+      from: propsTreasury.address,
+      nonce: (await propsTreasury.getTransactionCount()) + 2,
+    });
+
+    const propsControllerAddress = ethers.utils.getContractAddress({
+      from: propsTreasury.address,
+      nonce: (await propsTreasury.getTransactionCount()) + 4,
+    });
+
+    const sPropsAppStaking = await deployContractUpgradeable("SPropsAppStaking", propsTreasury, [
+      propsControllerAddress,
+      rPropsTokenAddress,
+      rPropsTokenAddress,
+      DAILY_REWARDS_EMISSION,
+    ]);
+
+    const sPropsUserStaking = await deployContractUpgradeable("SPropsUserStaking", propsTreasury, [
+      propsControllerAddress,
+      rPropsTokenAddress,
+      rPropsTokenAddress,
+      DAILY_REWARDS_EMISSION,
+      REWARDS_LOCK_DURATION,
+    ]);
+
+    const rPropsToken = await deployContractUpgradeable("RPropsToken", propsTreasury, [
       propsTreasury.address,
-      (await propsTreasury.getTransactionCount()) + 6
-    );
+      propsToken.address,
+    ]);
 
-    const sPropsAppStaking = await deployContract<SPropsAppStaking>("SPropsAppStaking", propsTreasury);
-    await sPropsAppStaking.connect(propsTreasury)
-      .initialize(
-        propsControllerAddress,
-        rPropsTokenAddress,
-        rPropsTokenAddress,
-        DAILY_REWARDS_EMISSION
-      );
-
-    const sPropsUserStaking = await deployContract<SPropsUserStaking>("SPropsUserStaking", propsTreasury);
-    await sPropsUserStaking.connect(propsTreasury)
-      .initialize(
-        propsControllerAddress,
-        rPropsTokenAddress,
-        rPropsTokenAddress,
-        DAILY_REWARDS_EMISSION,
-        REWARDS_LOCK_DURATION
-      );
-
-    const rPropsToken = await deployContract<RPropsToken>("RPropsToken", propsTreasury);
-    await rPropsToken.connect(propsTreasury)
-      .initialize(
-        propsToken.address,
+    await rPropsToken
+      .connect(propsTreasury)
+      .distributeRewards(
         sPropsAppStaking.address,
         bn(800000),
         sPropsUserStaking.address,
         bn(200000)
       );
 
-    propsController = await deployContract<PropsController>("PropsController", propsTreasury);
-    await propsController.connect(propsTreasury)
-      .initialize(
-        propsTreasury.address,
-        propsToken.address,
-        rPropsToken.address,
-        sPropsAppStaking.address,
-        sPropsUserStaking.address,
-        appTokenLogic.address,
-        appTokenStakingLogic.address
-      );
+    propsController = await deployContractUpgradeable("PropsController", propsTreasury, [
+      propsTreasury.address,
+      propsToken.address,
+      rPropsToken.address,
+      sPropsAppStaking.address,
+      sPropsUserStaking.address,
+      appTokenLogic.address,
+      appTokenStakingLogic.address,
+    ]);
   });
 
   it("successfully deploys a new app token", async () => {
     const [appToken, appTokenStaking] = await deployAppToken();
 
     // Check that the staking contract was correctly associated with the app token
-    expect(await propsController.appTokenToStaking(appToken.address)).to.eq(appTokenStaking.address);
+    expect(await propsController.appTokenToStaking(appToken.address)).to.eq(
+      appTokenStaking.address
+    );
 
     // Check basic token information
     expect(await appToken.name()).to.eq(APP_TOKEN_NAME);
     expect(await appToken.symbol()).to.eq(APP_TOKEN_SYMBOL);
     expect(await appToken.totalSupply()).to.eq(APP_TOKEN_AMOUNT);
 
-    // Check that the initial supply was properly distributed
+    // Check that the initial supply was properly distributed (5% goes to Props)
     expect(await appToken.balanceOf(propsTreasury.address)).to.eq(APP_TOKEN_AMOUNT.div(20));
-    expect(await appToken.balanceOf(appTokenOwner.address)).to.eq(APP_TOKEN_AMOUNT.sub(APP_TOKEN_AMOUNT.div(20)));
+    expect(await appToken.balanceOf(appTokenOwner.address)).to.eq(
+      APP_TOKEN_AMOUNT.sub(APP_TOKEN_AMOUNT.div(20))
+    );
 
     // Check basic staking information
     expect(await appTokenStaking.stakingToken()).to.eq(propsToken.address);
     expect(await appTokenStaking.rewardsToken()).to.eq(appToken.address);
   });
+
+  // TODO Add test for off-chain signature staking
 
   it("basic staking adjustment to a single app", async () => {
     const [appToken, appTokenStaking] = await deployAppToken();
@@ -176,10 +179,9 @@ describe("PropsController", () => {
     const [stakeAmount1, stakeAmount2] = [bn(100), bn(50)];
     await propsToken.connect(propsTreasury).transfer(alice.address, bn(150));
     await propsToken.connect(alice).approve(propsController.address, bn(150));
-    await propsController.connect(alice).stake(
-      [appToken1.address, appToken2.address],
-      [stakeAmount1, stakeAmount2]
-    );
+    await propsController
+      .connect(alice)
+      .stake([appToken1.address, appToken2.address], [stakeAmount1, stakeAmount2]);
 
     // Check that the Props were indeed staked in the two app token staking contracts
     expect(await appTokenStaking1.balanceOf(alice.address)).to.eq(stakeAmount1);
@@ -189,14 +191,15 @@ describe("PropsController", () => {
     const [adjustment1, adjustment2] = [bn(-80), bn(100)];
     await propsToken.connect(propsTreasury).transfer(alice.address, bn(20));
     await propsToken.connect(alice).approve(propsController.address, bn(20));
-    await propsController.connect(alice).stake(
-      [appToken1.address, appToken2.address],
-      [adjustment1, adjustment2]
-    );
+    await propsController
+      .connect(alice)
+      .stake([appToken1.address, appToken2.address], [adjustment1, adjustment2]);
 
     // Check that the staked amounts were properly rebalanced
     expect(await appTokenStaking1.balanceOf(alice.address)).to.eq(bn(20));
     expect(await appTokenStaking2.balanceOf(alice.address)).to.eq(bn(150));
+
+    // TODO Check that the total amount staked per app is correct (in all staking adjustment tests)
   });
 
   it("staking adjustment to three apps", async () => {
@@ -208,22 +211,28 @@ describe("PropsController", () => {
     const [stakeAmount1, stakeAmount2, stakeAmount3] = [bn(100), bn(50), bn(80)];
     await propsToken.connect(propsTreasury).transfer(alice.address, bn(230));
     await propsToken.connect(alice).approve(propsController.address, bn(230));
-    await propsController.connect(alice).stake(
-      [appToken1.address, appToken2.address, appToken3.address],
-      [stakeAmount1, stakeAmount2, stakeAmount3]
-    );
+    await propsController
+      .connect(alice)
+      .stake(
+        [appToken1.address, appToken2.address, appToken3.address],
+        [stakeAmount1, stakeAmount2, stakeAmount3]
+      );
 
     // Check that the Props were indeed staked in the two app token staking contracts
     expect(await appTokenStaking1.balanceOf(alice.address)).to.eq(stakeAmount1);
     expect(await appTokenStaking2.balanceOf(alice.address)).to.eq(stakeAmount2);
     expect(await appTokenStaking3.balanceOf(alice.address)).to.eq(stakeAmount3);
 
+    // TODO Add sProps balance checks
+
     // Rebalance
     const [adjustment1, adjustment2, adjustment3] = [bn(-50), bn(-50), bn(-70)];
-    await propsController.connect(alice).stake(
-      [appToken1.address, appToken2.address, appToken3.address],
-      [adjustment1, adjustment2, adjustment3]
-    );
+    await propsController
+      .connect(alice)
+      .stake(
+        [appToken1.address, appToken2.address, appToken3.address],
+        [adjustment1, adjustment2, adjustment3]
+      );
 
     // Check that the staked amounts were properly rebalanced and
     // the remaining Props are back into the staker's wallet
@@ -234,21 +243,21 @@ describe("PropsController", () => {
   });
 
   it("properly handles an invalid staking adjustment", async () => {
-    const [appToken, ] = await deployAppToken();
+    const [appToken] = await deployAppToken();
 
     // No approval to transfer tokens
-    await expect(
-      propsController.connect(alice).stake([appToken.address], [bn(100)])
-    ).to.be.reverted;
+    await expect(propsController.connect(alice).stake([appToken.address], [bn(100)])).to.be
+      .reverted;
 
     // Stake amount underflow
-    await expect(
-      propsController.connect(alice).stake([appToken.address], [bn(-100)])
-    ).to.be.reverted;
+    await expect(propsController.connect(alice).stake([appToken.address], [bn(-100)])).to.be
+      .reverted;
+
+    // TODO Be explicit about the revert message
   });
 
   it("staking adjusts the sProps balance", async () => {
-    const [appToken, ] = await deployAppToken();
+    const [appToken] = await deployAppToken();
 
     // Stake
     const stakeAmount = bn(100);
@@ -266,7 +275,7 @@ describe("PropsController", () => {
   });
 
   it("sProps are not transferrable", async () => {
-    const [appToken, ] = await deployAppToken();
+    const [appToken] = await deployAppToken();
 
     // Stake
     const stakeAmount = bn(100);
@@ -284,4 +293,6 @@ describe("PropsController", () => {
       propsController.connect(alice).approve(bob.address, stakeAmount)
     ).to.be.revertedWith("sProps are not transferrable");
   });
+
+  // TODO stakeWithPermit, claimRewards, staked and withdrawn events from the StakingManager
 });

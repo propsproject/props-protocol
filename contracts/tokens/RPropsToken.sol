@@ -16,22 +16,28 @@ contract RPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IRP
 
     address public propsToken;
 
-    function initialize(
-        address _propsToken,
+    function initialize(address _owner, address _propsToken) public initializer {
+        OwnableUpgradeable.__Ownable_init();
+        ERC20Upgradeable.__ERC20_init("rProps", "rProps");
+
+        // Set the proper owner
+        if (_owner != msg.sender) {
+            transferOwnership(_owner);
+        }
+
+        propsToken = _propsToken;
+    }
+
+    function distributeRewards(
         address _sPropsAppStaking,
         uint256 _appRewardsPercentage,
         address _sPropsUserStaking,
         uint256 _userRewardsPercentage
-    ) public initializer {
+    ) external onlyOwner {
         require(
             _appRewardsPercentage.add(_userRewardsPercentage) == 1e6,
             "Invalid rewards distribution"
         );
-
-        OwnableUpgradeable.__Ownable_init();
-        ERC20Upgradeable.__ERC20_init("rProps", "rProps");
-
-        propsToken = _propsToken;
 
         // Mint all needed rProps
         uint256 totalToMint =
