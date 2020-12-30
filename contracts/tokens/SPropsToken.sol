@@ -7,6 +7,12 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 import "../interfaces/ISPropsToken.sol";
 
+/**
+ * @dev sProps tokens represent Props stake shares (each sProps token corresponds
+ *   to a staked Props token). sProps are not transferrable, only mintable and
+ *   burnable. Only the owner is permissioned to mint and burn (PropsController).
+ *   sProps also count towards voting power in the governance process.
+ */
 abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken {
     using SafeMathUpgradeable for uint256;
 
@@ -69,7 +75,7 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
         _totalSupply = 0;
 
         DOMAIN_TYPEHASH = keccak256(
-            "EIP712Domain(string name,uint256 chainId,address verifyingContract)"
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
         );
         DELEGATION_TYPEHASH = keccak256(
             "Delegation(address delegatee,uint256 nonce,uint256 expiry)"

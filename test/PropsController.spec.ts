@@ -52,6 +52,8 @@ describe("PropsController", () => {
       "PropsController"
     );
 
+    await propsController.connect(propsTreasury).whitelistAppToken(appTokenAddress);
+
     return [
       (await ethers.getContractFactory("AppToken")).attach(appTokenAddress) as AppToken,
       (await ethers.getContractFactory("AppTokenStaking")).attach(
@@ -113,6 +115,7 @@ describe("PropsController", () => {
       );
 
     propsController = await deployContractUpgradeable("PropsController", propsTreasury, [
+      propsTreasury.address,
       propsTreasury.address,
       propsToken.address,
       rPropsToken.address,

@@ -7,7 +7,10 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 
-// TODO Add high-level contract docs
+/**
+ * @dev Each app in the Props protocol will get an associated AppToken contract.
+ *   Each AppToken is ERC20 compatible and mintable according to an inflation rate.
+ */
 contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -90,7 +93,7 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
     /**
      * @dev Mint additional tokens according to the current inflation rate.
      *   The amount of tokens to get minted is determined by both the last
-     *   mint time and the inflation rate (`lastMint` * `inflationRate`).
+     *   mint time and the inflation rate ((`currentTime` - `lastMint`) * `inflationRate`).
      */
     function mint() external onlyOwner {
         _updateInflationRate();
@@ -184,18 +187,6 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
         _approve(_owner, _spender, _amount);
     }
 
-    // function getTotalSupply() external returns (uint256) {
-    //     _updateInflationRate();
-
-    //     return super.totalSupply().add(block.timestamp.sub(lastMint).mul(inflationRate));
-    // }
-
-    // TODO Handle non-overridable `totalSupply`
-    // OZ's ERC20 `totalSupply` function is not virtual so it can't be overriden
-    // function totalSupply() public override view returns (uint256) {
-    //     return super.totalSupply().add(block.timestamp.sub(lastMint).mul(inflationRate));
-    // }
-
     /// @dev Internal function for making sure the inflation rate is up-todate
     function _updateInflationRate() internal {
         // If the delay for the new inflation rate passed, update the inflation rate
@@ -212,4 +203,16 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
         }
         return chainId;
     }
+
+    // function getTotalSupply() external returns (uint256) {
+    //     _updateInflationRate();
+
+    //     return super.totalSupply().add(block.timestamp.sub(lastMint).mul(inflationRate));
+    // }
+
+    // TODO Handle non-overridable `totalSupply`
+    // OZ's ERC20 `totalSupply` function is not virtual so it can't be overriden
+    // function totalSupply() public override view returns (uint256) {
+    //     return super.totalSupply().add(block.timestamp.sub(lastMint).mul(inflationRate));
+    // }
 }
