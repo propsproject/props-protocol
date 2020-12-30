@@ -17,11 +17,11 @@ contract TestPropsToken is Initializable, ERC20Upgradeable, IPropsToken {
 
     mapping(address => uint256) public nonces;
 
-    function initialize(uint256 _amount) public initializer {
+    function initialize(uint256 _amount, address minter) public initializer {
         ERC20Upgradeable.__ERC20_init("Props", "Props");
 
-        _minter = msg.sender;
-        _maxTotalSupply = 1e9 * (10**uint256(super.decimals()));
+        _minter = minter;
+        _maxTotalSupply = 1e9 * (10**uint256(decimals()));
 
         PERMIT_TYPEHASH = keccak256(
             "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
@@ -29,7 +29,7 @@ contract TestPropsToken is Initializable, ERC20Upgradeable, IPropsToken {
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes(super.name())),
+                keccak256(bytes(name())),
                 getChainId(),
                 address(this)
             )
@@ -43,9 +43,8 @@ contract TestPropsToken is Initializable, ERC20Upgradeable, IPropsToken {
     }
 
     function mint(address _account, uint256 _amount) external override {
-        if (msg.sender == _minter) {
-            _mint(_account, _amount);
-        }
+        require(msg.sender == _minter, "Only the minter can mint new tokens");
+        _mint(_account, _amount);
     }
 
     function permit(

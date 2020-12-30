@@ -35,7 +35,7 @@ contract SPropsUserStaking is
     address public rewardsDistribution;
 
     /// @dev The token the staking rewards are denominated in (this is the rProps token)
-    IERC20Upgradeable public rewardsToken;
+    address public rewardsToken;
 
     uint256 public periodFinish;
     uint256 public rewardRate;
@@ -44,18 +44,9 @@ contract SPropsUserStaking is
     uint256 public rewardPerTokenStored;
     /// @dev The most recent timestamp when a stake occured
     uint256 public lastStakeTime;
-    /// @dev The lock duration for the staking rewards
-    uint256 public rewardsLockDuration;
 
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
-
-    /// @dev Keeps track of the staking enter time
-    mapping(address => uint256) private _enterTime;
-    /// @dev Keeps track of the staking exit time (staking exit = unstake everything)
-    mapping(address => uint256) private _exitTime;
-    /// @dev Keeps track of the amount of rewards claimed so far
-    mapping(address => uint256) private _claimedRewards;
 
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
@@ -69,21 +60,19 @@ contract SPropsUserStaking is
         address _owner,
         address _rewardsDistribution,
         address _rewardsToken,
-        uint256 _dailyRewardsEmission,
-        uint256 _rewardsLockDuration
+        uint256 _dailyRewardsEmission
     ) public initializer {
         OwnableUpgradeable.__Ownable_init();
         ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
         // Set the proper owner
         if (_owner != msg.sender) {
-            super.transferOwnership(_owner);
+            transferOwnership(_owner);
         }
 
         rewardsDistribution = _rewardsDistribution;
-        rewardsToken = IERC20Upgradeable(_rewardsToken);
+        rewardsToken = _rewardsToken;
         rewardsDuration = uint256(1e18).div(_dailyRewardsEmission).mul(1 days);
-        rewardsLockDuration = _rewardsLockDuration;
     }
 
     function totalSupply() external view override returns (uint256) {
@@ -131,15 +120,8 @@ contract SPropsUserStaking is
         updateRewardRate
     {
         require(amount > 0, "Cannot stake 0");
-
         _totalSupply = _totalSupply.add(amount);
         _balances[account] = _balances[account].add(amount);
-
-        if (_enterTime[account] == 0 || _exitTime[account] != 0) {
-            _enterTime[account] = block.timestamp;
-            _exitTime[account] = 0;
-        }
-
         emit Staked(account, amount);
     }
 
@@ -151,14 +133,8 @@ contract SPropsUserStaking is
         updateReward(account)
     {
         require(amount > 0, "Cannot withdraw 0");
-
         _totalSupply = _totalSupply.sub(amount);
         _balances[account] = _balances[account].sub(amount);
-
-        if (_balances[account] == 0) {
-            _exitTime[account] = block.timestamp;
-        }
-
         emit Withdrawn(account, amount);
     }
 
@@ -169,34 +145,11 @@ contract SPropsUserStaking is
         nonReentrant
         updateReward(account)
     {
-        if (
-            _enterTime[account] != 0 &&
-            block.timestamp.sub(_enterTime[account]) > rewardsLockDuration
-        ) {
-            uint256 stakeDuration;
-            if (_exitTime[account] != 0) {
-                stakeDuration = _exitTime[account].sub(_enterTime[account]);
-            } else {
-                stakeDuration = block.timestamp.sub(_enterTime[account]);
-            }
-
-            uint256 availableRewards =
-                MathUpgradeable
-                    .min(
-                    stakeDuration,
-                    block.timestamp.sub(_enterTime[account].add(rewardsLockDuration))
-                )
-                    .div(stakeDuration)
-                    .mul(rewards[account]);
-
-            uint256 reward = availableRewards.sub(_claimedRewards[account]);
-            _claimedRewards[account] = _claimedRewards[account].add(reward);
-
-            if (reward > 0) {
-                // TODO Transfer and swap rProps
-                rewardsToken.transfer(account, reward);
-                emit RewardPaid(account, reward);
-            }
+        uint256 reward = rewards[account];
+        if (reward > 0) {
+            rewards[account] = 0;
+            IERC20Upgradeable(rewardsToken).safeTransfer(owner(), reward);
+            emit RewardPaid(account, reward);
         }
     }
 
@@ -218,7 +171,7 @@ contract SPropsUserStaking is
         // This keeps the reward rate in the right range, preventing overflows due to
         // very high values of rewardRate in the earned and rewardsPerToken functions;
         // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
-        uint256 balance = rewardsToken.balanceOf(address(this));
+        uint256 balance = IERC20Upgradeable(rewardsToken).balanceOf(address(this));
         require(rewardRate <= balance.div(rewardsDuration), "Provided reward too high");
 
         lastUpdateTime = block.timestamp;

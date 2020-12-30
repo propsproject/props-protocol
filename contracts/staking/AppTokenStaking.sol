@@ -32,9 +32,9 @@ contract AppTokenStaking is
     address public rewardsDistribution;
 
     /// @dev The token the staking rewards are denominated in (will be an instance of the AppToken contract)
-    IERC20Upgradeable public rewardsToken;
+    address public rewardsToken;
     /// @dev The token the stakes are denominated in (will be the Props token)
-    IERC20Upgradeable public stakingToken;
+    address public stakingToken;
 
     uint256 public periodFinish;
     uint256 public rewardRate;
@@ -70,8 +70,8 @@ contract AppTokenStaking is
         }
 
         rewardsDistribution = _rewardsDistribution;
-        rewardsToken = IERC20Upgradeable(_rewardsToken);
-        stakingToken = IERC20Upgradeable(_stakingToken);
+        rewardsToken = _rewardsToken;
+        stakingToken = _stakingToken;
         rewardsDuration = uint256(1e18).div(_dailyRewardsEmission).mul(1 days);
     }
 
@@ -122,7 +122,7 @@ contract AppTokenStaking is
         require(amount > 0, "Cannot stake 0");
         _totalSupply = _totalSupply.add(amount);
         _balances[account] = _balances[account].add(amount);
-        stakingToken.safeTransferFrom(owner(), address(this), amount);
+        IERC20Upgradeable(stakingToken).safeTransferFrom(owner(), address(this), amount);
         emit Staked(account, amount);
     }
 
@@ -136,7 +136,7 @@ contract AppTokenStaking is
         require(amount > 0, "Cannot withdraw 0");
         _totalSupply = _totalSupply.sub(amount);
         _balances[account] = _balances[account].sub(amount);
-        stakingToken.safeTransfer(owner(), amount);
+        IERC20Upgradeable(stakingToken).safeTransfer(owner(), amount);
         emit Withdrawn(account, amount);
     }
 
@@ -150,7 +150,7 @@ contract AppTokenStaking is
         uint256 reward = rewards[account];
         if (reward > 0) {
             rewards[account] = 0;
-            rewardsToken.safeTransfer(account, reward);
+            IERC20Upgradeable(rewardsToken).safeTransfer(account, reward);
             emit RewardPaid(account, reward);
         }
     }
@@ -173,7 +173,7 @@ contract AppTokenStaking is
         // This keeps the reward rate in the right range, preventing overflows due to
         // very high values of rewardRate in the earned and rewardsPerToken functions;
         // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
-        uint256 balance = rewardsToken.balanceOf(address(this));
+        uint256 balance = IERC20Upgradeable(rewardsToken).balanceOf(address(this));
         require(rewardRate <= balance.div(rewardsDuration), "Provided reward too high");
 
         lastUpdateTime = block.timestamp;

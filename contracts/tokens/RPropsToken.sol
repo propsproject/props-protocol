@@ -49,7 +49,7 @@ contract RPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IRP
         uint256 _appRewardsPercentage,
         address _sPropsUserStaking,
         uint256 _userRewardsPercentage
-    ) external onlyOwner {
+    ) external override onlyOwner {
         // The percentages must add up to 100%
         require(
             _appRewardsPercentage.add(_userRewardsPercentage) == 1e6,
@@ -78,7 +78,7 @@ contract RPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IRP
      * @param account The swap recipient
      */
     function swap(address account) external override onlyOwner {
-        uint256 amount = super.balanceOf(account);
+        uint256 amount = balanceOf(account);
         if (amount > 0) {
             // Burn the rProps
             _burn(account, amount);

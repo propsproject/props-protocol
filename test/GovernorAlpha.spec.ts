@@ -48,7 +48,6 @@ describe("GovernorAlpha", () => {
   // Corresponds to 0.0003658 - taken from old Props rewards formula
   // Distributes 12.5% of the remaining rewards pool each year
   const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
-  const REWARDS_LOCK_DURATION = daysToTimestamp(365);
 
   const TIMELOCK_DELAY = daysToTimestamp(3);
 
@@ -82,7 +81,7 @@ describe("GovernorAlpha", () => {
   };
 
   beforeEach(async () => {
-    [governance, appTokenOwner, propsTreasury, alice, bob] = await ethers.getSigners();
+    [propsTreasury, governance, appTokenOwner, alice, bob] = await ethers.getSigners();
 
     const appTokenLogic = await deployContract<AppToken>("AppToken", propsTreasury);
     const appTokenStakingLogic = await deployContract<AppTokenStaking>(
@@ -90,18 +89,19 @@ describe("GovernorAlpha", () => {
       propsTreasury
     );
 
-    propsToken = await deployContractUpgradeable("TestPropsToken", propsTreasury, [
-      PROPS_TOKEN_AMOUNT,
-    ]);
-
     const rPropsTokenAddress = ethers.utils.getContractAddress({
       from: propsTreasury.address,
-      nonce: (await propsTreasury.getTransactionCount()) + 5,
+      nonce: (await propsTreasury.getTransactionCount()) + 6,
     });
+
+    propsToken = await deployContractUpgradeable("TestPropsToken", propsTreasury, [
+      PROPS_TOKEN_AMOUNT,
+      rPropsTokenAddress,
+    ]);
 
     const propsControllerAddress = ethers.utils.getContractAddress({
       from: propsTreasury.address,
-      nonce: (await propsTreasury.getTransactionCount()) + 8,
+      nonce: (await propsTreasury.getTransactionCount()) + 6,
     });
 
     const sPropsAppStaking = await deployContractUpgradeable("SPropsAppStaking", propsTreasury, [
@@ -116,22 +116,12 @@ describe("GovernorAlpha", () => {
       rPropsTokenAddress,
       rPropsTokenAddress,
       DAILY_REWARDS_EMISSION,
-      REWARDS_LOCK_DURATION,
     ]);
 
     const rPropsToken = await deployContractUpgradeable("RPropsToken", propsTreasury, [
-      propsTreasury.address,
+      propsControllerAddress,
       propsToken.address,
     ]);
-
-    await rPropsToken
-      .connect(propsTreasury)
-      .distributeRewards(
-        sPropsAppStaking.address,
-        bn(800000),
-        sPropsUserStaking.address,
-        bn(200000)
-      );
 
     propsController = await deployContractUpgradeable("PropsController", propsTreasury, [
       propsTreasury.address,
@@ -143,6 +133,8 @@ describe("GovernorAlpha", () => {
       appTokenLogic.address,
       appTokenStakingLogic.address,
     ]);
+
+    await propsController.connect(propsTreasury).distributePropsRewards(bn(800000), bn(200000));
 
     const governorAlphaAddress = ethers.utils.getContractAddress({
       from: governance.address,
