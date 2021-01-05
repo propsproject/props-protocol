@@ -4,8 +4,8 @@ import * as ethUtil from "ethereumjs-util";
 import { solidity } from "ethereum-waffle";
 import { ethers } from "hardhat";
 
-import accounts from "../test-accounts";
-import type { AppToken, TestErc20 } from "../typechain";
+import accounts from "../../test-accounts";
+import type { AppToken, TestErc20 } from "../../typechain";
 import {
   bn,
   daysToTimestamp,
@@ -16,7 +16,7 @@ import {
   getTxTimestamp,
   mineBlock,
   now,
-} from "./utils";
+} from "../utils";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -175,6 +175,4 @@ describe("AppToken", () => {
         )
     ).to.be.revertedWith("Invalid signature");
   });
-
-  // TODO Improve branch coverage
 });

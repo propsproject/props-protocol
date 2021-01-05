@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.0;
 
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 import "../interfaces/IPropsToken.sol";
 
-contract TestPropsToken is Initializable, ERC20Upgradeable, IPropsToken {
+contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IPropsToken {
     address private _minter;
     uint256 private _maxTotalSupply;
 
@@ -17,10 +18,10 @@ contract TestPropsToken is Initializable, ERC20Upgradeable, IPropsToken {
 
     mapping(address => uint256) public nonces;
 
-    function initialize(uint256 _amount, address minter) public initializer {
+    function initialize(uint256 _amount) public initializer {
+        OwnableUpgradeable.__Ownable_init();
         ERC20Upgradeable.__ERC20_init("Props", "Props");
 
-        _minter = minter;
         _maxTotalSupply = 1e9 * (10**uint256(decimals()));
 
         PERMIT_TYPEHASH = keccak256(
@@ -28,9 +29,12 @@ contract TestPropsToken is Initializable, ERC20Upgradeable, IPropsToken {
         );
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
-                keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)"),
+                keccak256(
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                ),
                 keccak256(bytes(name())),
-                getChainId(),
+                keccak256(bytes("1")),
+                _getChainId(),
                 address(this)
             )
         );
@@ -40,6 +44,10 @@ contract TestPropsToken is Initializable, ERC20Upgradeable, IPropsToken {
 
     function maxTotalSupply() external view override returns (uint256) {
         return _maxTotalSupply;
+    }
+
+    function setMinter(address _newMinter) external onlyOwner {
+        _minter = _newMinter;
     }
 
     function mint(address _account, uint256 _amount) external override {
@@ -79,7 +87,7 @@ contract TestPropsToken is Initializable, ERC20Upgradeable, IPropsToken {
         _approve(_owner, _spender, _amount);
     }
 
-    function getChainId() internal pure returns (uint256) {
+    function _getChainId() internal pure returns (uint256) {
         uint256 chainId;
         assembly {
             chainId := chainid()

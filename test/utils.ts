@@ -95,7 +95,7 @@ export const deployContractUpgradeable = async <T extends Contract>(
 ): Promise<T> => {
   const contractFactory = await ethers.getContractFactory(name, deployer);
   const contractInstance = await upgrades.deployProxy(contractFactory, ...args, {
-    // TODO Check this out in depth
+    // TODO Manually check for storage incompatibilities (the Checkpoint struct in SPropsToken)
     unsafeAllowCustomTypes: true,
   });
   return (await contractInstance.deployed()) as T;

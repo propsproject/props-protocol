@@ -4,17 +4,15 @@ pragma solidity ^0.6.0;
 interface IStaking {
     function totalSupply() external view returns (uint256);
 
-    function balanceOf(address account) external view returns (uint256);
+    function balanceOf(address _account) external view returns (uint256);
 
-    function getRewardForDuration() external view returns (uint256);
+    function earned(address _account) external view returns (uint256);
 
-    function earned(address account) external view returns (uint256);
+    function stake(address _account, uint256 _amount) external;
 
-    function stake(address account, uint256 amount) external;
+    function withdraw(address _account, uint256 _amount) external;
 
-    function withdraw(address account, uint256 amount) external;
+    function claimReward(address _account) external;
 
-    function getReward(address account) external;
-
-    function notifyRewardAmount(uint256 reward) external;
+    function notifyRewardAmount(uint256 _reward) external;
 }

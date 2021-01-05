@@ -271,8 +271,6 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
     }
 
     function _delegate(address delegator, address delegatee) internal {
-        // TODO The rProps rewards should also count towards governance
-
         address currentDelegate = delegates[delegator];
         uint96 delegatorBalance = _balances[delegator];
         delegates[delegator] = delegatee;

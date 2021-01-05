@@ -11,7 +11,7 @@ import type {
   GovernorAlpha,
   TestPropsToken,
   Timelock,
-} from "../typechain";
+} from "../../typechain";
 import {
   bn,
   daysToTimestamp,
@@ -22,7 +22,7 @@ import {
   getEvent,
   mineBlock,
   mineBlocks,
-} from "./utils";
+} from "../utils";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -89,51 +89,48 @@ describe("GovernorAlpha", () => {
       propsTreasury
     );
 
-    const rPropsTokenAddress = ethers.utils.getContractAddress({
-      from: propsTreasury.address,
-      nonce: (await propsTreasury.getTransactionCount()) + 6,
-    });
-
     propsToken = await deployContractUpgradeable("TestPropsToken", propsTreasury, [
       PROPS_TOKEN_AMOUNT,
-      rPropsTokenAddress,
-    ]);
-
-    const propsControllerAddress = ethers.utils.getContractAddress({
-      from: propsTreasury.address,
-      nonce: (await propsTreasury.getTransactionCount()) + 6,
-    });
-
-    const sPropsAppStaking = await deployContractUpgradeable("SPropsAppStaking", propsTreasury, [
-      propsControllerAddress,
-      rPropsTokenAddress,
-      rPropsTokenAddress,
-      DAILY_REWARDS_EMISSION,
-    ]);
-
-    const sPropsUserStaking = await deployContractUpgradeable("SPropsUserStaking", propsTreasury, [
-      propsControllerAddress,
-      rPropsTokenAddress,
-      rPropsTokenAddress,
-      DAILY_REWARDS_EMISSION,
-    ]);
-
-    const rPropsToken = await deployContractUpgradeable("RPropsToken", propsTreasury, [
-      propsControllerAddress,
-      propsToken.address,
     ]);
 
     propsController = await deployContractUpgradeable("PropsController", propsTreasury, [
       propsTreasury.address,
       propsTreasury.address,
       propsToken.address,
-      rPropsToken.address,
-      sPropsAppStaking.address,
-      sPropsUserStaking.address,
       appTokenLogic.address,
       appTokenStakingLogic.address,
     ]);
 
+    const rPropsToken = await deployContractUpgradeable("RPropsToken", propsTreasury, [
+      propsController.address,
+      propsToken.address,
+    ]);
+
+    const sPropsAppStaking = await deployContractUpgradeable("SPropsStaking", propsTreasury, [
+      propsController.address,
+      rPropsToken.address,
+      rPropsToken.address,
+      propsController.address,
+      DAILY_REWARDS_EMISSION,
+    ]);
+
+    const sPropsUserStaking = await deployContractUpgradeable("SPropsStaking", propsTreasury, [
+      propsController.address,
+      rPropsToken.address,
+      rPropsToken.address,
+      propsController.address,
+      DAILY_REWARDS_EMISSION,
+    ]);
+
+    // The rProps token contract is allowed to mint new Props
+    propsToken.connect(propsTreasury).setMinter(rPropsToken.address);
+
+    // Initialize all needed fields on the controller
+    propsController.connect(propsTreasury).setRPropsToken(rPropsToken.address);
+    propsController.connect(propsTreasury).setSPropsAppStaking(sPropsAppStaking.address);
+    propsController.connect(propsTreasury).setSPropsUserStaking(sPropsUserStaking.address);
+
+    // Distribute the rProps rewards to the sProps staking contracts
     await propsController.connect(propsTreasury).distributePropsRewards(bn(800000), bn(200000));
 
     const governorAlphaAddress = ethers.utils.getContractAddress({
