@@ -7,104 +7,112 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 import "../interfaces/ISPropsToken.sol";
 
+/**
+ * @title  GovernorAlpha
+ * @author Forked from: Compound
+ *         Changes by: Props
+ * @notice Governance contract in the Props protocol.
+ * @dev    Changes to the original Compound contract:
+ *         - the contract is upgradeable
+ *         - the `votingDelay` and `votingPeriod` are passed in the
+ *           initializer instead of being hardcoded in the contract
+ */
 contract GovernorAlpha {
     using SafeMathUpgradeable for uint256;
 
-    /// @dev The name of this contract
+    // The name of this contract
     function name() public pure returns (string memory) {
         return "Props Governor Alpha";
     }
 
-    /// @dev The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
+    // The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
     function quorumVotes() public view returns (uint256) {
-        // TODO Handle non-fixed total supply of sProps
         return IERC20Upgradeable(sPropsToken).totalSupply() / 25;
     } // 4% of supply
 
-    /// @dev The number of votes required in order for a voter to become a proposer
+    // The number of votes required in order for a voter to become a proposer
     function proposalThreshold() public view returns (uint256) {
-        // TODO Handle non-fixed total supply of sProps
         return IERC20Upgradeable(sPropsToken).totalSupply() / 100;
     } // 1% of supply
 
-    /// @dev The maximum number of actions that can be included in a proposal
+    // The maximum number of actions that can be included in a proposal
     function proposalMaxOperations() public pure returns (uint256) {
         return 10;
     } // 10 actions
 
-    /// @dev The delay before voting on a proposal may take place, once proposed
+    // The delay before voting on a proposal may take place, once proposed
     uint256 public votingDelay;
 
-    /// @dev The duration of voting on a proposal, in blocks
+    // The duration of voting on a proposal, in blocks
     uint256 public votingPeriod;
 
-    /// @dev The address of the Props Protocol Timelock
+    // The address of the Props Protocol Timelock
     TimelockInterface public timelock;
 
-    /// @dev The address of the sProps governance token
+    // The address of the sProps governance token
     address public sPropsToken;
 
-    /// @dev The total number of proposals
+    // The total number of proposals
     uint256 public proposalCount;
 
     struct Proposal {
-        /// @dev Unique id for looking up a proposal
+        // Unique id for looking up a proposal
         uint256 id;
-        /// @dev Creator of the proposal
+        // Creator of the proposal
         address proposer;
-        /// @dev The timestamp that the proposal will be available for execution, set once the vote succeeds
+        // The timestamp that the proposal will be available for execution, set once the vote succeeds
         uint256 eta;
-        /// @dev the ordered list of target addresses for calls to be made
+        // the ordered list of target addresses for calls to be made
         address[] targets;
-        /// @dev The ordered list of values (i.e. msg.value) to be passed to the calls to be made
+        // The ordered list of values (i.e. msg.value) to be passed to the calls to be made
         uint256[] values;
-        /// @dev The ordered list of function signatures to be called
+        // The ordered list of function signatures to be called
         string[] signatures;
-        /// @dev The ordered list of calldata to be passed to each call
+        // The ordered list of calldata to be passed to each call
         bytes[] calldatas;
-        /// @dev The block at which voting begins: holders must delegate their votes prior to this block
+        // The block at which voting begins: holders must delegate their votes prior to this block
         uint256 startBlock;
-        /// @dev The block at which voting ends: votes must be cast prior to this block
+        // The block at which voting ends: votes must be cast prior to this block
         uint256 endBlock;
-        /// @dev Current number of votes in favor of this proposal
+        // Current number of votes in favor of this proposal
         uint256 forVotes;
-        /// @dev Current number of votes in opposition to this proposal
+        // Current number of votes in opposition to this proposal
         uint256 againstVotes;
-        /// @dev Flag marking whether the proposal has been canceled
+        // Flag marking whether the proposal has been canceled
         bool canceled;
-        /// @dev Flag marking whether the proposal has been executed
+        // Flag marking whether the proposal has been executed
         bool executed;
-        /// @dev Receipts of ballots for the entire set of voters
+        // Receipts of ballots for the entire set of voters
         mapping(address => Receipt) receipts;
     }
 
-    /// @dev Ballot receipt record for a voter
+    // Ballot receipt record for a voter
     struct Receipt {
-        /// @dev Whether or not a vote has been cast
+        // Whether or not a vote has been cast
         bool hasVoted;
-        /// @dev Whether or not the voter supports the proposal
+        // Whether or not the voter supports the proposal
         bool support;
-        /// @dev The number of votes the voter had, which were cast
+        // The number of votes the voter had, which were cast
         uint256 votes;
     }
 
-    /// @dev Possible states that a proposal may be in
+    // Possible states that a proposal may be in
     enum ProposalState {Pending, Active, Canceled, Defeated, Succeeded, Queued, Expired, Executed}
 
-    /// @dev The official record of all proposals ever proposed
+    // The official record of all proposals ever proposed
     mapping(uint256 => Proposal) public proposals;
 
-    /// @dev The latest proposal for each proposer
+    // The latest proposal for each proposer
     mapping(address => uint256) public latestProposalIds;
 
-    /// @dev The EIP-712 typehash for the contract's domain
+    // The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
-    /// @dev The EIP-712 typehash for the ballot struct used by the contract
+    // The EIP-712 typehash for the ballot struct used by the contract
     bytes32 public constant BALLOT_TYPEHASH = keccak256("Ballot(uint256 proposalId,bool support)");
 
-    /// @dev An event emitted when a new proposal is created
+    // An event emitted when a new proposal is created
     event ProposalCreated(
         uint256 id,
         address proposer,
@@ -117,16 +125,16 @@ contract GovernorAlpha {
         string description
     );
 
-    /// @dev An event emitted when a vote has been cast on a proposal
+    // An event emitted when a vote has been cast on a proposal
     event VoteCast(address voter, uint256 proposalId, bool support, uint256 votes);
 
-    /// @dev An event emitted when a proposal has been canceled
+    // An event emitted when a proposal has been canceled
     event ProposalCanceled(uint256 id);
 
-    /// @dev An event emitted when a proposal has been queued in the Timelock
+    // An event emitted when a proposal has been queued in the Timelock
     event ProposalQueued(uint256 id, uint256 eta);
 
-    /// @dev An event emitted when a proposal has been executed in the Timelock
+    // An event emitted when a proposal has been executed in the Timelock
     event ProposalExecuted(uint256 id);
 
     constructor(

@@ -7,8 +7,8 @@ import { ethers } from "hardhat";
 import type {
   AppToken,
   PropsController,
-  AppTokenStaking,
   GovernorAlpha,
+  Staking,
   TestPropsToken,
   Timelock,
 } from "../../typechain";
@@ -22,7 +22,7 @@ import {
   getEvent,
   mineBlock,
   mineBlocks,
-} from "../utils";
+} from "../../utils";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -54,7 +54,7 @@ describe("GovernorAlpha", () => {
   const GOVERNANCE_VOTING_DELAY = bn(1);
   const GOVERNANCE_VOTING_PERIOD = bn(5);
 
-  const deployAppToken = async (): Promise<[AppToken, AppTokenStaking]> => {
+  const deployAppToken = async (): Promise<[AppToken, Staking]> => {
     const tx = await propsController
       .connect(appTokenOwner)
       .deployAppToken(
@@ -74,9 +74,7 @@ describe("GovernorAlpha", () => {
 
     return [
       (await ethers.getContractFactory("AppToken")).attach(appTokenAddress) as AppToken,
-      (await ethers.getContractFactory("AppTokenStaking")).attach(
-        appTokenStakingAddress
-      ) as AppTokenStaking,
+      (await ethers.getContractFactory("Staking")).attach(appTokenStakingAddress) as Staking,
     ];
   };
 
@@ -84,10 +82,7 @@ describe("GovernorAlpha", () => {
     [propsTreasury, governance, appTokenOwner, alice, bob] = await ethers.getSigners();
 
     const appTokenLogic = await deployContract<AppToken>("AppToken", propsTreasury);
-    const appTokenStakingLogic = await deployContract<AppTokenStaking>(
-      "AppTokenStaking",
-      propsTreasury
-    );
+    const appTokenStakingLogic = await deployContract<Staking>("Staking", propsTreasury);
 
     propsToken = await deployContractUpgradeable("TestPropsToken", propsTreasury, [
       PROPS_TOKEN_AMOUNT,
@@ -106,7 +101,7 @@ describe("GovernorAlpha", () => {
       propsToken.address,
     ]);
 
-    const sPropsAppStaking = await deployContractUpgradeable("SPropsStaking", propsTreasury, [
+    const sPropsAppStaking = await deployContractUpgradeable("Staking", propsTreasury, [
       propsController.address,
       rPropsToken.address,
       rPropsToken.address,
@@ -114,7 +109,7 @@ describe("GovernorAlpha", () => {
       DAILY_REWARDS_EMISSION,
     ]);
 
-    const sPropsUserStaking = await deployContractUpgradeable("SPropsStaking", propsTreasury, [
+    const sPropsUserStaking = await deployContractUpgradeable("Staking", propsTreasury, [
       propsController.address,
       rPropsToken.address,
       rPropsToken.address,

@@ -5,7 +5,7 @@ import { BigNumber, BigNumberish } from "ethers";
 import { ethers } from "hardhat";
 
 import type { Timelock } from "../../typechain";
-import { bn, daysToTimestamp, deployContract, encodeParameters, mineBlock, now } from "../utils";
+import { bn, daysToTimestamp, deployContract, encodeParameters, mineBlock, now } from "../../utils";
 
 chai.use(solidity);
 const { expect } = chai;

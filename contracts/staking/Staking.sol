@@ -11,7 +11,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "../interfaces/IStaking.sol";
 
 /**
- * @title  BaseStaking
+ * @title  Staking
  * @author Forked from: Synthetix
  *         Changes by: Props
  * @notice Reward stakers of staking tokens with reward tokens, on a pro-rata basis.
@@ -30,19 +30,17 @@ import "../interfaces/IStaking.sol";
  *           parameter on initialization, which specifies the percentage of the remaining
  *           rewards pool that should get distributed each day
  *         - the staked and withdrawn amounts are implicit (the contract trusts its owner
- *           to provide correct values), no tokens are transferred to or from this contract
- *           (this behavior can be overriden via the provided stake and withdraw callbacks)
+ *           to provide correct values), no staking tokens are transferred to or from this
+ *           contract
+ *         - on claiming, rewards are tranferred to the owner of the contract instead of
+ *           the actual recipient, the owner being responsible for handling the rewards as
+ *           it sees fit
  */
-abstract contract BaseStaking is
-    Initializable,
-    OwnableUpgradeable,
-    ReentrancyGuardUpgradeable,
-    IStaking
-{
+contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable, IStaking {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
-    // The address responsible for distributing the staking rewards
+    // The address responsible for distributing the rewards
     address public rewardsDistribution;
 
     address public rewardsToken;
@@ -88,8 +86,7 @@ abstract contract BaseStaking is
      * @param _stakingToken The token stakes are denominated in
      * @param _dailyRewardEmission The percentage of the remaining rewards pool to get distributed each day
      */
-    // solhint-disable-next-line func-name-mixedcase
-    function __BaseStaking_init(
+    function initialize(
         address _owner,
         address _rewardsDistribution,
         address _rewardsToken,
@@ -160,11 +157,8 @@ abstract contract BaseStaking is
                      ACTIONS
     ****************************************/
 
-    /// @dev Hook that gets called after each stake action.
-    function _stakeCallback(uint256 _amount) internal virtual {}
-
     /**
-     * @dev Stake a given amount of the staking token for the given account.
+     * @dev Stake a given amount for the given account.
      * @param _account The address of the account to stake for
      * @param _amount The amount to stake
      */
@@ -179,12 +173,8 @@ abstract contract BaseStaking is
         require(_amount > 0, "Cannot stake 0");
         _totalSupply = _totalSupply.add(_amount);
         _balances[_account] = _balances[_account].add(_amount);
-        _stakeCallback(_amount);
         emit Staked(_account, _amount);
     }
-
-    /// @dev Hook that gets called after each withdraw action.
-    function _withdrawCallback(uint256 _amount) internal virtual {}
 
     /**
      * @dev Withdraw a given previously staked amount for the given account.
@@ -201,7 +191,6 @@ abstract contract BaseStaking is
         require(_amount > 0, "Cannot withdraw 0");
         _totalSupply = _totalSupply.sub(_amount);
         _balances[_account] = _balances[_account].sub(_amount);
-        _withdrawCallback(_amount);
         emit Withdrawn(_account, _amount);
     }
 
@@ -226,7 +215,7 @@ abstract contract BaseStaking is
 
     /**
      * @dev Notifies the contract that new rewards have been added and updates any
-     *      parameters to take the rewards into account.
+     *      parameters to take the new rewards into account.
      * @param _reward The amount of rewards that are getting distributed
      */
     function notifyRewardAmount(uint256 _reward)

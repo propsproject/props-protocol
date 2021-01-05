@@ -8,10 +8,20 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "../interfaces/ISPropsToken.sol";
 
 /**
- * @dev sProps tokens represent Props stake shares (each sProps token corresponds
- *   to a staked Props token). sProps are not transferrable, only mintable and
- *   burnable. Only the owner is permissioned to mint and burn (PropsController).
- *   sProps also count towards voting power in the governance process.
+ * @title  SPropsToken
+ * @author Forked from: Compound
+ *         Changes by: Props
+ * @notice The governance token in the Props protocol.
+ * @dev    sProps tokens represent Props stake shares (each sProps token
+ *         corresponds to a staked Props token). sProps are transferrable,
+ *         only mintable and burnable. Minting and burning are internal
+ *         actions, so they can only be indirectly triggered. sProps tokens
+ *         count towards voting power in the Props governance process.
+ *         Changes to the original Compound contract:
+ *         - the contract is upgradeable
+ *         - transfer-related actions are forbidden (the contract simply
+ *           reverts on transferring or approving)
+ *         - internal mint and burn functions were added
  */
 abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken {
     using SafeMathUpgradeable for uint256;
@@ -21,50 +31,50 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
     uint8 private _decimals;
     uint256 private _totalSupply;
 
-    /// @dev Official record of token balances for each account
+    // Official record of token balances for each account
     mapping(address => uint96) internal _balances;
 
-    /// @dev A record of each accounts delegate
+    // A record of each accounts delegate
     mapping(address => address) public delegates;
 
-    /// @dev A checkpoint for marking number of votes from a given block
+    // A checkpoint for marking number of votes from a given block
     struct Checkpoint {
         uint32 fromBlock;
         uint96 votes;
     }
 
-    /// @dev A record of votes checkpoints for each account, by index
+    // A record of votes checkpoints for each account, by index
     mapping(address => mapping(uint32 => Checkpoint)) public checkpoints;
 
-    /// @dev The number of checkpoints for each account
+    // The number of checkpoints for each account
     mapping(address => uint32) public numCheckpoints;
 
-    /// @dev The EIP-712 typehash for the contract's domain
+    // The EIP-712 typehash for the contract's domain
     // solhint-disable-next-line var-name-mixedcase
     bytes32 public DOMAIN_TYPEHASH;
 
-    /// @dev The EIP-712 typehash for the delegation struct used by the contract
+    // The EIP-712 typehash for the delegation struct used by the contract
     // solhint-disable-next-line var-name-mixedcase
     bytes32 public DELEGATION_TYPEHASH;
 
-    /// @dev A record of states for signing / validating signatures
+    // A record of states for signing / validating signatures
     mapping(address => uint256) public nonces;
 
-    /// @dev An event thats emitted when an account changes its delegate
+    // An event thats emitted when an account changes its delegate
     event DelegateChanged(
         address indexed delegator,
         address indexed fromDelegate,
         address indexed toDelegate
     );
 
-    /// @dev An event thats emitted when a delegate account's vote balance changes
+    // An event thats emitted when a delegate account's vote balance changes
     event DelegateVotesChanged(
         address indexed delegate,
         uint256 previousBalance,
         uint256 newBalance
     );
 
-    /// @dev The standard EIP-20 transfer event
+    // The standard EIP-20 transfer event
     event Transfer(address indexed from, address indexed to, uint256 amount);
 
     // solhint-disable-next-line func-name-mixedcase
@@ -103,7 +113,7 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
     }
 
     /**
-     * @dev Get the number of tokens held by the `account`
+     * @dev Get the number of tokens held by the `account`.
      * @param account The address of the account to get the balance of
      * @return The number of tokens held
      */
@@ -111,13 +121,13 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
         return _balances[account];
     }
 
-    /// @dev sProps are not transferrable, so here we simply revert
+    /// @dev sProps are not transferrable, so here we simply revert.
     function allowance(address, address) external view override returns (uint256) {
         revert("sProps are not transferrable");
     }
 
     /**
-     * @dev Mint new tokens
+     * @dev Mint new tokens.
      * @param dst The address of the destination account
      * @param rawAmount The number of tokens to be minted
      */
@@ -137,7 +147,7 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
     }
 
     /**
-     * @dev Burn existing tokens
+     * @dev Burn existing tokens.
      * @param src The address of the source account
      * @param rawAmount The number of tokens to be burned
      */
@@ -156,17 +166,17 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
         _moveDelegates(delegates[src], address(0), amount);
     }
 
-    /// @dev sProps are not transferrable, so here we simply revert
+    /// @dev sProps are not transferrable, so here we simply revert.
     function approve(address, uint256) external override returns (bool) {
         revert("sProps are not transferrable");
     }
 
-    /// @dev sProps are not transferrable, so here we simply revert
+    /// @dev sProps are not transferrable, so here we simply revert.
     function transfer(address, uint256) external override returns (bool) {
         revert("sProps are not transferrable");
     }
 
-    /// @dev sProps are not transferrable, so here we simply revert
+    /// @dev sProps are not transferrable, so here we simply revert.
     function transferFrom(
         address,
         address,
@@ -176,7 +186,7 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
     }
 
     /**
-     * @dev Delegate votes from `msg.sender` to `delegatee`
+     * @dev Delegate votes from `msg.sender` to `delegatee`.
      * @param delegatee The address to delegate votes to
      */
     function delegate(address delegatee) external override {
@@ -184,7 +194,7 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
     }
 
     /**
-     * @dev Delegates votes from signatory to `delegatee`
+     * @dev Delegates votes from signatory to `delegatee`.
      * @param delegatee The address to delegate votes to
      * @param nonce The contract state required to match the signature
      * @param expiry The time at which to expire the signature
@@ -214,7 +224,7 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
     }
 
     /**
-     * @dev Gets the current votes balance for `account`
+     * @dev Gets the current votes balance for `account`.
      * @param account The address to get votes balance
      * @return The number of current votes for `account`
      */
@@ -224,7 +234,7 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
     }
 
     /**
-     * @dev Determine the prior number of votes for an account as of a block number
+     * @dev Determine the prior number of votes for an account as of a block number.
      * @dev Block number must be a finalized block or else this function will revert to prevent misinformation.
      * @param account The address of the account to check
      * @param blockNumber The block number to get the vote balance at

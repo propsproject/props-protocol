@@ -16,7 +16,7 @@ import {
   getTxTimestamp,
   mineBlock,
   now,
-} from "../utils";
+} from "../../utils";
 
 chai.use(solidity);
 const { expect } = chai;

@@ -71,7 +71,7 @@ export const getApprovalDigest = async (
 // Generates the public key from a given private key
 export const getPublicKey = (privateKey: string): string => new ethers.Wallet(privateKey).address;
 
-// Encode a governance action"s parameters
+// Encode a governance action's parameters
 export const encodeParameters = (types: string[], values: any[]) => {
   const abi = new ethers.utils.AbiCoder();
   return abi.encode(types, values);
@@ -144,12 +144,6 @@ export const mineBlocks = async (numBlocks: number) => {
 export const now = async (): Promise<BigNumber> => {
   const latestBlock = await ethers.provider.getBlock("latest");
   return bn(latestBlock.timestamp);
-};
-
-// Retrieves the current block number on the blockchain
-export const currentBlockNumber = async (): Promise<BigNumber> => {
-  const latestBlock = await ethers.provider.getBlock("latest");
-  return bn(latestBlock.number);
 };
 
 // Pads a given number with 18 zeros

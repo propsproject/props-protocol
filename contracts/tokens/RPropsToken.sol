@@ -12,22 +12,27 @@ import "../interfaces/IRPropsToken.sol";
 import "../interfaces/IStaking.sol";
 
 /**
- * @dev The rProps token represents future Props rewards. Its role is to get
- *   distributed to the app and user Props staking contracts and have the
- *   rewards in those contracts be earned in rProps. The rProps token is
- *   swappable for regular Props tokens.
+ * @title  RPropsToken
+ * @author Props
+ * @dev    The rProps token represents future Props rewards. Its role is to get
+ *         distributed to the app and user Props staking contracts and have the
+ *         rewards in those contracts be earned in rProps. The rProps token is
+ *         then swappable for regular Props tokens.
  */
 contract RPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IRPropsToken {
     using SafeMathUpgradeable for uint256;
 
-    /// @dev The Props token contract
     address public propsToken;
 
+    /**
+     * @dev Initializer.
+     * @param _owner The owner of the contract
+     * @param _propsToken The address of the Props token contract
+     */
     function initialize(address _owner, address _propsToken) public initializer {
         OwnableUpgradeable.__Ownable_init();
         ERC20Upgradeable.__ERC20_init("rProps", "rProps");
 
-        // Set the proper owner
         if (_owner != msg.sender) {
             transferOwnership(_owner);
         }
@@ -37,8 +42,8 @@ contract RPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IRP
 
     /**
      * @dev Distribute rProps rewards to the app and user Props staking contracts.
-     *   This action mints the maximum possible amount of rProps and calls the
-     *   rewards distribution action to the staking contracts.
+     *      This action mints the maximum possible amount of rProps and calls the
+     *      rewards distribution action to the staking contracts.
      * @param _sPropsAppStaking The Props staking contract for apps
      * @param _appRewardsPercentage The percentage of minted rProps to get distributed to apps
      * @param _sPropsUserStaking The Props staking contract for users
@@ -53,7 +58,7 @@ contract RPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IRP
         // The percentages must add up to 100%
         require(
             _appRewardsPercentage.add(_userRewardsPercentage) == 1e6,
-            "Invalid rewards distribution"
+            "Invalid distribution percentages"
         );
 
         // Mint all available rProps
@@ -74,7 +79,7 @@ contract RPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IRP
     }
 
     /**
-     * @dev Swap an account's rProps balance for regular Props
+     * @dev Swap an account's rProps balance for regular Props.
      * @param account The swap recipient
      */
     function swap(address account) external override onlyOwner {

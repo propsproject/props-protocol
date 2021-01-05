@@ -8,26 +8,31 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 
 /**
- * @dev Each app in the Props protocol will get an associated AppToken contract.
- *   Each AppToken is ERC20 compatible and mintable according to an inflation rate.
+ * @title  AppToken
+ * @author Props
+ * @notice ERC20 token every app in the Props protocol gets associated with.
+ * @dev    Each app in the Props protocol will get an associated AppToken contract.
+ *         AppTokens are ERC20 compatible and mintable according to an inflation rate.
  */
 contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
-    /// @dev The Props protocol treasury address
+    // The Props protocol treasury address
     address public propsTreasury;
-    /// @dev The percentage of each mint that goes to the Props treasury (denoted in ppm)
+
+    // The percentage of each mint that goes to the Props treasury (denoted in ppm)
     uint256 public propsTreasuryMintPercentage;
-    /// @dev The delay before a newly set inflation rate goes into effect
+    // The delay before a newly set inflation rate goes into effect
     uint256 public inflationRateChangeDelay;
-    /// @dev The inflation rate of the app token
+    // The inflation rate of the app token
     uint256 public inflationRate;
-    /// @dev The new inflation rate that will go into effect once the delay passes
+    // The new inflation rate that will go into effect once the delay passes
     uint256 public pendingInflationRate;
-    /// @dev Time most recent mint occured at
+
+    // Time most recent mint occured at
     uint256 public lastMint;
-    /// @dev Time most recent inflation rate change occured at
+    // Time most recent inflation rate change occured at
     uint256 public lastInflationRateChange;
 
     // solhint-disable-next-line var-name-mixedcase
@@ -40,6 +45,7 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
     event InflationRateChanged(uint256 oldInflationRate, uint256 newInflationRate);
 
     /**
+     * @dev Initializer.
      * @param _name The name of the app token
      * @param _symbol The symbol of the app token
      * @param _amount Initial amount of app tokens to mint
@@ -56,7 +62,6 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
         OwnableUpgradeable.__Ownable_init();
         ERC20Upgradeable.__ERC20_init(_name, _symbol);
 
-        // Set the proper owner
         if (_owner != msg.sender) {
             transferOwnership(_owner);
         }
@@ -92,8 +97,8 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
 
     /**
      * @dev Mint additional tokens according to the current inflation rate.
-     *   The amount of tokens to get minted is determined by both the last
-     *   mint time and the inflation rate ((`currentTime` - `lastMint`) * `inflationRate`).
+     *      The amount of tokens to get minted is determined by both the last
+     *      mint time and the inflation rate ((`currentTime` - `lastMint`) * `inflationRate`).
      */
     function mint() external onlyOwner {
         _updateInflationRate();
@@ -112,8 +117,8 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
 
     /**
      * @dev Set a new inflation rate. Once a new inflation rate is set, it
-     *   takes some time before it goes into effect (the delay is determined
-     *   by `inflationRateChangeDelay`).
+     *      takes some time before it goes into effect (the delay is determined
+     *      by `inflationRateChangeDelay`).
      * @param _inflationRate The new inflation rate
      */
     function changeInflationRate(uint256 _inflationRate) external onlyOwner {
@@ -143,7 +148,7 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
     }
 
     /**
-     * @dev Allows for approvals to be made via secp256k1 signatures
+     * @dev Allows for approvals to be made via off-chain signatures.
      * @param _owner The approver of the tokens
      * @param _spender The spender of the tokens
      * @param _amount Approved amount
@@ -187,7 +192,6 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
         _approve(_owner, _spender, _amount);
     }
 
-    /// @dev Internal function for making sure the inflation rate is up-todate
     function _updateInflationRate() internal {
         // If the delay for the new inflation rate passed, update the inflation rate
         if (block.timestamp.sub(lastInflationRateChange) > inflationRateChangeDelay) {
@@ -195,7 +199,6 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
         }
     }
 
-    /// @dev Internal function for getting the current chain id
     function _getChainId() internal pure returns (uint256) {
         uint256 chainId;
         assembly {

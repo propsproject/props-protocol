@@ -20,7 +20,7 @@ import "./tokens/SPropsToken.sol";
  * @dev    It is responsible for proxying staking-related actions to the appropiate
  *         app token staking contracts. Moreover, it is the sProps ERC20 token, and
  *         it also handles sProps minting/burning and staking, swapping earned rProps
- *         for regular Props and handles locking users rProps rewards.
+ *         for regular Props and locking users rProps rewards.
  */
 contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFactory, SPropsToken {
     using SafeMathUpgradeable for uint256;
@@ -515,10 +515,6 @@ contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFacto
                 }
 
                 // Stake the Props in the app token staking contract
-                IERC20Upgradeable(propsToken).approve(
-                    appTokenToStaking[_appTokens[i]],
-                    amountToStake
-                );
                 IStaking(appTokenToStaking[_appTokens[i]]).stake(_to, amountToStake);
 
                 // Stake the sProps in the app sProps staking contract

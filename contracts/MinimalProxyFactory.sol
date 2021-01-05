@@ -2,11 +2,11 @@
 pragma solidity ^0.6.0;
 
 /**
- * @dev Factory contract for deploying minimal proxies.
+ * @title  MinimalProxyFactory
+ * @author Forked from: OpenZeppelin
+ * @dev    Factory contract for deploying minimal proxies.
  */
 abstract contract MinimalProxyFactory {
-    // Taken from https://github.com/OpenZeppelin/openzeppelin-sdk/blob/master/packages/lib/contracts/upgradeability/ProxyFactory.sol
-
     event ProxyCreated(address proxy);
 
     /**

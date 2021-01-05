@@ -28,6 +28,10 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: { accounts },
+    ropsten: {
+      url: `https://ropsten.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+      accounts: [`${process.env.ACCOUNT0}`, `${process.env.ACCOUNT1}`, `${process.env.ACCOUNT2}`],
+    },
   },
 };
 

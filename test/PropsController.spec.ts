@@ -5,14 +5,7 @@ import { solidity } from "ethereum-waffle";
 import { ethers } from "hardhat";
 
 import accounts from "../test-accounts";
-import type {
-  AppToken,
-  AppTokenStaking,
-  PropsController,
-  RPropsToken,
-  SPropsStaking,
-  TestPropsToken,
-} from "../typechain";
+import type { AppToken, PropsController, RPropsToken, Staking, TestPropsToken } from "../typechain";
 import {
   bn,
   daysToTimestamp,
@@ -25,7 +18,7 @@ import {
   getTxTimestamp,
   mineBlock,
   now,
-} from "./utils";
+} from "../utils";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -38,8 +31,8 @@ describe("PropsController", () => {
 
   let propsToken: TestPropsToken;
   let rPropsToken: RPropsToken;
-  let sPropsAppStaking: SPropsStaking;
-  let sPropsUserStaking: SPropsStaking;
+  let sPropsAppStaking: Staking;
+  let sPropsUserStaking: Staking;
   let propsController: PropsController;
 
   const PROPS_TOKEN_AMOUNT = expandTo18Decimals(100000);
@@ -52,7 +45,7 @@ describe("PropsController", () => {
   // Distributes 12.5% of the remaining rewards pool each year
   const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
 
-  const deployAppToken = async (): Promise<[AppToken, AppTokenStaking]> => {
+  const deployAppToken = async (): Promise<[AppToken, Staking]> => {
     const tx = await propsController
       .connect(appTokenOwner)
       .deployAppToken(
@@ -72,9 +65,7 @@ describe("PropsController", () => {
 
     return [
       (await ethers.getContractFactory("AppToken")).attach(appTokenAddress) as AppToken,
-      (await ethers.getContractFactory("AppTokenStaking")).attach(
-        appTokenStakingAddress
-      ) as AppTokenStaking,
+      (await ethers.getContractFactory("Staking")).attach(appTokenStakingAddress) as Staking,
     ];
   };
 
@@ -82,10 +73,7 @@ describe("PropsController", () => {
     [propsTreasury, appTokenOwner, alice, bob] = await ethers.getSigners();
 
     const appTokenLogic = await deployContract<AppToken>("AppToken", propsTreasury);
-    const appTokenStakingLogic = await deployContract<AppTokenStaking>(
-      "AppTokenStaking",
-      propsTreasury
-    );
+    const appTokenStakingLogic = await deployContract<Staking>("Staking", propsTreasury);
 
     propsToken = await deployContractUpgradeable("TestPropsToken", propsTreasury, [
       PROPS_TOKEN_AMOUNT,
@@ -104,7 +92,7 @@ describe("PropsController", () => {
       propsToken.address,
     ]);
 
-    sPropsAppStaking = await deployContractUpgradeable("SPropsStaking", propsTreasury, [
+    sPropsAppStaking = await deployContractUpgradeable("Staking", propsTreasury, [
       propsController.address,
       rPropsToken.address,
       rPropsToken.address,
@@ -112,7 +100,7 @@ describe("PropsController", () => {
       DAILY_REWARDS_EMISSION,
     ]);
 
-    sPropsUserStaking = await deployContractUpgradeable("SPropsStaking", propsTreasury, [
+    sPropsUserStaking = await deployContractUpgradeable("Staking", propsTreasury, [
       propsController.address,
       rPropsToken.address,
       rPropsToken.address,
@@ -362,6 +350,64 @@ describe("PropsController", () => {
     await propsController
       .connect(alice)
       .stakeOnBehalf([appToken.address], [stakeAmount], bob.address);
+
+    // Check the sProps balance and staked amounts are all under Bob' ownership
+    expect(await propsController.balanceOf(bob.address)).to.eq(bn(100));
+    expect(await appTokenStaking.balanceOf(bob.address)).to.eq(bn(100));
+    expect(await sPropsAppStaking.balanceOf(appToken.address)).to.eq(bn(100));
+    expect(await sPropsUserStaking.balanceOf(bob.address)).to.eq(bn(100));
+
+    // Check Alice has nothing staked
+    expect(await propsController.balanceOf(alice.address)).to.eq(bn(0));
+    expect(await appTokenStaking.balanceOf(alice.address)).to.eq(bn(0));
+    expect(await sPropsUserStaking.balanceOf(alice.address)).to.eq(bn(0));
+  });
+
+  it("stake on behalf by off-chain signature", async () => {
+    const [appToken, appTokenStaking] = await deployAppToken();
+
+    const stakeAmount = bn(100);
+
+    const permitDeadline = (await now()).add(daysToTimestamp(1));
+    const approvalDigest = await getApprovalDigest(
+      propsToken,
+      {
+        owner: alice.address,
+        spender: propsController.address,
+        value: stakeAmount,
+      },
+      await propsToken.nonces(alice.address),
+      permitDeadline
+    );
+
+    // Sign the approval digest
+    const sig = ethUtil.ecsign(
+      Buffer.from(approvalDigest.slice(2), "hex"),
+      Buffer.from(
+        accounts
+          .find(({ privateKey }) => getPublicKey(privateKey) === alice.address)!
+          .privateKey.slice(2),
+        "hex"
+      )
+    );
+
+    // Stake by off-chain signature
+    await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
+    await propsToken.connect(alice).approve(propsController.address, stakeAmount);
+    await propsController
+      .connect(alice)
+      .stakeOnBehalfBySig(
+        [appToken.address],
+        [stakeAmount],
+        bob.address,
+        alice.address,
+        propsController.address,
+        stakeAmount,
+        permitDeadline,
+        sig.v,
+        sig.r,
+        sig.s
+      );
 
     // Check the sProps balance and staked amounts are all under Bob' ownership
     expect(await propsController.balanceOf(bob.address)).to.eq(bn(100));

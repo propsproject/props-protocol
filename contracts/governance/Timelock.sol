@@ -3,6 +3,11 @@ pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 
+/**
+ * @title  Timelock
+ * @author Forked from: Compound
+ * @notice Timelock contract for Props governance.
+ */
 contract Timelock {
     using SafeMathUpgradeable for uint256;
 
