@@ -4,7 +4,7 @@ rProps tokens represent future Props rewards. They were introduced as a workarou
 
 The `RPropsToken` contract is owned by the `PropsController`. Moreover, the `RPropsToken` contract should have minting permissions on the Props token contract. Also, the `RPropsToken` contract should be the designated rewards distribution address in the staking contracts for earning apps and users Props rewards.
 
-#### Architecture
+## Architecture
 
 ##### Distribute rewards
 

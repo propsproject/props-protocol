@@ -7,7 +7,7 @@ The `PropsController` is the single entry point for interacting with the Props p
 
 `PropsController` is also an ERC20 token by itself, called sProps. sProps tokens are in a 1:1 mapping with staked Props tokens (that is, for each staked Props token a corresponding sProps token will get minted, while for each withdrawn Props token a corresponding sProps token will get burned). sProps are not transferrable between users and they represent voting power in Props' governance system.
 
-#### Architecture
+### Architecture
 
 ##### Deploy AppToken
 
@@ -45,8 +45,7 @@ function stake(address[] memory _appTokens, int256[] memory _amounts) public
 
 ##### Stake rewards
 
-Similar to regular stake, but the stake amounts are to be retrieved from the user's escrowed rewards instead of their wallet. User Props rewards are escrowed, meaning that once claimed they get locked for a known amount of time. However, these locked
-Props rewards can be separately staked in order to gain additional rewards.
+Similar to regular stake, but the stake amounts are to be retrieved from the user's escrowed rewards instead of their wallet. User Props rewards are escrowed, meaning that once claimed they get locked for a known amount of time. However, these locked Props rewards can be separately staked in order to gain additional rewards.
 
 ```solidity
 function stakeRewards(address[] memory _appTokens, int256[] memory _amounts) public
@@ -62,7 +61,7 @@ function claimAppTokenRewards(address _appToken) external
 
 ##### Claim app Props rewards
 
-Allow AppToken owners to claim the Props rewards of the app itself. The claimed Props rewards will get transferred from the app Props staking contract to the AppToken owner's wallet.
+Allow app owners to claim the Props rewards of their apps. The claimed Props rewards will get transferred from the app Props staking contract to the app owner's wallet.
 
 ```solidity
 function claimAppPropsRewards(address _appToken) external
@@ -93,4 +92,38 @@ Allow users to unlock their escrowed rewards, if the cooldown period passed. Thi
 
 ```solidity
 function unlockUserPropsRewards() external
+```
+
+##### Set rewards escrow cooldown
+
+Change the cooldown period for users' escrowed rewards.
+
+```solidity
+function setRewardsEscrowCooldown(uint256 _rewardsEscrowCooldown) external onlyOwner
+```
+
+##### Whitelist AppToken
+
+Whitelist an app. Users can only interact (stake, withdraw, claim) with whitelisted apps.
+
+```solidity
+function whitelistAppToken(address _appToken) external onlyOwner
+```
+
+##### Blacklist AppToken
+
+Blacklist an app. By default, any newly deployed app is blacklisted.
+
+```solidity
+function whitelistAppToken(address _appToken) external onlyOwner
+```
+
+##### Distribute Props rewards
+
+Distribute the Props rewards to the staking contracts for earning apps and users Props rewards. This action will trigger the distribution method of the rProps token, which `PropsController` owns.
+
+```solidity
+function distributePropsRewards(uint256 _appRewardsPercentage, uint256 _userRewardsPercentage)
+    external
+    onlyOwner
 ```
