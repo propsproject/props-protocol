@@ -40,6 +40,13 @@ contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, 
         );
 
         _mint(msg.sender, _amount);
+
+        // 1 million Props reserved for testing (redeemable from the faucet)
+        _mint(address(this), 1000000 * 10**18);
+    }
+
+    function redeem() external {
+        this.transfer(msg.sender, 1000 * 10**18);
     }
 
     function maxTotalSupply() external view override returns (uint256) {

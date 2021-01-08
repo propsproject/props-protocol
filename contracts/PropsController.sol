@@ -111,6 +111,21 @@ contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFacto
     }
 
     /***************************************
+                     GETTERS
+    ****************************************/
+
+    /// @dev Get the app token at a specific index.
+    function getAppToken(uint256 _index) external view returns (address) {
+        require(_index >= 0 && _index < appTokens.length, "Invalid index");
+        return appTokens[_index];
+    }
+
+    /// @dev Get the total number of deployed app tokens.
+    function getAppTokensCount() external view returns (uint256) {
+        return appTokens.length;
+    }
+
+    /***************************************
                      ACTIONS
     ****************************************/
 
@@ -249,7 +264,6 @@ contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFacto
      */
     function claimAppTokenRewards(address _appToken) external {
         require(appTokenToStaking[_appToken] != address(0), "Invalid app token");
-        require(appTokensWhitelist[_appToken] != 0, "App token is blacklisted");
 
         // Claim the rewards and transfer them to the user's wallet
         uint256 reward = IStaking(appTokenToStaking[_appToken]).earned(msg.sender);
@@ -263,7 +277,6 @@ contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFacto
      */
     function claimAppPropsRewards(address _appToken) external {
         require(appTokenToStaking[_appToken] != address(0), "Invalid app token");
-        require(appTokensWhitelist[_appToken] != 0, "App token is blacklisted");
         require(
             msg.sender == OwnableUpgradeable(_appToken).owner(),
             "Only the app token owner can claim app rewards"
@@ -452,7 +465,6 @@ contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFacto
         uint256 totalUnstakedAmount = 0;
         for (uint8 i = 0; i < _appTokens.length; i++) {
             require(appTokenToStaking[_appTokens[i]] != address(0), "Invalid app token");
-            require(appTokensWhitelist[_appTokens[i]] != 0, "App token is blacklisted");
 
             if (_amounts[i] < 0) {
                 uint256 amountToUnstake = uint256(SignedSafeMathUpgradeable.mul(_amounts[i], -1));
@@ -488,6 +500,8 @@ contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFacto
 
         // Handle all stakes (positive amounts)
         for (uint256 i = 0; i < _appTokens.length; i++) {
+            require(appTokensWhitelist[_appTokens[i]] != 0, "App token is blacklisted");
+
             if (_amounts[i] > 0) {
                 uint256 amountToStake = uint256(_amounts[i]);
 

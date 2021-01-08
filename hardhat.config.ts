@@ -28,9 +28,17 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: { accounts },
+    local: {
+      url: "http://localhost:8545",
+      accounts: {
+        mnemonic: "hip mention twenty random stairs nasty pistol essay giraffe season shuffle ring",
+      },
+    },
     ropsten: {
       url: `https://ropsten.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
-      accounts: [`${process.env.ACCOUNT0}`, `${process.env.ACCOUNT1}`, `${process.env.ACCOUNT2}`],
+      accounts: {
+        mnemonic: "hip mention twenty random stairs nasty pistol essay giraffe season shuffle ring",
+      },
     },
   },
 };
