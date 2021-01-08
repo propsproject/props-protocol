@@ -116,7 +116,7 @@ contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFacto
 
     /// @dev Get the app token at a specific index.
     function getAppToken(uint256 _index) external view returns (address) {
-        require(_index >= 0 && _index < appTokens.length, "Invalid index");
+        require(_index < appTokens.length, "Invalid index");
         return appTokens[_index];
     }
 
