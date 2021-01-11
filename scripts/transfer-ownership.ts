@@ -1,12 +1,17 @@
-import { Contract } from "ethers";
-import { ethers, upgrades } from "hardhat";
-
+import { upgrades } from "hardhat";
 
 async function main() {
-  const newProxyOwner:string = "0x0"; // use 0x0 to renounce ownership - irreversible
-      
-  await upgrades.admin.transferProxyAdminOwnership(newProxyOwner)  
-  console.log(`proxy admin owner changed to: ${newProxyOwner}`);  
+  const owner = process.env.OWNER;
+
+  if (!owner) {
+    throw new Error(`Missing OWNER - the new owner of the ProxyAdmin contract`);
+  }
+
+  console.log("Starting transferring ownership...");
+
+  await upgrades.admin.transferProxyAdminOwnership(owner);
+
+  console.log("Ownership transfer successfully done!");
 }
 
 main()

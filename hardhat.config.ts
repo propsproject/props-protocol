@@ -11,6 +11,8 @@ import "solidity-coverage";
 
 import accounts from "./test-accounts";
 
+const MNEMONIC = "hip mention twenty random stairs nasty pistol essay giraffe season shuffle ring";
+
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
   solidity: {
@@ -31,13 +33,13 @@ const config: HardhatUserConfig = {
     local: {
       url: "http://localhost:8545",
       accounts: {
-        mnemonic: "hip mention twenty random stairs nasty pistol essay giraffe season shuffle ring",
+        mnemonic: `${MNEMONIC}`,
       },
     },
     ropsten: {
       url: `https://ropsten.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
       accounts: {
-        mnemonic: "hip mention twenty random stairs nasty pistol essay giraffe season shuffle ring",
+        mnemonic: `${MNEMONIC}`,
       },
     },
   },

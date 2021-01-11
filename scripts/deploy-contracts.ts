@@ -33,7 +33,11 @@ async function main() {
 
   const network = (await ethers.provider.getNetwork()).name;
 
+  console.log(`Detected network: ${network}`);
+
   if (fs.existsSync(`${network}.json`)) {
+    console.log(`Contracts file found, connecting to deployed instances...`);
+
     // Connect to deployed contracts
     const contractAddresses = JSON.parse(fs.readFileSync(`${network}.json`).toString());
 
@@ -64,7 +68,11 @@ async function main() {
     sPropsUserStaking = (await ethers.getContractFactory("Staking")).attach(
       contractAddresses.sPropsUserStaking
     ) as Staking;
+
+    console.log("Connected successfully!");
   } else {
+    console.log("Contracts file not found, deploying new contract instances...");
+
     // Deploy new contracts
     const contractAddresses: any = {};
 
@@ -116,6 +124,10 @@ async function main() {
     ]);
     contractAddresses.sPropsUserStaking = sPropsUserStaking.address;
 
+    console.log("Deployment successfully done!");
+
+    console.log("Initializing contracts state...");
+
     // The rProps token contract is allowed to mint new Props
     await propsToken.connect(deployer).setMinter(rPropsToken.address, { gasLimit: 1000000 });
 
@@ -129,6 +141,8 @@ async function main() {
     await propsController
       .connect(propsControllerOwner)
       .setSPropsUserStaking(sPropsUserStaking.address, { gasLimit: 1000000 });
+
+    console.log("Contracts successfully initialized!");
 
     fs.writeFileSync(`${network}.json`, JSON.stringify(contractAddresses, null, 2));
   }

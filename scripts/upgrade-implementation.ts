@@ -1,13 +1,22 @@
-import { Contract } from "ethers";
 import { ethers, upgrades } from "hardhat";
 
 async function main() {
-  
-  const proxyAddress = process.argv[2]; // passed as argument to the script
-  const logicContractFactory = await ethers.getContractFactory("AppToken");
-  const res:Contract = await upgrades.upgradeProxy(proxyAddress, logicContractFactory);
-  console.log(`upgrade done: ${res.address}`); 
-   
+  const proxyAddress = process.env.PROXY_ADDRESS;
+  const contractName = process.env.CONTRACT_NAME;
+
+  if (!proxyAddress) {
+    throw new Error(`Missing PROXY_ADDRESS - the proxy contract to get upgraded`);
+  }
+  if (!contractName) {
+    throw new Error(`Missing CONTRACT_NAME - the name for the proxy's implementation contract`);
+  }
+
+  console.log("Starting upgrading...");
+
+  const factory = await ethers.getContractFactory(contractName);
+  await upgrades.upgradeProxy(proxyAddress, factory, { unsafeAllowCustomTypes: true });
+
+  console.log("Upgrade successfully done!");
 }
 
 main()
