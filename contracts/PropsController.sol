@@ -329,7 +329,7 @@ contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFacto
         int256[] memory amounts = new int256[](_percentages.length);
         for (uint8 i = 0; i < _percentages.length; i++) {
             if (i < _percentages.length.sub(1)) {
-                // Just making sure nothing gets dropped
+                // Make sure nothing gets lost
                 amounts[i] = _safeInt256(reward.mul(_percentages[i]).div(1e6));
             } else {
                 amounts[i] = _safeInt256(reward.sub(totalAmountSoFar));

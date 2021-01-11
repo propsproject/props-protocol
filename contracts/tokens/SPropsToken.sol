@@ -13,7 +13,7 @@ import "../interfaces/ISPropsToken.sol";
  *         Changes by: Props
  * @notice The governance token in the Props protocol.
  * @dev    sProps tokens represent Props stake shares (each sProps token
- *         corresponds to a staked Props token). sProps are transferrable,
+ *         corresponds to a staked Props token). sProps are not transferrable,
  *         only mintable and burnable. Minting and burning are internal
  *         actions, so they can only be indirectly triggered. sProps tokens
  *         count towards voting power in the Props governance process.

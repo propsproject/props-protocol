@@ -197,8 +197,7 @@ describe("GovernorAlpha", () => {
     );
     expect(voter).to.eq(alice.address);
     expect(support).to.eq(true);
-    // TODO Change to hardcoded values
-    expect(votes).to.eq(await propsController.getPriorVotes(alice.address, proposalStartBlock));
+    expect(votes).to.eq(bn(0));
 
     // Vote once again on proposal, this time from an account that has voting power
     tx = await governorAlpha.connect(bob).castVote(proposalId, true);
@@ -209,8 +208,7 @@ describe("GovernorAlpha", () => {
     );
     expect(voter).to.eq(bob.address);
     expect(support).to.eq(true);
-    // TODO Change to hardcoded values
-    expect(votes).to.eq(await propsController.getPriorVotes(bob.address, proposalStartBlock));
+    expect(votes).to.eq(stakeAmount);
 
     // Fast forward until the start of the voting period
     await mineBlocks(proposalEndBlock - proposalStartBlock + 1);

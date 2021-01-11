@@ -101,7 +101,10 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
      *      mint time and the inflation rate ((`currentTime` - `lastMint`) * `inflationRate`).
      */
     function mint() external onlyOwner {
-        _updateInflationRate();
+        // If the delay for the new inflation rate passed, update the inflation rate
+        if (block.timestamp.sub(lastInflationRateChange) > inflationRateChangeDelay) {
+            inflationRate = pendingInflationRate;
+        }
 
         uint256 amount = inflationRate.mul(block.timestamp.sub(lastMint));
         if (amount != 0) {
@@ -192,13 +195,6 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
         _approve(_owner, _spender, _amount);
     }
 
-    function _updateInflationRate() internal {
-        // If the delay for the new inflation rate passed, update the inflation rate
-        if (block.timestamp.sub(lastInflationRateChange) > inflationRateChangeDelay) {
-            inflationRate = pendingInflationRate;
-        }
-    }
-
     function _getChainId() internal pure returns (uint256) {
         uint256 chainId;
         assembly {
@@ -206,16 +202,4 @@ contract AppToken is Initializable, OwnableUpgradeable, ERC20Upgradeable {
         }
         return chainId;
     }
-
-    // function getTotalSupply() external returns (uint256) {
-    //     _updateInflationRate();
-
-    //     return super.totalSupply().add(block.timestamp.sub(lastMint).mul(inflationRate));
-    // }
-
-    // TODO Handle non-overridable `totalSupply`
-    // OZ's ERC20 `totalSupply` function is not virtual so it can't be overriden
-    // function totalSupply() public override view returns (uint256) {
-    //     return super.totalSupply().add(block.timestamp.sub(lastMint).mul(inflationRate));
-    // }
 }
