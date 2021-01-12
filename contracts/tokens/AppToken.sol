@@ -233,10 +233,16 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
         _;
     }
 
-    /// @dev Mark the token as non-transferrable.
+    /// @dev Pause transfers.
     function pause() public override onlyOwner {
         require(!paused, "Already paused");
         paused = true;
+    }
+
+    /// @dev Unpause transfers.
+    function unpause() external override onlyOwner {
+        require(paused, "Already unpaused");
+        paused = false;
     }
 
     /// @dev Whitelist an address for transfers.
