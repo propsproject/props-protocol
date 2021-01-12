@@ -6,6 +6,7 @@ import { HardhatUserConfig } from "hardhat/types";
 import "@nomiclabs/hardhat-waffle";
 import "@nomiclabs/hardhat-etherscan";
 import "@openzeppelin/hardhat-upgrades";
+import "hardhat-gas-reporter";
 import "hardhat-typechain";
 import "solidity-coverage";
 
@@ -42,6 +43,9 @@ const config: HardhatUserConfig = {
         mnemonic: `${MNEMONIC}`,
       },
     },
+  },
+  gasReporter: {
+    enabled: process.env.REPORT_GAS ? true : false,
   },
 };
 

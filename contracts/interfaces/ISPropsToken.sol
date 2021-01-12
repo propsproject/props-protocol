@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.6.0;
+pragma solidity 0.6.8;
 
 interface ISPropsToken {
     function getCurrentVotes(address account) external view returns (uint96);

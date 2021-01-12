@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.6.0;
+pragma solidity 0.6.8;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SignedSafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 
 import "./MinimalProxyFactory.sol";
 import "./interfaces/IPropsToken.sol";
@@ -24,6 +25,7 @@ import "./tokens/SPropsToken.sol";
  */
 contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFactory, SPropsToken {
     using SafeMathUpgradeable for uint256;
+    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     // The Props protocol treasury address
     address public propsTreasury;
@@ -268,7 +270,7 @@ contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFacto
         // Claim the rewards and transfer them to the user's wallet
         uint256 reward = IStaking(appTokenToStaking[_appToken]).earned(msg.sender);
         IStaking(appTokenToStaking[_appToken]).claimReward(msg.sender);
-        IERC20Upgradeable(_appToken).transfer(msg.sender, reward);
+        IERC20Upgradeable(_appToken).safeTransfer(msg.sender, reward);
     }
 
     /**
@@ -285,7 +287,7 @@ contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFacto
         // Claim the rewards and transfer them to the user's wallet
         uint256 reward = IStaking(sPropsAppStaking).earned(_appToken);
         IStaking(sPropsAppStaking).claimReward(_appToken);
-        IERC20Upgradeable(rPropsToken).transfer(msg.sender, reward);
+        IERC20Upgradeable(rPropsToken).safeTransfer(msg.sender, reward);
         // Since the rewards are in rProps, swap it for regular Props
         IRPropsToken(rPropsToken).swap(msg.sender);
     }
@@ -356,7 +358,7 @@ contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFacto
         rewardsEscrow[msg.sender] = 0;
 
         // Transfer the rewards to the user's wallet
-        IERC20Upgradeable(propsToken).transfer(msg.sender, escrowedRewards);
+        IERC20Upgradeable(propsToken).safeTransfer(msg.sender, escrowedRewards);
     }
 
     /***************************************
@@ -516,7 +518,11 @@ contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFacto
                         rewardsEscrow[msg.sender] = rewardsEscrow[msg.sender].sub(left);
                     } else {
                         // Otherwise, if we are handling the principal, transfer the needed Props
-                        IERC20Upgradeable(propsToken).transferFrom(msg.sender, address(this), left);
+                        IERC20Upgradeable(propsToken).safeTransferFrom(
+                            msg.sender,
+                            address(this),
+                            left
+                        );
                     }
 
                     // Mint corresponding sProps
@@ -560,7 +566,7 @@ contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFacto
                 rewardsEscrowUnlock[_to] = block.timestamp.add(rewardsEscrowCooldown);
             } else {
                 // Transfer any left Props back to the user
-                IERC20Upgradeable(propsToken).transfer(_to, totalUnstakedAmount);
+                IERC20Upgradeable(propsToken).safeTransfer(_to, totalUnstakedAmount);
             }
 
             // Burn the sProps
