@@ -104,7 +104,7 @@ function setRewardsEscrowCooldown(uint256 _rewardsEscrowCooldown) external onlyO
 
 ##### Whitelist AppToken
 
-Whitelist an app. Users can only interact (stake, withdraw, claim) with whitelisted apps.
+Whitelist an app. Users can only stake to whitelisted apps.
 
 ```solidity
 function whitelistAppToken(address _appToken) external onlyOwner
@@ -112,7 +112,7 @@ function whitelistAppToken(address _appToken) external onlyOwner
 
 ##### Blacklist AppToken
 
-Blacklist an app. By default, any newly deployed app is blacklisted.
+Blacklist an app. By default, any newly deployed app is blacklisted. Although staking to blacklisted apps is forbidden, withdrawing and claiming are still available.
 
 ```solidity
 function whitelistAppToken(address _appToken) external onlyOwner
