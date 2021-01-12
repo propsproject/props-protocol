@@ -6,3 +6,7 @@ The Props protocol comprises of a suite of upgradeable smart contracts. More det
 - [`PropsController`](./docs/PropsController.md)
 - [`RPropsToken`](./docs/RPropsToken.md)
 - [`Staking`](./docs/Staking.md)
+
+The following also provide a detailed overview of certain aspects of the Props protocol:
+
+- [Admin Actions](./docs/AdminActions.md)
