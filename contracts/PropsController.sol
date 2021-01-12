@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 
 import "./MinimalProxyFactory.sol";
+import "./interfaces/IAppToken.sol";
 import "./interfaces/IPropsToken.sol";
 import "./interfaces/IRPropsToken.sol";
 import "./interfaces/IStaking.sol";
@@ -172,6 +173,19 @@ contract PropsController is Initializable, OwnableUpgradeable, MinimalProxyFacto
                 _dailyRewardEmission
             );
         address appTokenStakingProxy = deployMinimal(appTokenStakingLogic, appTokenStakingPayload);
+
+        // Pause app token transfers
+        IAppToken(appTokenProxy).pause();
+
+        // Whitelist the app token owner
+        IAppToken(appTokenProxy).whitelistAddress(_owner);
+        // Whitelist the PropsController contract
+        IAppToken(appTokenProxy).whitelistAddress(address(this));
+        // Whitelist the app token staking contract
+        IAppToken(appTokenProxy).whitelistAddress(appTokenStakingProxy);
+
+        // Transfer ownership to the app token owner
+        OwnableUpgradeable(appTokenProxy).transferOwnership(_owner);
 
         // Save the app token and its corresponding staking contract
         appTokens.push(appTokenProxy);

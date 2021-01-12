@@ -78,7 +78,7 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
     event Transfer(address indexed from, address indexed to, uint256 amount);
 
     // solhint-disable-next-line func-name-mixedcase
-    function __SPropsToken_init() public initializer {
+    function __SPropsToken_init() internal initializer {
         _name = "sProps";
         _symbol = "sProps";
         _decimals = 18;

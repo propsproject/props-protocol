@@ -103,6 +103,20 @@ describe("AppToken", () => {
     );
   });
 
+  it("totalSupply takes into account the inflation rate", async () => {
+    const newInflationRate = bn(100);
+
+    // There is a delay before a change in the inflation rate goes into effect
+    await appToken.connect(appTokenOwner).changeInflationRate(newInflationRate);
+    expect(await appToken.totalSupply()).to.eq(APP_TOKEN_AMOUNT);
+
+    // Fast-forward until after the inflation rate delay
+    await mineBlock((await now()).add(await appToken.inflationRateChangeDelay()).add(1));
+
+    // Calling totalSupply should take into account the new inflation rate
+    expect(await appToken.totalSupply()).to.be.gte(APP_TOKEN_AMOUNT);
+  });
+
   it("recover tokens accidentally sent to contract", async () => {
     const erc20: TestErc20 = await deployContractUpgradeable("TestERC20", alice, [
       "Test",
@@ -174,5 +188,32 @@ describe("AppToken", () => {
           sig.s
         )
     ).to.be.revertedWith("Invalid signature");
+  });
+
+  it("non-transferrable when paused", async () => {
+    // Pause
+    await appToken.connect(appTokenOwner).pause();
+
+    // Try transferring
+    await expect(
+      appToken.connect(appTokenOwner).transfer(alice.address, bn(100))
+    ).to.be.revertedWith("Paused");
+
+    // Whitelist the app token owner
+    await appToken.connect(appTokenOwner).whitelistAddress(appTokenOwner.address);
+
+    // Only whitelisted addresses are able to transfer
+    await appToken.connect(appTokenOwner).transfer(alice.address, bn(100));
+    await expect(
+      appToken.connect(alice).transfer(appTokenOwner.address, bn(100))
+    ).to.be.revertedWith("Paused");
+
+    // Blacklist the app token owner
+    await appToken.connect(appTokenOwner).blacklistAddress(appTokenOwner.address);
+
+    // After blacklist, transfers will fail once again
+    await expect(
+      appToken.connect(appTokenOwner).transfer(alice.address, bn(100))
+    ).to.be.revertedWith("Paused");
   });
 });
