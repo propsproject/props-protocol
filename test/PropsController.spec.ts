@@ -2,6 +2,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-wit
 import chai from "chai";
 import * as ethUtil from "ethereumjs-util";
 import { solidity } from "ethereum-waffle";
+import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 
 import accounts from "../test-accounts";
@@ -45,7 +46,9 @@ describe("PropsController", () => {
   // Distributes 12.5% of the remaining rewards pool each year
   const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
 
-  const deployAppToken = async (): Promise<[AppToken, Staking]> => {
+  const deployAppToken = async (
+    rewardsDistributedPercentage: BigNumber = bn(0)
+  ): Promise<[AppToken, Staking]> => {
     const tx = await propsController
       .connect(appTokenOwner)
       .deployAppToken(
@@ -53,7 +56,8 @@ describe("PropsController", () => {
         APP_TOKEN_SYMBOL,
         APP_TOKEN_AMOUNT,
         appTokenOwner.address,
-        DAILY_REWARDS_EMISSION
+        DAILY_REWARDS_EMISSION,
+        rewardsDistributedPercentage
       );
     const [appTokenAddress, appTokenStakingAddress] = await getEvent(
       await tx.wait(),
@@ -80,6 +84,7 @@ describe("PropsController", () => {
     ]);
 
     propsController = await deployContractUpgradeable("PropsController", propsTreasury, [
+      propsTreasury.address,
       propsTreasury.address,
       propsTreasury.address,
       propsToken.address,
@@ -121,7 +126,8 @@ describe("PropsController", () => {
   });
 
   it("successfully deploys a new app token", async () => {
-    const [appToken, appTokenStaking] = await deployAppToken();
+    const rewardsDistributedPercentage = bn(10000);
+    const [appToken, appTokenStaking] = await deployAppToken(rewardsDistributedPercentage);
 
     // Check that the staking contract was correctly associated with the app token
     expect(await propsController.appTokenToStaking(appToken.address)).to.eq(
@@ -135,13 +141,21 @@ describe("PropsController", () => {
 
     // Check that the initial supply was properly distributed (5% goes to the Props treasury)
     expect(await appToken.balanceOf(propsTreasury.address)).to.eq(APP_TOKEN_AMOUNT.div(20));
+
+    const ownerAmount = APP_TOKEN_AMOUNT.sub(APP_TOKEN_AMOUNT.div(20));
     expect(await appToken.balanceOf(appTokenOwner.address)).to.eq(
-      APP_TOKEN_AMOUNT.sub(APP_TOKEN_AMOUNT.div(20))
+      ownerAmount.sub(ownerAmount.mul(rewardsDistributedPercentage).div(1000000))
     );
 
     // Check basic staking information
     expect(await appTokenStaking.stakingToken()).to.eq(propsToken.address);
     expect(await appTokenStaking.rewardsToken()).to.eq(appToken.address);
+
+    // Check the initial rewards were properly distributed on deployment
+    expect(await appTokenStaking.rewardRate()).to.not.eq(bn(0));
+    expect(await appToken.balanceOf(appTokenStaking.address)).to.eq(
+      ownerAmount.mul(rewardsDistributedPercentage).div(1000000)
+    );
   });
 
   it("sProps are not transferrable", async () => {
@@ -156,11 +170,6 @@ describe("PropsController", () => {
     // Try transferring
     await expect(
       propsController.connect(alice).transfer(bob.address, stakeAmount)
-    ).to.be.revertedWith("sProps are not transferrable");
-
-    // Try approving
-    await expect(
-      propsController.connect(alice).approve(bob.address, stakeAmount)
     ).to.be.revertedWith("sProps are not transferrable");
   });
 
@@ -775,5 +784,38 @@ describe("PropsController", () => {
       "Ownable: caller is not the owner"
     );
     expect(await propsController.connect(propsTreasury).blacklistAppToken(mockAddress));
+
+    // Only the guardian can pause the controller
+    await expect(propsController.connect(alice).pause()).to.be.revertedWith(
+      "Caller is not the Props guardian"
+    );
+    expect(await propsController.connect(propsTreasury).pause());
+  });
+
+  it("no user actions are available when paused", async () => {
+    const [appToken] = await deployAppToken();
+
+    // Prepare staking
+    const stakeAmount = bn(100);
+    await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
+    await propsToken.connect(alice).approve(propsController.address, stakeAmount);
+
+    // Pause the contract
+    await propsController.connect(propsTreasury).pause();
+
+    // No action is available when paused
+    await expect(
+      propsController.connect(alice).stake([appToken.address], [stakeAmount])
+    ).to.be.revertedWith("Pausable: paused");
+    await expect(propsController.connect(alice).claimUserPropsRewards()).to.be.revertedWith(
+      "Pausable: paused"
+    );
+
+    // Unpause the contract
+    await propsController.connect(propsTreasury).unpause();
+
+    // Actions are once again available
+    await propsController.connect(alice).stake([appToken.address], [stakeAmount]);
+    await propsController.connect(alice).claimUserPropsRewards();
   });
 });

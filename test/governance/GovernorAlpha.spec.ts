@@ -62,7 +62,8 @@ describe("GovernorAlpha", () => {
         APP_TOKEN_SYMBOL,
         APP_TOKEN_AMOUNT,
         appTokenOwner.address,
-        DAILY_REWARDS_EMISSION
+        DAILY_REWARDS_EMISSION,
+        bn(0)
       );
     const [appTokenAddress, appTokenStakingAddress] = await getEvent(
       await tx.wait(),
@@ -89,6 +90,7 @@ describe("GovernorAlpha", () => {
     ]);
 
     propsController = await deployContractUpgradeable("PropsController", propsTreasury, [
+      propsTreasury.address,
       propsTreasury.address,
       propsTreasury.address,
       propsToken.address,

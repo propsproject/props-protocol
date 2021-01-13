@@ -112,17 +112,23 @@ contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
                      GETTERS
     ****************************************/
 
-    /// @dev Gets the total staked amount.
+    /**
+     * @dev Gets the total staked amount.
+     */
     function totalSupply() external view override returns (uint256) {
         return _totalSupply;
     }
 
-    /// @dev Gets the staked balance of an account.
+    /**
+     * @dev Gets the staked balance of an account.
+     */
     function balanceOf(address _account) external view override returns (uint256) {
         return _balances[_account];
     }
 
-    /// @dev Gets the last applicable timestamp for the current rewards period.
+    /**
+     * @dev Gets the last applicable timestamp for the current rewards period.
+     */
     function lastTimeRewardApplicable() public view returns (uint256) {
         return MathUpgradeable.min(block.timestamp, periodFinish);
     }
@@ -144,7 +150,9 @@ contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
             );
     }
 
-    /// @dev Gets the amount of unclaimed rewards a user has accrued.
+    /**
+     * @dev Gets the amount of unclaimed rewards a user has accrued.
+     */
     function earned(address _account) public view override returns (uint256) {
         return
             _balances[_account]
@@ -246,11 +254,20 @@ contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         emit RewardAdded(_reward);
     }
 
+    /**
+     * @dev Change the reward distribution address.
+     */
+    function setRewardsDistribution(address _account) external override onlyRewardsDistribution {
+        rewardsDistribution = _account;
+    }
+
     /***************************************
                      HELPERS
     ****************************************/
 
-    /// @dev Update reward parameters, before executing the corresponding function.
+    /**
+     * @dev Update reward parameters, before executing the corresponding function.
+     */
     modifier updateReward(address _account) {
         rewardPerTokenStored = rewardPerToken();
         lastUpdateTime = lastTimeRewardApplicable();
@@ -261,7 +278,9 @@ contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         _;
     }
 
-    /// @dev Update the reward rate and rewards period finish time, mimicking a perpetual distribution.
+    /**
+     * @dev Update the reward rate and rewards period finish time, mimicking a perpetual distribution.
+     */
     modifier updateRewardRate() {
         _;
         if (lastRewardRateUpdate == 0) {
@@ -279,7 +298,9 @@ contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
         }
     }
 
-    /// @dev Only allow the `rewardsDistribution` address to call the corresponding function.
+    /**
+     * @dev Only allow the `rewardsDistribution` address to call the corresponding function.
+     */
     modifier onlyRewardsDistribution() {
         require(
             msg.sender == rewardsDistribution,

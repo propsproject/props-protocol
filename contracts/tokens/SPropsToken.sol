@@ -31,6 +31,9 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
     uint8 private _decimals;
     uint256 private _totalSupply;
 
+    // Allowance amounts on behalf of others
+    mapping(address => mapping(address => uint96)) internal _allowances;
+
     // Official record of token balances for each account
     mapping(address => uint96) internal _balances;
 
@@ -92,22 +95,30 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
         );
     }
 
-    /// @dev EIP-20 token name for this token
+    /**
+     * @dev EIP-20 token name for this token.
+     */
     function name() external view returns (string memory) {
         return _name;
     }
 
-    /// @dev EIP-20 token symbol for this token
+    /**
+     * @dev EIP-20 token symbol for this token.
+     */
     function symbol() external view returns (string memory) {
         return _symbol;
     }
 
-    /// @dev EIP-20 token decimals for this token
+    /**
+     * @dev EIP-20 token decimals for this token.
+     */
     function decimals() external view returns (uint8) {
         return _decimals;
     }
 
-    /// @dev EIP-20 total token supply for this token
+    /**
+     * @dev EIP-20 total token supply for this token.
+     */
     function totalSupply() external view override returns (uint256) {
         return _totalSupply;
     }
@@ -121,9 +132,14 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
         return _balances[account];
     }
 
-    /// @dev sProps are not transferrable, so here we simply revert.
-    function allowance(address, address) external view override returns (uint256) {
-        revert("sProps are not transferrable");
+    /**
+     * @dev Get the number of tokens `spender` is approved to spend on behalf of `account`.
+     * @param account The address of the account holding the funds
+     * @param spender The address of the account spending the funds
+     * @return The number of tokens approved
+     */
+    function allowance(address account, address spender) external view override returns (uint256) {
+        return _allowances[account][spender];
     }
 
     /**
@@ -166,17 +182,34 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
         _moveDelegates(delegates[src], address(0), amount);
     }
 
-    /// @dev sProps are not transferrable, so here we simply revert.
-    function approve(address, uint256) external override returns (bool) {
-        revert("sProps are not transferrable");
+    /**
+     * @notice Approve `spender` to transfer up to `amount` from `src`.
+     * @param spender The address of the account which may transfer tokens
+     * @param rawAmount The number of tokens that are approved (2^256-1 means infinite)
+     * @return Whether or not the transfer succeeded
+     */
+    function approve(address spender, uint256 rawAmount) external override returns (bool) {
+        uint96 amount;
+        if (rawAmount == uint256(-1)) {
+            amount = uint96(-1);
+        } else {
+            amount = safe96(rawAmount, "Amount exceeds 96 bits");
+        }
+
+        _allowances[msg.sender][spender] = amount;
+        return true;
     }
 
-    /// @dev sProps are not transferrable, so here we simply revert.
+    /**
+     * @dev sProps are not transferrable, so here we simply revert.
+     */
     function transfer(address, uint256) external override returns (bool) {
         revert("sProps are not transferrable");
     }
 
-    /// @dev sProps are not transferrable, so here we simply revert.
+    /**
+     * @dev sProps are not transferrable, so here we simply revert.
+     */
     function transferFrom(
         address,
         address,

@@ -15,4 +15,6 @@ interface IStaking {
     function claimReward(address _account) external;
 
     function notifyRewardAmount(uint256 _reward) external;
+
+    function setRewardsDistribution(address _account) external;
 }

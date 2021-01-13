@@ -41,6 +41,7 @@ describe("AppToken", () => {
       APP_TOKEN_AMOUNT,
       appTokenOwner.address,
       propsTreasury.address,
+      bn(0),
     ]);
   });
 

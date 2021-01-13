@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.6.8;
 
-import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 
 import "../interfaces/IAppToken.sol";
 
@@ -16,7 +16,7 @@ import "../interfaces/IAppToken.sol";
  * @dev    Each app in the Props protocol will get an associated AppToken contract.
  *         AppTokens are ERC20 compatible and mintable according to an inflation rate.
  *         Besides, AppTokens are pausable but this restriction can be overcame via
- *         whitelisting, which only the owner is allowed to do.
+ *         whitelisting, which only the owner is allowed to perform.
  */
 contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppToken {
     using SafeMathUpgradeable for uint256;
@@ -55,13 +55,15 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
      * @param _amount Initial amount of app tokens to mint
      * @param _owner The owner of the app token
      * @param _propsTreasury The Props protocol treasury
+     * @param _rewardsDistributedPercentage The percentage of the app token owner's tokens that should get distributed as rewards
      */
     function initialize(
         string memory _name,
         string memory _symbol,
         uint256 _amount,
         address _owner,
-        address _propsTreasury
+        address _propsTreasury,
+        uint256 _rewardsDistributedPercentage
     ) public initializer {
         OwnableUpgradeable.__Ownable_init();
         __ERC20_init(_name, _symbol);
@@ -88,9 +90,12 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
         // Initial mint
         uint256 propsTreasuryAmount = _amount.mul(propsTreasuryMintPercentage).div(1e6);
         uint256 ownerAmount = _amount.sub(propsTreasuryAmount);
+        uint256 rewards = ownerAmount.mul(_rewardsDistributedPercentage).div(1e6);
 
         _mint(propsTreasury, propsTreasuryAmount);
-        _mint(_owner, ownerAmount);
+        _mint(_owner, ownerAmount.sub(rewards));
+        // The initial rewards are to be distributed by the sender
+        _mint(msg.sender, rewards);
 
         lastMint = block.timestamp;
     }
@@ -98,7 +103,8 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
     /**
      * @dev Mint additional tokens according to the current inflation rate.
      *      The amount of tokens to get minted is determined by both the last
-     *      mint time and the inflation rate ((`currentTime` - `lastMint`) * `inflationRate`).
+     *      mint time and the inflation rate (given by the following formula:
+     *      (`currentTime` - `lastMint`) * `inflationRate`).
      */
     function mint() external onlyOwner {
         // If the delay for the new inflation rate passed, update the inflation rate
@@ -143,10 +149,8 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
         uint256 _amount
     ) external onlyOwner {
         require(_to != address(0), "Cannot transfer to address zero");
-
         uint256 balance = _token.balanceOf(address(this));
         require(_amount <= balance, "Cannot transfer more than balance");
-
         _token.safeTransfer(_to, _amount);
     }
 
@@ -207,6 +211,12 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
                       ERC20
     ****************************************/
 
+    /**
+     * We use our custom ERC20 implementation in order to support pausability
+     * with whitelisting and a custom `totalSupply` implementation that takes
+     * into account the inflation rate.
+     */
+
     bool public paused;
     mapping(address => uint8) public addressesWhitelist;
 
@@ -215,7 +225,6 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
     mapping(address => mapping(address => uint256)) private _allowances;
 
     uint256 private _totalSupply;
-
     string private _name;
     string private _symbol;
     uint8 private _decimals;
@@ -227,42 +236,52 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
         _decimals = 18;
     }
 
-    /// @dev Modifier for disabling transfers when the token is paused.
+    /**
+     * @dev Modifier for disabling transfers when the token is paused.
+     */
     modifier whenNotPaused() {
         require(!paused || addressesWhitelist[msg.sender] != 0, "Paused");
         _;
     }
 
-    /// @dev Pause transfers.
+    /**
+     * @dev Pause transfers.
+     */
     function pause() public override onlyOwner {
-        require(!paused, "Already paused");
         paused = true;
     }
 
-    /// @dev Unpause transfers.
+    /**
+     * @dev Pause transfers.
+     */
     function unpause() external override onlyOwner {
-        require(paused, "Already unpaused");
         paused = false;
     }
 
-    /// @dev Whitelist an address for transfers.
+    /**
+     * @dev Whitelist an address for transfers.
+     */
     function whitelistAddress(address _account) public override onlyOwner {
-        require(addressesWhitelist[_account] == 0, "Already whitelisted");
         addressesWhitelist[_account] = 1;
     }
 
-    /// @dev Blacklist an address for transfers.
+    /**
+     * @dev Blacklist an address from transfers.
+     */
     function blacklistAddress(address _account) external override onlyOwner {
-        require(addressesWhitelist[_account] != 0, "Already blacklisted");
         addressesWhitelist[_account] = 0;
     }
 
-    /// @dev Returns the name of the token.
+    /**
+     * @dev Returns the name of the token.
+     */
     function name() public view returns (string memory) {
         return _name;
     }
 
-    /// @dev Returns the symbol of the token, usually a shorter version of the name.
+    /**
+     * @dev Returns the symbol of the token, usually a shorter version of the name.
+     */
     function symbol() public view returns (string memory) {
         return _symbol;
     }
@@ -298,7 +317,9 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
         }
     }
 
-    /// @dev See {IERC20-balanceOf}.
+    /**
+     * @dev See {IERC20-balanceOf}.
+     */
     function balanceOf(address account) public view override returns (uint256) {
         return _balances[account];
     }
@@ -320,7 +341,9 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
         return true;
     }
 
-    /// @dev See {IERC20-allowance}.
+    /**
+     * @dev See {IERC20-allowance}.
+     */
     function allowance(address owner, address spender) public view override returns (uint256) {
         return _allowances[owner][spender];
     }
