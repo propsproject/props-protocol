@@ -28,6 +28,14 @@ Pause any transfer. The AppToken's owner is able to restrict transfers to a spec
 function pause() public onlyOwner
 ```
 
+##### Unpause
+
+Unpause the contract.
+
+```solidity
+function unpause() public onlyOwner
+```
+
 ##### Whitelist address
 
 Whitelist an address to perform transfers. The whitelist is only active when the AppToken is paused.

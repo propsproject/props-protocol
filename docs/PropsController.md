@@ -7,11 +7,13 @@ The `PropsController` is the single entry point for interacting with the Props p
 
 `PropsController` is also an ERC20 token by itself, called sProps. sProps tokens are in a 1:1 mapping with staked Props tokens (that is, for each staked Props token a corresponding sProps token will get minted, while for each withdrawn Props token a corresponding sProps token will get burned). sProps are not transferrable between users and they represent voting power in Props' governance system.
 
+As an escape hatch for possible bugs, the `PropsController` contract is pausable. Pausing it would simply forbid all user actions. The ability to pause and unpause the contract is given to a special address denoted as the Props guardian. Ideally, the Props guardian is a multi-sig of a few trusted addresses that, in case of bugs, can pause the contract until an upgrade that fixes the bug goes through the governance process.
+
 ### Architecture
 
 ##### Deploy AppToken
 
-Create and deploy a new AppToken together with its corresponding staking contract. The AppToken contract will be owned by the app's designated owner, while the staking contract will be owned by the `PropsController`.
+Create and deploy a new AppToken together with its corresponding staking contract. The AppToken contract will be owned by the app's designated owner, while the staking contract will be owned by the `PropsController`. Optionally, it is possible to specify the percentage of the AppToken owner's minted tokens that should get distributed as rewards to the AppToken staking contract.
 
 ```solidity
 function deployAppToken(
@@ -19,7 +21,8 @@ function deployAppToken(
     string calldata _symbol,
     uint256 _amount,
     address _owner,
-    uint256 _dailyRewardEmission
+    uint256 _dailyRewardEmission,
+    uint256 _rewardsDistributedPercentage
 ) external returns (address)
 ```
 
@@ -92,6 +95,22 @@ Allow users to unlock their escrowed rewards, if the cooldown period passed. Thi
 
 ```solidity
 function unlockUserPropsRewards() external
+```
+
+##### Pause
+
+Pause the contract
+
+```solidity
+function pause() public
+```
+
+##### Unpause
+
+Unpause the contract.
+
+```solidity
+function unpause() public
 ```
 
 ##### Set rewards escrow cooldown
