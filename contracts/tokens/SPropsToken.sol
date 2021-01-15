@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.6.8;
 
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -14,16 +15,16 @@ import "../interfaces/ISPropsToken.sol";
  * @notice The governance token in the Props protocol.
  * @dev    sProps tokens represent Props stake shares (each sProps token
  *         corresponds to a staked Props token). sProps are not transferrable,
- *         only mintable and burnable. Minting and burning are internal
- *         actions, so they can only be indirectly triggered. sProps tokens
+ *         only mintable and burnable. Minting and burning are actions
+ *         restricted to the owner of the contract. sProps tokens
  *         count towards voting power in the Props governance process.
  *         Changes to the original Compound contract:
- *         - the contract is upgradeable
+ *         - the contract is ownable and upgradeable
  *         - transfer-related actions are forbidden (the contract simply
  *           reverts on transferring or approving)
- *         - internal mint and burn functions were added
+ *         - mint and burn functions were added
  */
-abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken {
+contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, ISPropsToken {
     using SafeMathUpgradeable for uint256;
 
     string private _name;
@@ -80,8 +81,13 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
     // The standard EIP-20 transfer event
     event Transfer(address indexed from, address indexed to, uint256 amount);
 
-    // solhint-disable-next-line func-name-mixedcase
-    function __SPropsToken_init() internal initializer {
+    function initialize(address _owner) public initializer {
+        OwnableUpgradeable.__Ownable_init();
+
+        if (_owner != msg.sender) {
+            transferOwnership(_owner);
+        }
+
         _name = "sProps";
         _symbol = "sProps";
         _decimals = 18;
@@ -147,7 +153,7 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
      * @param dst The address of the destination account
      * @param rawAmount The number of tokens to be minted
      */
-    function mint(address dst, uint256 rawAmount) internal {
+    function mint(address dst, uint256 rawAmount) external override onlyOwner {
         require(dst != address(0), "Cannot mint to the zero address");
 
         // Mint the amount
@@ -167,7 +173,7 @@ abstract contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken 
      * @param src The address of the source account
      * @param rawAmount The number of tokens to be burned
      */
-    function burn(address src, uint256 rawAmount) internal {
+    function burn(address src, uint256 rawAmount) external override onlyOwner {
         require(src != address(0), "Cannot burn from the zero address");
 
         // Burn the amount

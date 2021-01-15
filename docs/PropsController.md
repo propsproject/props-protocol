@@ -5,7 +5,7 @@ The `PropsController` is the single entry point for interacting with the Props p
 - it owns the rProps token contract, being responsible for initiating the rProps rewards distribution and for swapping rProps tokens for regular Props tokens
 - it owns all staking contracts, being responsible for performing staking-related operations on the individual staking contracts and for making sure the staked amounts are consistent across all staking contracts
 
-`PropsController` is also an ERC20 token by itself, called sProps. sProps tokens are in a 1:1 mapping with staked Props tokens (that is, for each staked Props token a corresponding sProps token will get minted, while for each withdrawn Props token a corresponding sProps token will get burned). sProps are not transferrable between users and they represent voting power in Props' governance system.
+`PropsController` also handles minting and burning of sProps, the ERC20 governance token in the Props protocol. sProps tokens are in a 1:1 mapping with staked Props tokens (that is, for each staked Props token a corresponding sProps token will get minted, while for each withdrawn Props token a corresponding sProps token will get burned). sProps are not transferrable between users and they represent voting power in Props' governance system.
 
 As an escape hatch for possible bugs, the `PropsController` contract is pausable. Pausing it would simply forbid all user actions. The ability to pause and unpause the contract is given to a special address denoted as the Props guardian. Ideally, the Props guardian is a multi-sig of a few trusted addresses that, in case of bugs, can pause the contract until an upgrade that fixes the bug goes through the governance process.
 

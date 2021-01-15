@@ -2,6 +2,10 @@
 pragma solidity 0.6.8;
 
 interface ISPropsToken {
+    function mint(address dst, uint256 rawAmount) external;
+
+    function burn(address src, uint256 rawAmount) external;
+
     function getCurrentVotes(address account) external view returns (uint96);
 
     function getPriorVotes(address account, uint256 blockNumber) external view returns (uint96);

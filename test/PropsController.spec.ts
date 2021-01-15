@@ -6,7 +6,14 @@ import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 
 import accounts from "../test-accounts";
-import type { AppToken, PropsController, RPropsToken, Staking, TestPropsToken } from "../typechain";
+import type {
+  AppToken,
+  PropsController,
+  RPropsToken,
+  SPropsToken,
+  Staking,
+  TestPropsToken,
+} from "../typechain";
 import {
   bn,
   daysToTimestamp,
@@ -32,6 +39,7 @@ describe("PropsController", () => {
 
   let propsToken: TestPropsToken;
   let rPropsToken: RPropsToken;
+  let sPropsToken: SPropsToken;
   let sPropsAppStaking: Staking;
   let sPropsUserStaking: Staking;
   let propsController: PropsController;
@@ -97,6 +105,10 @@ describe("PropsController", () => {
       propsToken.address,
     ]);
 
+    sPropsToken = await deployContractUpgradeable("SPropsToken", propsTreasury, [
+      propsController.address,
+    ]);
+
     sPropsAppStaking = await deployContractUpgradeable("Staking", propsTreasury, [
       propsController.address,
       rPropsToken.address,
@@ -118,6 +130,7 @@ describe("PropsController", () => {
 
     // Initialize all needed fields on the controller
     propsController.connect(propsTreasury).setRPropsToken(rPropsToken.address);
+    propsController.connect(propsTreasury).setSPropsToken(sPropsToken.address);
     propsController.connect(propsTreasury).setSPropsAppStaking(sPropsAppStaking.address);
     propsController.connect(propsTreasury).setSPropsUserStaking(sPropsUserStaking.address);
 
@@ -168,9 +181,9 @@ describe("PropsController", () => {
     await propsController.connect(alice).stake([appToken.address], [stakeAmount]);
 
     // Try transferring
-    await expect(
-      propsController.connect(alice).transfer(bob.address, stakeAmount)
-    ).to.be.revertedWith("sProps are not transferrable");
+    await expect(sPropsToken.connect(alice).transfer(bob.address, stakeAmount)).to.be.revertedWith(
+      "sProps are not transferrable"
+    );
   });
 
   it("basic staking adjustment to a single app", async () => {
@@ -183,7 +196,7 @@ describe("PropsController", () => {
     await propsController.connect(alice).stake([appToken.address], [stakeAmount]);
 
     // Check the sProps balance and staked amounts
-    expect(await propsController.balanceOf(alice.address)).to.eq(bn(100));
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(bn(100));
     expect(await appTokenStaking.balanceOf(alice.address)).to.eq(bn(100));
     expect(await sPropsAppStaking.balanceOf(appToken.address)).to.eq(bn(100));
     expect(await sPropsUserStaking.balanceOf(alice.address)).to.eq(bn(100));
@@ -193,7 +206,7 @@ describe("PropsController", () => {
     await propsController.connect(alice).stake([appToken.address], [adjustment]);
 
     // Check the Props balance, sProps balance and staked amounts
-    expect(await propsController.balanceOf(alice.address)).to.eq(bn(30));
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(bn(30));
     expect(await appTokenStaking.balanceOf(alice.address)).to.eq(bn(30));
     expect(await sPropsAppStaking.balanceOf(appToken.address)).to.eq(bn(30));
     expect(await sPropsUserStaking.balanceOf(alice.address)).to.eq(bn(30));
@@ -213,7 +226,7 @@ describe("PropsController", () => {
       .stake([appToken1.address, appToken2.address], [stakeAmount1, stakeAmount2]);
 
     // Check the sProps balance and staked amounts
-    expect(await propsController.balanceOf(alice.address)).to.eq(bn(150));
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(bn(150));
     expect(await appTokenStaking1.balanceOf(alice.address)).to.eq(bn(100));
     expect(await appTokenStaking2.balanceOf(alice.address)).to.eq(bn(50));
     expect(await sPropsAppStaking.balanceOf(appToken1.address)).to.eq(bn(100));
@@ -229,7 +242,7 @@ describe("PropsController", () => {
       .stake([appToken1.address, appToken2.address], [adjustment1, adjustment2]);
 
     // Check the sProps balance and staked amounts
-    expect(await propsController.balanceOf(alice.address)).to.eq(bn(170));
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(bn(170));
     expect(await appTokenStaking1.balanceOf(alice.address)).to.eq(bn(20));
     expect(await appTokenStaking2.balanceOf(alice.address)).to.eq(bn(150));
     expect(await sPropsAppStaking.balanceOf(appToken1.address)).to.eq(bn(20));
@@ -254,7 +267,7 @@ describe("PropsController", () => {
       );
 
     // Check the sProps balance and staked amounts
-    expect(await propsController.balanceOf(alice.address)).to.eq(bn(230));
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(bn(230));
     expect(await appTokenStaking1.balanceOf(alice.address)).to.eq(bn(100));
     expect(await appTokenStaking2.balanceOf(alice.address)).to.eq(bn(50));
     expect(await appTokenStaking3.balanceOf(alice.address)).to.eq(bn(80));
@@ -273,7 +286,7 @@ describe("PropsController", () => {
       );
 
     // Check the Props balance, sProps balance and staked amounts
-    expect(await propsController.balanceOf(alice.address)).to.eq(bn(60));
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(bn(60));
     expect(await appTokenStaking1.balanceOf(alice.address)).to.eq(bn(50));
     expect(await appTokenStaking2.balanceOf(alice.address)).to.eq(bn(0));
     expect(await appTokenStaking3.balanceOf(alice.address)).to.eq(bn(10));
@@ -343,7 +356,7 @@ describe("PropsController", () => {
       );
 
     // Check the sProps balance and staked amounts
-    expect(await propsController.balanceOf(alice.address)).to.eq(bn(100));
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(bn(100));
     expect(await appTokenStaking.balanceOf(alice.address)).to.eq(bn(100));
     expect(await sPropsAppStaking.balanceOf(appToken.address)).to.eq(bn(100));
     expect(await sPropsUserStaking.balanceOf(alice.address)).to.eq(bn(100));
@@ -361,13 +374,13 @@ describe("PropsController", () => {
       .stakeOnBehalf([appToken.address], [stakeAmount], bob.address);
 
     // Check the sProps balance and staked amounts are all under Bob' ownership
-    expect(await propsController.balanceOf(bob.address)).to.eq(bn(100));
+    expect(await sPropsToken.balanceOf(bob.address)).to.eq(bn(100));
     expect(await appTokenStaking.balanceOf(bob.address)).to.eq(bn(100));
     expect(await sPropsAppStaking.balanceOf(appToken.address)).to.eq(bn(100));
     expect(await sPropsUserStaking.balanceOf(bob.address)).to.eq(bn(100));
 
     // Check Alice has nothing staked
-    expect(await propsController.balanceOf(alice.address)).to.eq(bn(0));
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(bn(0));
     expect(await appTokenStaking.balanceOf(alice.address)).to.eq(bn(0));
     expect(await sPropsUserStaking.balanceOf(alice.address)).to.eq(bn(0));
   });
@@ -419,13 +432,13 @@ describe("PropsController", () => {
       );
 
     // Check the sProps balance and staked amounts are all under Bob' ownership
-    expect(await propsController.balanceOf(bob.address)).to.eq(bn(100));
+    expect(await sPropsToken.balanceOf(bob.address)).to.eq(bn(100));
     expect(await appTokenStaking.balanceOf(bob.address)).to.eq(bn(100));
     expect(await sPropsAppStaking.balanceOf(appToken.address)).to.eq(bn(100));
     expect(await sPropsUserStaking.balanceOf(bob.address)).to.eq(bn(100));
 
     // Check Alice has nothing staked
-    expect(await propsController.balanceOf(alice.address)).to.eq(bn(0));
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(bn(0));
     expect(await appTokenStaking.balanceOf(alice.address)).to.eq(bn(0));
     expect(await sPropsUserStaking.balanceOf(alice.address)).to.eq(bn(0));
   });
@@ -452,7 +465,7 @@ describe("PropsController", () => {
     await propsController.connect(alice).stakeRewards([appToken.address], [rewardsStakeAmount]);
 
     // Check the sProps balance and staked amounts
-    expect(await propsController.balanceOf(alice.address)).to.eq(
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(
       principalStakeAmount.add(rewardsStakeAmount)
     );
     expect(await appTokenStaking.balanceOf(alice.address)).to.eq(
@@ -478,7 +491,7 @@ describe("PropsController", () => {
     );
 
     // Check the sProps balance and staked amounts
-    expect(await propsController.balanceOf(alice.address)).to.eq(principalStakeAmount);
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(principalStakeAmount);
     expect(await appTokenStaking.balanceOf(alice.address)).to.eq(principalStakeAmount);
     expect(await sPropsAppStaking.balanceOf(appToken.address)).to.eq(principalStakeAmount);
     expect(await sPropsUserStaking.balanceOf(alice.address)).to.eq(principalStakeAmount);
@@ -541,7 +554,7 @@ describe("PropsController", () => {
     );
 
     // Check the sProps balance and staked amounts
-    expect(await propsController.balanceOf(alice.address)).to.eq(
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(
       principalStakeAmount1
         .add(principalStakeAmount2)
         .add(rewardsStakeAmount2)
@@ -688,7 +701,7 @@ describe("PropsController", () => {
     expect(await rPropsToken.balanceOf(alice.address)).to.eq(bn(0));
 
     // Check the sProps balance (ensure results are within .01%)
-    const sPropsBalance = await propsController.balanceOf(alice.address);
+    const sPropsBalance = await sPropsToken.balanceOf(alice.address);
     const localSPropsBalance = principalStakeAmount1.add(principalStakeAmount2).add(earned);
     expect(sPropsBalance.sub(localSPropsBalance).abs().lte(sPropsBalance.div(10000))).to.be.true;
 

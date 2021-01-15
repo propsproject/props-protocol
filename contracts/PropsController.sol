@@ -10,10 +10,10 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./interfaces/IAppToken.sol";
 import "./interfaces/IPropsToken.sol";
+import "./interfaces/ISPropsToken.sol";
 import "./interfaces/IRPropsToken.sol";
 import "./interfaces/IStaking.sol";
 import "./MinimalProxyFactory.sol";
-import "./tokens/SPropsToken.sol";
 
 /**
  * @title  PropsController
@@ -21,16 +21,15 @@ import "./tokens/SPropsToken.sol";
  * @notice Entry point for participating in the Props protocol. All actions should
  *         be done exclusively through this contract.
  * @dev    It is responsible for proxying staking-related actions to the appropiate
- *         app token staking contracts. Moreover, it is the sProps ERC20 token, and
- *         it also handles sProps minting/burning and staking, swapping earned rProps
- *         for regular Props and locking users rProps rewards.
+ *         app token staking contracts. Moreover, tt also handles sProps minting
+ *         and burning, staking, swapping earned rProps for regular Props and locking
+ *         users rProps rewards.
  */
 contract PropsController is
     Initializable,
     OwnableUpgradeable,
     PausableUpgradeable,
-    MinimalProxyFactory,
-    SPropsToken
+    MinimalProxyFactory
 {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -42,6 +41,7 @@ contract PropsController is
     address public propsGuardian;
 
     address public propsToken;
+    address public sPropsToken;
     address public rPropsToken;
 
     // The sProps staking contract for app Props rewards
@@ -59,8 +59,6 @@ contract PropsController is
     // Mapping of the app token staking contract of each app token
     mapping(address => address) public appTokenToStaking;
 
-    // Mapping of the total amount staked to each app token
-    mapping(address => uint256) public appStakes;
     // Mapping of the total amount staked of each user across all app tokens
     mapping(address => mapping(address => uint256)) public userStakes;
     // Mapping of the total locked rewards amount staked of each user across all app tokens
@@ -113,7 +111,6 @@ contract PropsController is
     ) public initializer {
         OwnableUpgradeable.__Ownable_init();
         PausableUpgradeable.__Pausable_init();
-        SPropsToken.__SPropsToken_init();
 
         if (_owner != msg.sender) {
             transferOwnership(_owner);
@@ -128,26 +125,6 @@ contract PropsController is
         appTokenStakingLogic = _appTokenStakingLogic;
 
         rewardsEscrowCooldown = 90 days;
-    }
-
-    /***************************************
-                     GETTERS
-    ****************************************/
-
-    /**
-     * @dev Get the app token at a specific index.
-     * @param _index Index to retrieve
-     */
-    function getAppToken(uint256 _index) external view returns (address) {
-        require(_index < appTokens.length, "Invalid index");
-        return appTokens[_index];
-    }
-
-    /**
-     * @dev Get the total number of deployed app tokens.
-     */
-    function getAppTokensCount() external view returns (uint256) {
-        return appTokens.length;
     }
 
     /***************************************
@@ -441,6 +418,15 @@ contract PropsController is
     }
 
     /**
+     * @dev Set the sProps token contract.
+     * @param _sPropsToken The address of the sProps token contract
+     */
+    function setSPropsToken(address _sPropsToken) external onlyOwner {
+        require(sPropsToken == address(0), "Already set");
+        sPropsToken = _sPropsToken;
+    }
+
+    /**
      * @dev Set the sProps staking contract for app Props rewards.
      * @param _sPropsAppStaking The address of the sProps staking contract for app Props rewards
      */
@@ -552,8 +538,7 @@ contract PropsController is
             if (_amounts[i] < 0) {
                 uint256 amountToUnstake = uint256(SignedSafeMathUpgradeable.mul(_amounts[i], -1));
 
-                // Update app and user total staked amounts
-                appStakes[_appTokens[i]] = appStakes[_appTokens[i]].sub(amountToUnstake);
+                // Update user total staked amounts
                 if (rewards) {
                     userRewardStakes[_to][_appTokens[i]] = userRewardStakes[_to][_appTokens[i]].sub(
                         amountToUnstake
@@ -607,7 +592,7 @@ contract PropsController is
                     }
 
                     // Mint corresponding sProps
-                    mint(_to, left);
+                    ISPropsToken(sPropsToken).mint(_to, left);
 
                     // Also stake the corresponding sProps in the user sProps staking contract
                     IStaking(sPropsUserStaking).stake(_to, left);
@@ -621,8 +606,7 @@ contract PropsController is
                 // Stake the sProps in the app sProps staking contract
                 IStaking(sPropsAppStaking).stake(_appTokens[i], amountToStake);
 
-                // Update app and user total staked amounts
-                appStakes[_appTokens[i]] = appStakes[_appTokens[i]].add(amountToStake);
+                // Update user total staked amounts
                 if (rewards) {
                     userRewardStakes[_to][_appTokens[i]] = userRewardStakes[_to][_appTokens[i]].add(
                         amountToStake
@@ -651,7 +635,7 @@ contract PropsController is
             }
 
             // Burn the sProps
-            burn(_to, totalUnstakedAmount);
+            ISPropsToken(sPropsToken).burn(_to, totalUnstakedAmount);
         }
     }
 

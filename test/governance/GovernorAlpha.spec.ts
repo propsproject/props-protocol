@@ -8,6 +8,7 @@ import type {
   AppToken,
   PropsController,
   GovernorAlpha,
+  SPropsToken,
   Staking,
   TestPropsToken,
   Timelock,
@@ -35,6 +36,7 @@ describe("GovernorAlpha", () => {
   let bob: SignerWithAddress;
 
   let propsToken: TestPropsToken;
+  let sPropsToken: SPropsToken;
   let propsController: PropsController;
   let timelock: Timelock;
   let governorAlpha: GovernorAlpha;
@@ -103,6 +105,10 @@ describe("GovernorAlpha", () => {
       propsToken.address,
     ]);
 
+    sPropsToken = await deployContractUpgradeable("SPropsToken", propsTreasury, [
+      propsController.address,
+    ]);
+
     const sPropsAppStaking = await deployContractUpgradeable("Staking", propsTreasury, [
       propsController.address,
       rPropsToken.address,
@@ -124,6 +130,7 @@ describe("GovernorAlpha", () => {
 
     // Initialize all needed fields on the controller
     propsController.connect(propsTreasury).setRPropsToken(rPropsToken.address);
+    propsController.connect(propsTreasury).setSPropsToken(sPropsToken.address);
     propsController.connect(propsTreasury).setSPropsAppStaking(sPropsAppStaking.address);
     propsController.connect(propsTreasury).setSPropsUserStaking(sPropsUserStaking.address);
 
@@ -141,7 +148,7 @@ describe("GovernorAlpha", () => {
       "GovernorAlpha",
       governance,
       timelock.address,
-      propsController.address,
+      sPropsToken.address,
       GOVERNANCE_VOTING_DELAY,
       GOVERNANCE_VOTING_PERIOD
     );
@@ -156,10 +163,10 @@ describe("GovernorAlpha", () => {
     await propsToken.connect(alice).approve(propsController.address, stakeAmount);
     await propsController.connect(alice).stake([appToken.address], [stakeAmount]);
 
-    expect(await propsController.balanceOf(alice.address)).to.eq(stakeAmount);
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(stakeAmount);
 
     // Delegate voting power
-    await propsController.connect(alice).delegate(bob.address);
+    await sPropsToken.connect(alice).delegate(bob.address);
 
     let tx: ContractTransaction;
 
