@@ -56,10 +56,7 @@ contract RPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IRP
         uint256 _userRewardsPercentage
     ) external override onlyOwner {
         // The percentages must add up to 100%
-        require(
-            _appRewardsPercentage.add(_userRewardsPercentage) == 1e6,
-            "Invalid distribution percentages"
-        );
+        require(_appRewardsPercentage.add(_userRewardsPercentage) == 1e6, "Bad input");
 
         // Mint all available rProps
         uint256 totalToMint =
@@ -67,15 +64,17 @@ contract RPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IRP
                 IERC20Upgradeable(propsToken).totalSupply()
             );
 
-        // Distribute app rewards
-        uint256 appRewards = totalToMint.mul(_appRewardsPercentage).div(1e6);
-        _mint(_sPropsAppStaking, appRewards);
-        IStaking(_sPropsAppStaking).notifyRewardAmount(balanceOf(_sPropsAppStaking));
+        if (totalToMint > 0) {
+            // Distribute app rewards
+            uint256 appRewards = totalToMint.mul(_appRewardsPercentage).div(1e6);
+            _mint(_sPropsAppStaking, appRewards);
+            IStaking(_sPropsAppStaking).notifyRewardAmount(balanceOf(_sPropsAppStaking));
 
-        // Distribute user rewards
-        uint256 userRewards = totalToMint.sub(appRewards);
-        _mint(_sPropsUserStaking, userRewards);
-        IStaking(_sPropsUserStaking).notifyRewardAmount(balanceOf(_sPropsUserStaking));
+            // Distribute user rewards
+            uint256 userRewards = totalToMint.sub(appRewards);
+            _mint(_sPropsUserStaking, userRewards);
+            IStaking(_sPropsUserStaking).notifyRewardAmount(balanceOf(_sPropsUserStaking));
+        }
     }
 
     /**

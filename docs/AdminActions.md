@@ -6,6 +6,8 @@ As the name suggests, the upgradeability admin is responsible and allowed to upg
 
 The PropsController owner has the ability to perform certain restricted actions on the PropsController contract:
 
+- set the sProps and rProps tokens contracts
+- set the app and user sProps staking contracts
 - set the rewards escrow cooldown period
 - set the implementation contract for new app token contracts
 - set the implementation contract for new app token staking contracts

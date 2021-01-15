@@ -92,7 +92,7 @@ describe("Staking", () => {
 
     const rewardsDuration = await staking.rewardsDuration();
     const reward = expandTo18Decimals(100);
-    const stakeAmount = bn(100000);
+    const stakeAmount = expandTo18Decimals(10);
 
     // Distribute reward
     await rewardsToken.connect(rewardsDistribution).transfer(staking.address, reward);
@@ -160,7 +160,7 @@ describe("Staking", () => {
   });
 
   it("proper permissioning", async () => {
-    const stakeAmount = bn(100);
+    const stakeAmount = expandTo18Decimals(100);
 
     // Only the owner can stake
     await expect(staking.connect(alice).stake(alice.address, stakeAmount)).to.be.revertedWith(
@@ -227,7 +227,7 @@ describe("Staking", () => {
 
   it("rewards are properly distributed to stakers (single staker)", async () => {
     const reward = expandTo18Decimals(100);
-    const stakeAmount = bn(100000);
+    const stakeAmount = expandTo18Decimals(10);
 
     // Distribute reward
     await rewardsToken.connect(rewardsDistribution).transfer(staking.address, reward);
@@ -247,7 +247,7 @@ describe("Staking", () => {
   it("rewards are properly distributed to stakers (two stakers)", async () => {
     const rewardsDuration = await staking.rewardsDuration();
     const reward = expandTo18Decimals(100);
-    const stakeAmount = bn(100000);
+    const stakeAmount = expandTo18Decimals(10);
 
     // Distribute reward
     await rewardsToken.connect(rewardsDistribution).transfer(staking.address, reward);
@@ -295,7 +295,7 @@ describe("Staking", () => {
   it("rewards are properly distributed to stakers (three stakers with unstaking)", async () => {
     const rewardsDuration = await staking.rewardsDuration();
     const reward = expandTo18Decimals(100);
-    const stakeAmount = bn(100000);
+    const stakeAmount = expandTo18Decimals(10);
 
     // Distribute reward
     await rewardsToken.connect(rewardsDistribution).transfer(staking.address, reward);

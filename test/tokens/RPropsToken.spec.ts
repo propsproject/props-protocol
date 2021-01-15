@@ -87,7 +87,7 @@ describe("RPropsToken", () => {
           sPropsUserStaking.address,
           bn(400000)
         )
-    ).to.be.revertedWith("Invalid distribution percentages");
+    ).to.be.revertedWith("Bad input");
 
     const rPropsToMint = (await propsToken.maxTotalSupply()).sub(await propsToken.totalSupply());
 
@@ -123,9 +123,13 @@ describe("RPropsToken", () => {
       );
 
     // Stake
-    await propsToken.connect(propsTreasury).transfer(propsController.address, bn(100));
-    await propsToken.connect(propsController).approve(sPropsUserStaking.address, bn(100));
-    await sPropsUserStaking.connect(propsController).stake(alice.address, bn(100));
+    await propsToken
+      .connect(propsTreasury)
+      .transfer(propsController.address, expandTo18Decimals(100));
+    await propsToken
+      .connect(propsController)
+      .approve(sPropsUserStaking.address, expandTo18Decimals(100));
+    await sPropsUserStaking.connect(propsController).stake(alice.address, expandTo18Decimals(100));
 
     // Fast-forward to let some time for the rProps rewards to accrue
     await mineBlock((await now()).add(daysToTimestamp(10)));

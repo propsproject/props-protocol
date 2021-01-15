@@ -22,8 +22,8 @@ import "./MinimalProxyFactory.sol";
  *         be done exclusively through this contract.
  * @dev    It is responsible for proxying staking-related actions to the appropiate
  *         app token staking contracts. Moreover, tt also handles sProps minting
- *         and burning, staking, swapping earned rProps for regular Props and locking
- *         users rProps rewards.
+ *         and burning, sProps staking, swapping earned rProps for regular Props and
+ *         locking users Props rewards.
  */
 contract PropsController is
     Initializable,
@@ -31,6 +31,10 @@ contract PropsController is
     PausableUpgradeable,
     MinimalProxyFactory
 {
+    // Possible easy contract size optimizations:
+    // - implement own Pausable logic
+    // - move proxy factory to a different contract
+
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
@@ -64,6 +68,9 @@ contract PropsController is
     // Mapping of the total locked rewards amount staked of each user across all app tokens
     mapping(address => mapping(address => uint256)) public userRewardStakes;
 
+    // Mapping of the staking delegatee of each user
+    mapping(address => address) public delegates;
+
     // Mapping of the total amount of escrowed rewards of each user
     mapping(address => uint256) public rewardsEscrow;
     // Mapping of the unlock time for the escrowed rewards of each user
@@ -83,10 +90,14 @@ contract PropsController is
         address indexed appToken,
         address indexed appTokenStaking,
         string name,
-        uint256 amount
+        string symbol,
+        address owner
     );
-    event Staked(address indexed appToken, address indexed account, uint256 amount);
-    event Withdrawn(address indexed appToken, address indexed account, uint256 amount);
+    event Stake(address indexed appToken, address indexed account, int256 amount);
+    event RewardsStake(address indexed appToken, address indexed account, int256 amount);
+    event RewardsEscrowUpdated(address indexed account, uint256 lockedAmount, uint256 unlockTime);
+    event AppTokenWhitelisted(address indexed appToken);
+    event AppTokenBlacklisted(address indexed appToken);
 
     /***************************************
                    INITIALIZER
@@ -139,7 +150,6 @@ contract PropsController is
      * @param _owner The owner of the app token
      * @param _dailyRewardEmission The daily reward emission parameter for the app token's staking contract
      * @param _rewardsDistributedPercentage Percentage of the initially minted app tokens to get distributed as rewards
-     * @return The address of the just deployed app token
      */
     function deployAppToken(
         string calldata _name,
@@ -148,7 +158,7 @@ contract PropsController is
         address _owner,
         uint256 _dailyRewardEmission,
         uint256 _rewardsDistributedPercentage
-    ) external whenNotPaused returns (address) {
+    ) external whenNotPaused {
         // In order to reduce gas costs, the minimal proxy pattern is used when creating new app tokens
 
         // Deploy the app token contract
@@ -194,7 +204,7 @@ contract PropsController is
         // Transfer ownership to the app token owner
         OwnableUpgradeable(appTokenProxy).transferOwnership(_owner);
 
-        // If neccessary, distribute the app token rewards
+        // If requested, distribute the app token rewards
         uint256 rewards = IERC20Upgradeable(appTokenProxy).balanceOf(address(this));
         if (rewards > 0) {
             IERC20Upgradeable(appTokenProxy).transfer(appTokenStakingProxy, rewards);
@@ -209,8 +219,15 @@ contract PropsController is
         // solhint-disable-next-line reentrancy
         appTokenToStaking[appTokenProxy] = appTokenStakingProxy;
 
-        emit AppTokenDeployed(appTokenProxy, appTokenStakingProxy, _name, _amount);
-        return appTokenProxy;
+        emit AppTokenDeployed(appTokenProxy, appTokenStakingProxy, _name, _symbol, _owner);
+    }
+
+    /**
+     * @dev Delegate staking rights.
+     * @param _to The account to delegate to
+     */
+    function delegate(address _to) external {
+        delegates[msg.sender] = _to;
     }
 
     /**
@@ -233,15 +250,15 @@ contract PropsController is
             amounts[i] = _safeInt256(_amounts[i]);
         }
 
-        _stake(_appTokens, amounts, _account, false);
+        _stake(_appTokens, amounts, msg.sender, _account, false);
     }
 
     /**
      * @dev Use an off-chain signature to approve and stake on behalf in the same transaction.
      */
     function stakeOnBehalfBySig(
-        address[] calldata _appTokens,
-        uint256[] calldata _amounts,
+        address[] memory _appTokens,
+        uint256[] memory _amounts,
         address _account,
         address _owner,
         address _spender,
@@ -250,7 +267,7 @@ contract PropsController is
         uint8 _v,
         bytes32 _r,
         bytes32 _s
-    ) external whenNotPaused {
+    ) public whenNotPaused {
         IPropsToken(propsToken).permit(_owner, _spender, _amount, _deadline, _v, _r, _s);
         stakeOnBehalf(_appTokens, _amounts, _account);
     }
@@ -264,7 +281,7 @@ contract PropsController is
      * @param _amounts Array of amounts to stake/unstake to/from each app token
      */
     function stake(address[] memory _appTokens, int256[] memory _amounts) public whenNotPaused {
-        _stake(_appTokens, _amounts, msg.sender, false);
+        _stake(_appTokens, _amounts, msg.sender, msg.sender, false);
     }
 
     /**
@@ -286,6 +303,21 @@ contract PropsController is
     }
 
     /**
+     * @dev Stake on behalf of the delegator account.
+     * @param _appTokens Array of app tokens to stake/unstake to/from
+     * @param _amounts Array of amounts to stake/unstake to/from each app token
+     * @param _account Delegator account to stake on behalf of
+     */
+    function stakeAsDelegate(
+        address[] memory _appTokens,
+        int256[] memory _amounts,
+        address _account
+    ) public whenNotPaused {
+        require(msg.sender == delegates[_account]);
+        _stake(_appTokens, _amounts, _account, _account, false);
+    }
+
+    /**
      * @dev Similar to `stake`, this function is used to stake/unstake to/from
      *      app tokens. The only difference is that it uses the escrowed
      *      rewards instead of transferring from the user's wallet.
@@ -296,7 +328,22 @@ contract PropsController is
         public
         whenNotPaused
     {
-        _stake(_appTokens, _amounts, msg.sender, true);
+        _stake(_appTokens, _amounts, msg.sender, msg.sender, true);
+    }
+
+    /**
+     * @dev Stake rewards on behalf of the delegator account.
+     * @param _appTokens Array of app tokens to stake/unstake to/from
+     * @param _amounts Array of amounts to stake/unstake to/from each app token
+     * @param _account Delegator account to stake on behalf of
+     */
+    function stakeRewardsAsDelegate(
+        address[] memory _appTokens,
+        int256[] memory _amounts,
+        address _account
+    ) public whenNotPaused {
+        require(msg.sender == delegates[_account]);
+        _stake(_appTokens, _amounts, _account, _account, true);
     }
 
     /**
@@ -304,12 +351,14 @@ contract PropsController is
      * @param _appToken The app token to claim the rewards for
      */
     function claimAppTokenRewards(address _appToken) external whenNotPaused {
-        require(appTokenToStaking[_appToken] != address(0), "Invalid app token");
+        require(appTokenToStaking[_appToken] != address(0), "Bad input");
 
         // Claim the rewards and transfer them to the user's wallet
         uint256 reward = IStaking(appTokenToStaking[_appToken]).earned(msg.sender);
-        IStaking(appTokenToStaking[_appToken]).claimReward(msg.sender);
-        IERC20Upgradeable(_appToken).safeTransfer(msg.sender, reward);
+        if (reward > 0) {
+            IStaking(appTokenToStaking[_appToken]).claimReward(msg.sender);
+            IERC20Upgradeable(_appToken).safeTransfer(msg.sender, reward);
+        }
     }
 
     /**
@@ -317,18 +366,37 @@ contract PropsController is
      * @param _appToken The app token to claim the rewards for
      */
     function claimAppPropsRewards(address _appToken) external whenNotPaused {
-        require(appTokenToStaking[_appToken] != address(0), "Invalid app token");
-        require(
-            msg.sender == OwnableUpgradeable(_appToken).owner(),
-            "Only the app token owner can claim app rewards"
-        );
+        require(appTokenToStaking[_appToken] != address(0), "Bad input");
+        require(msg.sender == OwnableUpgradeable(_appToken).owner(), "Unauthorized");
 
         // Claim the rewards and transfer them to the user's wallet
         uint256 reward = IStaking(sPropsAppStaking).earned(_appToken);
-        IStaking(sPropsAppStaking).claimReward(_appToken);
-        IERC20Upgradeable(rPropsToken).safeTransfer(msg.sender, reward);
-        // Since the rewards are in rProps, swap it for regular Props
-        IRPropsToken(rPropsToken).swap(msg.sender);
+        if (reward > 0) {
+            IStaking(sPropsAppStaking).claimReward(_appToken);
+            IERC20Upgradeable(rPropsToken).safeTransfer(msg.sender, reward);
+            // Since the rewards are in rProps, swap it for regular Props
+            IRPropsToken(rPropsToken).swap(msg.sender);
+        }
+    }
+
+    /**
+     * @dev Allow app token owners to claim and directly stake their app's Props rewards.
+     * @param _appToken The app token to claim and stake the rewards for
+     */
+    function claimAppPropsRewardsAndStake(address _appToken) external whenNotPaused {
+        uint256 reward = IStaking(sPropsAppStaking).earned(_appToken);
+        if (reward > 0) {
+            IStaking(sPropsAppStaking).claimReward(_appToken);
+            // Since the rewards are in rProps, swap it for regular Props
+            IRPropsToken(rPropsToken).swap(address(this));
+
+            address[] memory _appTokens = new address[](1);
+            _appTokens[0] = _appToken;
+            uint256[] memory _amounts = new uint256[](1);
+            _amounts[0] = reward;
+
+            this.stakeOnBehalf(_appTokens, _amounts, msg.sender);
+        }
     }
 
     /**
@@ -337,13 +405,21 @@ contract PropsController is
     function claimUserPropsRewards() external whenNotPaused {
         // Claim the rewards but don't transfer them to the user's wallet
         uint256 reward = IStaking(sPropsUserStaking).earned(msg.sender);
-        IStaking(sPropsUserStaking).claimReward(msg.sender);
-        // Since the rewards are in rProps, swap it for regular Props
-        IRPropsToken(rPropsToken).swap(address(this));
+        if (reward > 0) {
+            IStaking(sPropsUserStaking).claimReward(msg.sender);
+            // Since the rewards are in rProps, swap it for regular Props
+            IRPropsToken(rPropsToken).swap(address(this));
 
-        // Place the rewards in the escrow and extend the cooldown period
-        rewardsEscrow[msg.sender] = rewardsEscrow[msg.sender].add(reward);
-        rewardsEscrowUnlock[msg.sender] = block.timestamp.add(rewardsEscrowCooldown);
+            // Place the rewards in the escrow and extend the cooldown period
+            rewardsEscrow[msg.sender] = rewardsEscrow[msg.sender].add(reward);
+            rewardsEscrowUnlock[msg.sender] = block.timestamp.add(rewardsEscrowCooldown);
+
+            emit RewardsEscrowUpdated(
+                msg.sender,
+                rewardsEscrow[msg.sender],
+                rewardsEscrowUnlock[msg.sender]
+            );
+        }
     }
 
     /**
@@ -357,51 +433,39 @@ contract PropsController is
         address[] calldata _appTokens,
         uint256[] calldata _percentages
     ) external whenNotPaused {
-        // Claim the rewards but don't transfer them to the user's wallet
-        uint256 reward = IStaking(sPropsUserStaking).earned(msg.sender);
-        IStaking(sPropsUserStaking).claimReward(msg.sender);
-        // Since the rewards are in rProps, swap it for regular Props
-        IRPropsToken(rPropsToken).swap(address(this));
+        _claimUserPropsRewardsAndStake(_appTokens, _percentages, msg.sender);
+    }
 
-        // Place the rewards in the escrow but don't extend the cooldown period
-        rewardsEscrow[msg.sender] = rewardsEscrow[msg.sender].add(reward);
-
-        // Calculate amounts from the given percentages
-        uint256 totalPercentage = 0;
-        uint256 totalAmountSoFar = 0;
-        int256[] memory amounts = new int256[](_percentages.length);
-        for (uint8 i = 0; i < _percentages.length; i++) {
-            if (i < _percentages.length.sub(1)) {
-                // Make sure nothing gets lost
-                amounts[i] = _safeInt256(reward.mul(_percentages[i]).div(1e6));
-            } else {
-                amounts[i] = _safeInt256(reward.sub(totalAmountSoFar));
-            }
-
-            totalPercentage = totalPercentage.add(_percentages[i]);
-            totalAmountSoFar = totalAmountSoFar.add(uint256(amounts[i]));
-        }
-        // Make sure the given percentages add up to 100%
-        require(totalPercentage == 1e6, "Invalid percentages");
-
-        stakeRewards(_appTokens, amounts);
+    /**
+     * @dev Claim and stake user Props rewards on behalf of a delegator account.
+     * @param _appTokens Array of app tokens to stake to
+     * @param _percentages Array of percentages of the claimed rewards to stake to each app token
+     * @param _account Delegator to claim and stake on behalf of
+     */
+    function claimUserPropsRewardsAndStakeAsDelegate(
+        address[] calldata _appTokens,
+        uint256[] calldata _percentages,
+        address _account
+    ) external whenNotPaused {
+        _claimUserPropsRewardsAndStake(_appTokens, _percentages, _account);
     }
 
     /**
      * @dev Allow users to unlock their escrowed Props rewards.
      */
     function unlockUserPropsRewards() external whenNotPaused {
-        require(
-            block.timestamp >= rewardsEscrowUnlock[msg.sender],
-            "Rewards are still in cooldown"
-        );
+        require(block.timestamp >= rewardsEscrowUnlock[msg.sender], "Unauthorized");
 
-        // Empty the escrow
-        uint256 escrowedRewards = rewardsEscrow[msg.sender];
-        rewardsEscrow[msg.sender] = 0;
+        if (rewardsEscrow[msg.sender] > 0) {
+            // Empty the escrow
+            uint256 escrowedRewards = rewardsEscrow[msg.sender];
+            rewardsEscrow[msg.sender] = 0;
 
-        // Transfer the rewards to the user's wallet
-        IERC20Upgradeable(propsToken).safeTransfer(msg.sender, escrowedRewards);
+            // Transfer the rewards to the user's wallet
+            IERC20Upgradeable(propsToken).safeTransfer(msg.sender, escrowedRewards);
+
+            emit RewardsEscrowUpdated(msg.sender, 0, 0);
+        }
     }
 
     /***************************************
@@ -413,7 +477,6 @@ contract PropsController is
      * @param _rPropsToken The address of the rProps token contract
      */
     function setRPropsToken(address _rPropsToken) external onlyOwner {
-        require(rPropsToken == address(0), "Already set");
         rPropsToken = _rPropsToken;
     }
 
@@ -422,7 +485,6 @@ contract PropsController is
      * @param _sPropsToken The address of the sProps token contract
      */
     function setSPropsToken(address _sPropsToken) external onlyOwner {
-        require(sPropsToken == address(0), "Already set");
         sPropsToken = _sPropsToken;
     }
 
@@ -431,7 +493,6 @@ contract PropsController is
      * @param _sPropsAppStaking The address of the sProps staking contract for app Props rewards
      */
     function setSPropsAppStaking(address _sPropsAppStaking) external onlyOwner {
-        require(sPropsAppStaking == address(0), "Already set");
         sPropsAppStaking = _sPropsAppStaking;
     }
 
@@ -440,7 +501,6 @@ contract PropsController is
      * @param _sPropsUserStaking The address of the sProps staking contract for user Props rewards
      */
     function setSPropsUserStaking(address _sPropsUserStaking) external onlyOwner {
-        require(sPropsUserStaking == address(0), "Already set");
         sPropsUserStaking = _sPropsUserStaking;
     }
 
@@ -448,7 +508,7 @@ contract PropsController is
      * @dev Pause the contract.
      */
     function pause() external {
-        require(msg.sender == propsGuardian, "Caller is not the Props guardian");
+        require(msg.sender == propsGuardian, "Unauthorized");
         _pause();
     }
 
@@ -456,7 +516,7 @@ contract PropsController is
      * @dev Unpause the contract.
      */
     function unpause() external {
-        require(msg.sender == propsGuardian, "Caller is not the Props guardian");
+        require(msg.sender == propsGuardian, "Unauthorized");
         _unpause();
     }
 
@@ -490,6 +550,7 @@ contract PropsController is
      */
     function whitelistAppToken(address _appToken) external onlyOwner {
         appTokensWhitelist[_appToken] = 1;
+        emit AppTokenWhitelisted(_appToken);
     }
 
     /**
@@ -498,6 +559,7 @@ contract PropsController is
      */
     function blacklistAppToken(address _appToken) external onlyOwner {
         appTokensWhitelist[_appToken] = 0;
+        emit AppTokenBlacklisted(_appToken);
     }
 
     /**
@@ -525,15 +587,16 @@ contract PropsController is
     function _stake(
         address[] memory _appTokens,
         int256[] memory _amounts,
+        address _from,
         address _to,
         bool rewards
     ) internal {
-        require(_appTokens.length == _amounts.length, "Invalid lengths for the input arrays");
+        require(_appTokens.length == _amounts.length, "Bad input");
 
         // First, handle all unstakes (negative amounts)
         uint256 totalUnstakedAmount = 0;
         for (uint8 i = 0; i < _appTokens.length; i++) {
-            require(appTokenToStaking[_appTokens[i]] != address(0), "Invalid app token");
+            require(appTokenToStaking[_appTokens[i]] != address(0), "Bad input");
 
             if (_amounts[i] < 0) {
                 uint256 amountToUnstake = uint256(SignedSafeMathUpgradeable.mul(_amounts[i], -1));
@@ -562,16 +625,31 @@ contract PropsController is
                 // Update the total unstaked amount
                 totalUnstakedAmount = totalUnstakedAmount.add(amountToUnstake);
 
-                emit Withdrawn(_appTokens[i], _to, amountToUnstake);
+                if (rewards) {
+                    emit RewardsStake(_appTokens[i], _to, _amounts[i]);
+                } else {
+                    emit Stake(_appTokens[i], _to, _amounts[i]);
+                }
             }
         }
 
         // Handle all stakes (positive amounts)
         for (uint256 i = 0; i < _appTokens.length; i++) {
-            require(appTokensWhitelist[_appTokens[i]] != 0, "App token is blacklisted");
+            require(appTokensWhitelist[_appTokens[i]] != 0, "Blacklisted");
 
             if (_amounts[i] > 0) {
                 uint256 amountToStake = uint256(_amounts[i]);
+
+                // Update user total staked amounts
+                if (rewards) {
+                    userRewardStakes[_to][_appTokens[i]] = userRewardStakes[_to][_appTokens[i]].add(
+                        amountToStake
+                    );
+                } else {
+                    userStakes[_to][_appTokens[i]] = userStakes[_to][_appTokens[i]].add(
+                        amountToStake
+                    );
+                }
 
                 if (totalUnstakedAmount >= amountToStake) {
                     // If the previously unstaked amount can cover the stake then use that
@@ -581,14 +659,19 @@ contract PropsController is
 
                     if (rewards) {
                         // Otherwise, if we are handling the rewards, get the needed Props from escrow
-                        rewardsEscrow[msg.sender] = rewardsEscrow[msg.sender].sub(left);
+                        rewardsEscrow[_from] = rewardsEscrow[_from].sub(left);
                     } else {
-                        // Otherwise, if we are handling the principal, transfer the needed Props
-                        IERC20Upgradeable(propsToken).safeTransferFrom(
-                            msg.sender,
-                            address(this),
-                            left
-                        );
+                        if (_from != address(this)) {
+                            // When acting on behalf of a delegator no transfers are allowed
+                            require(_from == msg.sender, "Unauthorized");
+
+                            // Otherwise, if we are handling the principal, transfer the needed Props
+                            IERC20Upgradeable(propsToken).safeTransferFrom(
+                                _from,
+                                address(this),
+                                left
+                            );
+                        }
                     }
 
                     // Mint corresponding sProps
@@ -606,29 +689,27 @@ contract PropsController is
                 // Stake the sProps in the app sProps staking contract
                 IStaking(sPropsAppStaking).stake(_appTokens[i], amountToStake);
 
-                // Update user total staked amounts
                 if (rewards) {
-                    userRewardStakes[_to][_appTokens[i]] = userRewardStakes[_to][_appTokens[i]].add(
-                        amountToStake
-                    );
+                    emit RewardsStake(_appTokens[i], _to, _amounts[i]);
                 } else {
-                    userStakes[_to][_appTokens[i]] = userStakes[_to][_appTokens[i]].add(
-                        amountToStake
-                    );
+                    emit Stake(_appTokens[i], _to, _amounts[i]);
                 }
-
-                emit Staked(_appTokens[i], _to, amountToStake);
             }
         }
 
         // If more tokens were unstaked than staked
         if (totalUnstakedAmount > 0) {
+            // When acting on behalf of a delegator no withdraws are allowed
+            require(_from == msg.sender, "Unauthorized");
+
             // Unstake the corresponding sProps from the user sProps staking contract
             IStaking(sPropsUserStaking).withdraw(_to, totalUnstakedAmount);
 
             if (rewards) {
                 rewardsEscrow[_to] = rewardsEscrow[_to].add(totalUnstakedAmount);
                 rewardsEscrowUnlock[_to] = block.timestamp.add(rewardsEscrowCooldown);
+
+                emit RewardsEscrowUpdated(_to, rewardsEscrow[_to], rewardsEscrowUnlock[_to]);
             } else {
                 // Transfer any left Props back to the user
                 IERC20Upgradeable(propsToken).safeTransfer(_to, totalUnstakedAmount);
@@ -639,8 +720,53 @@ contract PropsController is
         }
     }
 
+    function _claimUserPropsRewardsAndStake(
+        address[] memory _appTokens,
+        uint256[] memory _percentages,
+        address _account
+    ) internal {
+        if (_account != msg.sender) {
+            require(delegates[_account] == msg.sender, "Unauthorized");
+        }
+
+        // Claim the rewards but don't transfer them to the user's wallet
+        uint256 reward = IStaking(sPropsUserStaking).earned(_account);
+        if (reward > 0) {
+            IStaking(sPropsUserStaking).claimReward(_account);
+            // Since the rewards are in rProps, swap it for regular Props
+            IRPropsToken(rPropsToken).swap(address(this));
+
+            // Place the rewards in the escrow but don't extend the cooldown period
+            rewardsEscrow[_account] = rewardsEscrow[_account].add(reward);
+
+            // Calculate amounts from the given percentages
+            uint256 totalPercentage = 0;
+            uint256 totalAmountSoFar = 0;
+            int256[] memory amounts = new int256[](_percentages.length);
+            for (uint8 i = 0; i < _percentages.length; i++) {
+                if (i < _percentages.length.sub(1)) {
+                    // Make sure nothing gets lost
+                    amounts[i] = _safeInt256(reward.mul(_percentages[i]).div(1e6));
+                } else {
+                    amounts[i] = _safeInt256(reward.sub(totalAmountSoFar));
+                }
+
+                totalPercentage = totalPercentage.add(_percentages[i]);
+                totalAmountSoFar = totalAmountSoFar.add(uint256(amounts[i]));
+            }
+            // Make sure the given percentages add up to 100%
+            require(totalPercentage == 1e6, "Bad input");
+
+            if (_account == msg.sender) {
+                stakeRewards(_appTokens, amounts);
+            } else {
+                stakeRewardsAsDelegate(_appTokens, amounts, _account);
+            }
+        }
+    }
+
     function _safeInt256(uint256 a) internal pure returns (int256) {
-        require(a <= 2**255 - 1, "Overflow");
+        require(a <= 2**255 - 1);
         return int256(a);
     }
 }

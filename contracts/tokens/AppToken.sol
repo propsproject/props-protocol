@@ -47,6 +47,10 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
     mapping(address => uint256) public nonces;
 
     event InflationRateChanged(uint256 oldInflationRate, uint256 newInflationRate);
+    event Paused();
+    event Unpaused();
+    event AddressWhitelisted(address indexed account);
+    event AddressBlacklisted(address indexed account);
 
     /**
      * @dev Initializer.
@@ -249,6 +253,7 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
      */
     function pause() public override onlyOwner {
         paused = true;
+        emit Paused();
     }
 
     /**
@@ -256,6 +261,7 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
      */
     function unpause() external override onlyOwner {
         paused = false;
+        emit Unpaused();
     }
 
     /**
@@ -263,6 +269,7 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
      */
     function whitelistAddress(address _account) public override onlyOwner {
         addressesWhitelist[_account] = 1;
+        emit AddressWhitelisted(_account);
     }
 
     /**
@@ -270,6 +277,7 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
      */
     function blacklistAddress(address _account) external override onlyOwner {
         addressesWhitelist[_account] = 0;
+        emit AddressBlacklisted(_account);
     }
 
     /**

@@ -11,8 +11,10 @@ Moreover, apps also earn rewards in Props, their stakes being the total amount o
 
 In total, there are three types of staking rewards:
 
-- users earn AppToken rewards by staking Props
-- users earn Props rewards by staking sProps
-- apps earn Props rewards by staking sProps
+- users earn AppToken rewards by staking Props (staking is done explicitly)
+- users earn Props rewards by staking sProps (staking is done implicitly)
+- apps earn Props rewards by staking sProps (staking is done implicitly)
 
 All staking contracts are exclusively owned by the `PropsController`. Staking-related operations (stake, withdraw, claim) are to be done through the `PropsController` which will proxy the calls to the individual staking contracts.
+
+One feature of the Props protocol is staking delegation. Users are able to delegate their staking rights to a trusted account who can then readjust stakes to apps on behalf of the delegator. One caveat is that delegated staking can only be used to readjust existing stake amounts and not to introduce new or withdraw existing stakes. Delegated staking works on both regular staking and rewards staking. Moreover, delegators are able to claim and stake their delegator's earned Props rewards.

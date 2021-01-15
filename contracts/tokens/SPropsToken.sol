@@ -16,8 +16,7 @@ import "../interfaces/ISPropsToken.sol";
  * @dev    sProps tokens represent Props stake shares (each sProps token
  *         corresponds to a staked Props token). sProps are not transferrable,
  *         only mintable and burnable. Minting and burning are actions
- *         restricted to the owner of the contract. sProps tokens
- *         count towards voting power in the Props governance process.
+ *         restricted to the owner of the contract.
  *         Changes to the original Compound contract:
  *         - the contract is ownable and upgradeable
  *         - transfer-related actions are forbidden (the contract simply
@@ -157,11 +156,11 @@ contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IS
         require(dst != address(0), "Cannot mint to the zero address");
 
         // Mint the amount
-        uint96 amount = safe96(rawAmount, "Amount exceeds 96 bits");
-        _totalSupply = safe96(_totalSupply.add(amount), "totalSupply exceeds 96 bits");
+        uint96 amount = safe96(rawAmount);
+        _totalSupply = safe96(_totalSupply.add(amount));
 
         // Transfer the amount to the destination account
-        _balances[dst] = add96(_balances[dst], amount, "Mint amount overflows");
+        _balances[dst] = add96(_balances[dst], amount);
         emit Transfer(address(0), dst, amount);
 
         // Move delegates
@@ -177,11 +176,11 @@ contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IS
         require(src != address(0), "Cannot burn from the zero address");
 
         // Burn the amount
-        uint96 amount = safe96(rawAmount, "Amount exceeds 96 bits");
-        _totalSupply = safe96(_totalSupply.sub(amount), "totalSupply exceeds 96 bits");
+        uint96 amount = safe96(rawAmount);
+        _totalSupply = safe96(_totalSupply.sub(amount));
 
         // Transfer the amount from the source account
-        _balances[src] = sub96(_balances[src], amount, "Transfer amount overflows");
+        _balances[src] = sub96(_balances[src], amount);
         emit Transfer(src, address(0), amount);
 
         // Move delegates
@@ -199,7 +198,7 @@ contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IS
         if (rawAmount == uint256(-1)) {
             amount = uint96(-1);
         } else {
-            amount = safe96(rawAmount, "Amount exceeds 96 bits");
+            amount = safe96(rawAmount);
         }
 
         _allowances[msg.sender][spender] = amount;
@@ -338,14 +337,14 @@ contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IS
             if (srcRep != address(0)) {
                 uint32 srcRepNum = numCheckpoints[srcRep];
                 uint96 srcRepOld = srcRepNum > 0 ? checkpoints[srcRep][srcRepNum - 1].votes : 0;
-                uint96 srcRepNew = sub96(srcRepOld, amount, "Vote amount underflows");
+                uint96 srcRepNew = sub96(srcRepOld, amount);
                 _writeCheckpoint(srcRep, srcRepNum, srcRepOld, srcRepNew);
             }
 
             if (dstRep != address(0)) {
                 uint32 dstRepNum = numCheckpoints[dstRep];
                 uint96 dstRepOld = dstRepNum > 0 ? checkpoints[dstRep][dstRepNum - 1].votes : 0;
-                uint96 dstRepNew = add96(dstRepOld, amount, "Vote amount overflows");
+                uint96 dstRepNew = add96(dstRepOld, amount);
                 _writeCheckpoint(dstRep, dstRepNum, dstRepOld, dstRepNew);
             }
         }
@@ -357,7 +356,7 @@ contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IS
         uint96 oldVotes,
         uint96 newVotes
     ) internal {
-        uint32 blockNumber = safe32(block.number, "Block number exceeds 32 bits");
+        uint32 blockNumber = safe32(block.number);
 
         if (nCheckpoints > 0 && checkpoints[delegatee][nCheckpoints - 1].fromBlock == blockNumber) {
             checkpoints[delegatee][nCheckpoints - 1].votes = newVotes;
@@ -369,32 +368,24 @@ contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IS
         emit DelegateVotesChanged(delegatee, oldVotes, newVotes);
     }
 
-    function safe32(uint256 n, string memory errorMessage) internal pure returns (uint32) {
-        require(n < 2**32, errorMessage);
+    function safe32(uint256 n) internal pure returns (uint32) {
+        require(n < 2**32);
         return uint32(n);
     }
 
-    function safe96(uint256 n, string memory errorMessage) internal pure returns (uint96) {
-        require(n < 2**96, errorMessage);
+    function safe96(uint256 n) internal pure returns (uint96) {
+        require(n < 2**96);
         return uint96(n);
     }
 
-    function add96(
-        uint96 a,
-        uint96 b,
-        string memory errorMessage
-    ) internal pure returns (uint96) {
+    function add96(uint96 a, uint96 b) internal pure returns (uint96) {
         uint96 c = a + b;
-        require(c >= a, errorMessage);
+        require(c >= a);
         return c;
     }
 
-    function sub96(
-        uint96 a,
-        uint96 b,
-        string memory errorMessage
-    ) internal pure returns (uint96) {
-        require(b <= a, errorMessage);
+    function sub96(uint96 a, uint96 b) internal pure returns (uint96) {
+        require(b <= a);
         return a - b;
     }
 

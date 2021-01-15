@@ -69,7 +69,7 @@ describe("GovernorAlpha", () => {
       );
     const [appTokenAddress, appTokenStakingAddress] = await getEvent(
       await tx.wait(),
-      "AppTokenDeployed(address,address,string,uint256)",
+      "AppTokenDeployed(address,address,string,string,address)",
       "PropsController"
     );
 
@@ -158,7 +158,7 @@ describe("GovernorAlpha", () => {
     const [appToken] = await deployAppToken();
 
     // Stake and get sProps
-    const stakeAmount = bn(100);
+    const stakeAmount = expandTo18Decimals(100);
     await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
     await propsToken.connect(alice).approve(propsController.address, stakeAmount);
     await propsController.connect(alice).stake([appToken.address], [stakeAmount]);

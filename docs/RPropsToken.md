@@ -8,7 +8,7 @@ The `RPropsToken` contract is owned by the `PropsController`. Moreover, the `RPr
 
 ##### Distribute rewards
 
-Mint all available rProps tokens and distribute them to the staking contracts for earning apps and users Props rewards. The distribution will also trigger the start of the rewards period on those two staking contracts. The amount of rProps distributed to each rewards pool is determined by the given percentages.
+Mint all available rProps tokens and distribute them to the staking contracts for earning apps and users Props rewards. The distribution will also trigger the start of the rewards period on those two staking contracts. The amount of rProps distributed to each rewards pool is determined by the given percentages. This is a one-time action. Once distributed, all rProps tokens will get minted and further calls to this function won't trigger any mints or rewards distributions.
 
 ```solidity
 function distributeRewards(
