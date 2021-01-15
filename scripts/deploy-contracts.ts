@@ -2,7 +2,14 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-wit
 import * as fs from "fs";
 import { ethers } from "hardhat";
 
-import type { AppToken, PropsController, RPropsToken, Staking, TestPropsToken } from "../typechain";
+import type {
+  AppToken,
+  PropsController,
+  RPropsToken,
+  SPropsToken,
+  Staking,
+  TestPropsToken,
+} from "../typechain";
 import { bn, deployContract, deployContractUpgradeable, expandTo18Decimals } from "../utils";
 
 // Constants
@@ -13,23 +20,26 @@ const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
 let deployer: SignerWithAddress;
 let propsControllerOwner: SignerWithAddress;
 let propsTreasury: SignerWithAddress;
+let propsGuardian: SignerWithAddress;
 
 // Contracts
 let propsToken: TestPropsToken;
 let appTokenLogic: AppToken;
 let appTokenStakingLogic: Staking;
 let propsController: PropsController;
+let sPropsToken: SPropsToken;
 let rPropsToken: RPropsToken;
 let sPropsAppStaking: Staking;
 let sPropsUserStaking: Staking;
 
 async function main() {
-  [deployer, propsControllerOwner, propsTreasury] = await ethers.getSigners();
+  [deployer, propsControllerOwner, propsTreasury, propsGuardian] = await ethers.getSigners();
 
   console.log("Using the following addresses:");
   console.log(`Deployer: ${deployer.address}`);
   console.log(`PropsController owner: ${propsControllerOwner.address}`);
   console.log(`Props treasury: ${propsTreasury.address}`);
+  console.log(`Props guardian: ${propsGuardian.address}`);
 
   const network = (await ethers.provider.getNetwork()).name;
 
@@ -60,6 +70,10 @@ async function main() {
     rPropsToken = (await ethers.getContractFactory("RPropsToken")).attach(
       contractAddresses.rPropsToken
     ) as RPropsToken;
+
+    sPropsToken = (await ethers.getContractFactory("SPropsToken")).attach(
+      contractAddresses.sPropsToken
+    ) as SPropsToken;
 
     sPropsAppStaking = (await ethers.getContractFactory("Staking")).attach(
       contractAddresses.sPropsAppStaking
@@ -93,6 +107,7 @@ async function main() {
       [
         propsControllerOwner.address,
         propsTreasury.address,
+        propsGuardian.address,
         propsToken.address,
         appTokenLogic.address,
         appTokenStakingLogic.address,
@@ -105,6 +120,11 @@ async function main() {
       propsToken.address,
     ]);
     contractAddresses.rPropsToken = rPropsToken.address;
+
+    sPropsToken = await deployContractUpgradeable<SPropsToken>("SPropsToken", deployer, [
+      propsController.address,
+    ]);
+    contractAddresses.sPropsToken = sPropsToken.address;
 
     sPropsAppStaking = await deployContractUpgradeable("Staking", deployer, [
       propsController.address,
@@ -135,6 +155,9 @@ async function main() {
     await propsController
       .connect(propsControllerOwner)
       .setRPropsToken(rPropsToken.address, { gasLimit: 1000000 });
+    await propsController
+      .connect(propsControllerOwner)
+      .setSPropsToken(sPropsToken.address, { gasLimit: 1000000 });
     await propsController
       .connect(propsControllerOwner)
       .setSPropsAppStaking(sPropsAppStaking.address, { gasLimit: 1000000 });
