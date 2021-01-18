@@ -39,6 +39,9 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
     // Time most recent inflation rate change occured at
     uint256 public lastInflationRateChange;
 
+    // IPFS hash pointing to app information
+    bytes public appInfo;
+
     // solhint-disable-next-line var-name-mixedcase
     bytes32 public DOMAIN_SEPARATOR;
     // solhint-disable-next-line var-name-mixedcase
@@ -46,6 +49,7 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
 
     mapping(address => uint256) public nonces;
 
+    event AppInfoChanged(bytes indexed newAppInfo);
     event InflationRateChanged(uint256 oldInflationRate, uint256 newInflationRate);
     event Paused();
     event Unpaused();
@@ -102,6 +106,15 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
         _mint(msg.sender, rewards);
 
         lastMint = block.timestamp;
+    }
+
+    /**
+     * @dev Update the IPFS hash pointing to the app information.
+     * @param _appInfo The new IPFS app information hash
+     */
+    function updateAppInfo(bytes calldata _appInfo) external onlyOwner {
+        appInfo = _appInfo;
+        emit AppInfoChanged(_appInfo);
     }
 
     /**

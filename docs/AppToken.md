@@ -12,6 +12,14 @@ Mint new AppTokens according to the set inflation rate. The number of new AppTok
 function mint() external onlyOwner
 ```
 
+##### Update app info
+
+Update the IPFS hash pointing to the app's info. Each app can have optional information associated to it (bio, logo, etc.). This information is to be stored on IPFS, and the IPFS hash of it should be kept on-chain.
+
+```solidity
+function updateAppInfo(bytes calldata _appInfo) external onlyOwner
+```
+
 ##### Change inflation rate
 
 Change the AppToken's inflation rate. Once changed, there is a delay before the new inflation rate goes into effect.
