@@ -8,6 +8,7 @@ import { ethers } from "hardhat";
 import accounts from "../test-accounts";
 import type {
   AppToken,
+  AppTokenProxyFactory,
   PropsController,
   RPropsToken,
   SPropsToken,
@@ -42,6 +43,7 @@ describe("PropsController", () => {
   let sPropsToken: SPropsToken;
   let sPropsAppStaking: Staking;
   let sPropsUserStaking: Staking;
+  let appTokenProxyFactory: AppTokenProxyFactory;
   let propsController: PropsController;
 
   const PROPS_TOKEN_AMOUNT = expandTo18Decimals(100000);
@@ -57,7 +59,7 @@ describe("PropsController", () => {
   const deployAppToken = async (
     rewardsDistributedPercentage: BigNumber = bn(0)
   ): Promise<[AppToken, Staking]> => {
-    const tx = await propsController
+    const tx = await appTokenProxyFactory
       .connect(appTokenOwner)
       .deployAppToken(
         APP_TOKEN_NAME,
@@ -70,7 +72,7 @@ describe("PropsController", () => {
     const [appTokenAddress, appTokenStakingAddress] = await getEvent(
       await tx.wait(),
       "AppTokenDeployed(address,address,string,string,address)",
-      "PropsController"
+      "AppTokenProxyFactory"
     );
 
     await propsController.connect(propsTreasury).whitelistAppToken(appTokenAddress);
@@ -84,9 +86,6 @@ describe("PropsController", () => {
   beforeEach(async () => {
     [propsTreasury, appTokenOwner, alice, bob] = await ethers.getSigners();
 
-    const appTokenLogic = await deployContract<AppToken>("AppToken", propsTreasury);
-    const appTokenStakingLogic = await deployContract<Staking>("Staking", propsTreasury);
-
     propsToken = await deployContractUpgradeable("TestPropsToken", propsTreasury, [
       PROPS_TOKEN_AMOUNT,
     ]);
@@ -94,10 +93,7 @@ describe("PropsController", () => {
     propsController = await deployContractUpgradeable("PropsController", propsTreasury, [
       propsTreasury.address,
       propsTreasury.address,
-      propsTreasury.address,
       propsToken.address,
-      appTokenLogic.address,
-      appTokenStakingLogic.address,
     ]);
 
     rPropsToken = await deployContractUpgradeable("RPropsToken", propsTreasury, [
@@ -125,14 +121,29 @@ describe("PropsController", () => {
       DAILY_REWARDS_EMISSION,
     ]);
 
+    const appTokenLogic = await deployContract<AppToken>("AppToken", propsTreasury);
+    const appTokenStakingLogic = await deployContract<Staking>("Staking", propsTreasury);
+
+    appTokenProxyFactory = await deployContractUpgradeable("AppTokenProxyFactory", propsTreasury, [
+      propsTreasury.address,
+      propsController.address,
+      propsTreasury.address,
+      propsToken.address,
+      appTokenLogic.address,
+      appTokenStakingLogic.address,
+    ]);
+
     // The rProps token contract is allowed to mint new Props
-    propsToken.connect(propsTreasury).setMinter(rPropsToken.address);
+    await propsToken.connect(propsTreasury).setMinter(rPropsToken.address);
 
     // Initialize all needed fields on the controller
-    propsController.connect(propsTreasury).setRPropsToken(rPropsToken.address);
-    propsController.connect(propsTreasury).setSPropsToken(sPropsToken.address);
-    propsController.connect(propsTreasury).setSPropsAppStaking(sPropsAppStaking.address);
-    propsController.connect(propsTreasury).setSPropsUserStaking(sPropsUserStaking.address);
+    await propsController
+      .connect(propsTreasury)
+      .setAppTokenProxyFactory(appTokenProxyFactory.address);
+    await propsController.connect(propsTreasury).setRPropsToken(rPropsToken.address);
+    await propsController.connect(propsTreasury).setSPropsToken(sPropsToken.address);
+    await propsController.connect(propsTreasury).setSPropsAppStaking(sPropsAppStaking.address);
+    await propsController.connect(propsTreasury).setSPropsUserStaking(sPropsUserStaking.address);
 
     // Distribute the rProps rewards to the sProps staking contracts
     await propsController.connect(propsTreasury).distributePropsRewards(bn(800000), bn(200000));
@@ -956,32 +967,32 @@ describe("PropsController", () => {
     // Only the owner can set the rewards escrow cooldown
     await expect(
       propsController.connect(alice).setRewardsEscrowCooldown(bn(10))
-    ).to.be.revertedWith("Ownable: caller is not the owner");
+    ).to.be.revertedWith("Unauthorized");
     expect(await propsController.connect(propsTreasury).setRewardsEscrowCooldown(bn(10)));
 
     const mockAddress = bob.address;
 
-    // Only the owner can set the app token logic
-    await expect(propsController.connect(alice).setAppTokenLogic(mockAddress)).to.be.revertedWith(
-      "Ownable: caller is not the owner"
-    );
-    expect(await propsController.connect(propsTreasury).setAppTokenLogic(mockAddress));
+    // // Only the owner can set the app token logic
+    // await expect(propsController.connect(alice).setAppTokenLogic(mockAddress)).to.be.revertedWith(
+    //   "Unauthorized"
+    // );
+    // expect(await propsController.connect(propsTreasury).setAppTokenLogic(mockAddress));
 
-    // Only the owner can set the app token staking logic
-    await expect(
-      propsController.connect(alice).setAppTokenStakingLogic(mockAddress)
-    ).to.be.revertedWith("Ownable: caller is not the owner");
-    expect(await propsController.connect(propsTreasury).setAppTokenStakingLogic(mockAddress));
+    // // Only the owner can set the app token staking logic
+    // await expect(
+    //   propsController.connect(alice).setAppTokenStakingLogic(mockAddress)
+    // ).to.be.revertedWith("Unauthorized");
+    // expect(await propsController.connect(propsTreasury).setAppTokenStakingLogic(mockAddress));
 
     // Only the owner can whitelist app tokens
     await expect(propsController.connect(alice).whitelistAppToken(mockAddress)).to.be.revertedWith(
-      "Ownable: caller is not the owner"
+      "Unauthorized"
     );
     expect(await propsController.connect(propsTreasury).whitelistAppToken(mockAddress));
 
     // Only the owner can blacklist app tokens
     await expect(propsController.connect(alice).blacklistAppToken(mockAddress)).to.be.revertedWith(
-      "Ownable: caller is not the owner"
+      "Unauthorized"
     );
     expect(await propsController.connect(propsTreasury).blacklistAppToken(mockAddress));
 
@@ -1004,9 +1015,9 @@ describe("PropsController", () => {
     // No action is available when paused
     await expect(
       propsController.connect(alice).stake([appToken.address], [stakeAmount])
-    ).to.be.revertedWith("Pausable: paused");
+    ).to.be.revertedWith("Paused");
     await expect(propsController.connect(alice).claimUserPropsRewards()).to.be.revertedWith(
-      "Pausable: paused"
+      "Paused"
     );
 
     // Unpause the contract

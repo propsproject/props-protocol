@@ -1,3 +1,3 @@
 module.exports = {
-  skipFiles: ["test/", "governance/", "tokens/SPropsToken.sol"],
+  skipFiles: ["test/", "governance/", "tokens/SPropsToken.sol", "MinimalProxyFactory.sol"],
 };

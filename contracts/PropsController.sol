@@ -1,65 +1,49 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.6.8;
+pragma solidity 0.6.12;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SignedSafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./interfaces/IAppToken.sol";
+import "./interfaces/IOwnable.sol";
+import "./interfaces/IPropsController.sol";
 import "./interfaces/IPropsToken.sol";
 import "./interfaces/ISPropsToken.sol";
 import "./interfaces/IRPropsToken.sol";
 import "./interfaces/IStaking.sol";
-import "./MinimalProxyFactory.sol";
+import "./utils/Ownable.sol";
 
 /**
  * @title  PropsController
  * @author Props
- * @notice Entry point for participating in the Props protocol. All actions should
- *         be done exclusively through this contract.
+ * @notice Entry point for participating in the Props protocol. All user actions
+ *         should be done exclusively through this contract.
  * @dev    It is responsible for proxying staking-related actions to the appropiate
  *         app token staking contracts. Moreover, tt also handles sProps minting
  *         and burning, sProps staking, swapping earned rProps for regular Props and
  *         locking users Props rewards.
  */
-contract PropsController is
-    Initializable,
-    OwnableUpgradeable,
-    PausableUpgradeable,
-    MinimalProxyFactory
-{
-    // Possible easy contract size optimizations:
-    // - implement own Pausable logic
-    // - move proxy factory to a different contract
-
+contract PropsController is Initializable, Ownable, IPropsController {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
-    // The Props protocol treasury address
-    address public propsTreasury;
-
-    // The Props protocol guardian
+    // The Props protocol guardian (has the ability to pause/unpause the protocol)
     address public propsGuardian;
 
     address public propsToken;
     address public sPropsToken;
     address public rPropsToken;
 
+    // The factory contract for deploying new app tokens
+    address public appTokenProxyFactory;
+
     // The sProps staking contract for app Props rewards
     address public sPropsAppStaking;
     // The sProps staking contract for user Props rewards
     address public sPropsUserStaking;
 
-    // Logic contract for app token contract proxies
-    address public appTokenLogic;
-    // Logic contract for app token staking contract proxies
-    address public appTokenStakingLogic;
-
-    // List of all existing app tokens
-    address[] public appTokens;
     // Mapping of the app token staking contract of each app token
     mapping(address => address) public appTokenToStaking;
 
@@ -80,24 +64,22 @@ contract PropsController is
     uint256 public rewardsEscrowCooldown;
 
     // Set of whitelisted app tokens
-    mapping(address => uint8) public appTokensWhitelist;
+    mapping(address => uint8) private appTokensWhitelist;
+
+    bool public paused;
 
     /**************************************
                      EVENTS
     ***************************************/
 
-    event AppTokenDeployed(
-        address indexed appToken,
-        address indexed appTokenStaking,
-        string name,
-        string symbol,
-        address owner
-    );
     event Stake(address indexed appToken, address indexed account, int256 amount);
     event RewardsStake(address indexed appToken, address indexed account, int256 amount);
     event RewardsEscrowUpdated(address indexed account, uint256 lockedAmount, uint256 unlockTime);
     event AppTokenWhitelisted(address indexed appToken);
     event AppTokenBlacklisted(address indexed appToken);
+    event DelegateChanged(address indexed delegator, address indexed delegatee);
+    event Paused();
+    event Unpaused();
 
     /***************************************
                    INITIALIZER
@@ -106,36 +88,36 @@ contract PropsController is
     /**
      * @dev Initializer.
      * @param _owner The owner of the contract
-     * @param _propsTreasury The Props protocol treasury that a percentage of all minted app tokens will go to
      * @param _propsGuardian The Props protocol guardian
      * @param _propsToken The Props token contract
-     * @param _appTokenLogic The logic contract for app token contract proxies
-     * @param _appTokenStakingLogic The logic contract for app token staking contract proxies
      */
     function initialize(
         address _owner,
-        address _propsTreasury,
         address _propsGuardian,
-        address _propsToken,
-        address _appTokenLogic,
-        address _appTokenStakingLogic
+        address _propsToken
     ) public initializer {
-        OwnableUpgradeable.__Ownable_init();
-        PausableUpgradeable.__Pausable_init();
+        Ownable.__Ownable_init();
 
         if (_owner != msg.sender) {
             transferOwnership(_owner);
         }
 
-        propsTreasury = _propsTreasury;
         propsGuardian = _propsGuardian;
-
         propsToken = _propsToken;
-
-        appTokenLogic = _appTokenLogic;
-        appTokenStakingLogic = _appTokenStakingLogic;
-
         rewardsEscrowCooldown = 90 days;
+    }
+
+    /**
+     * @dev Save an app token and its associated staking contract (to be called
+     *      only by the app token factory contract).
+     * @param _appToken The app token contract address
+     * @param _appTokenStaking The app token staking contract address
+     */
+    function saveAppToken(address _appToken, address _appTokenStaking) external override {
+        _requireNotPaused();
+        require(msg.sender == appTokenProxyFactory, "Unauthorized");
+
+        appTokenToStaking[_appToken] = _appTokenStaking;
     }
 
     /***************************************
@@ -143,91 +125,12 @@ contract PropsController is
     ****************************************/
 
     /**
-     * @dev Deploy a new app token.
-     * @param _name The name of the app token
-     * @param _symbol The symbol of the app token
-     * @param _amount The initial amount of app tokens to be minted
-     * @param _owner The owner of the app token
-     * @param _dailyRewardEmission The daily reward emission parameter for the app token's staking contract
-     * @param _rewardsDistributedPercentage Percentage of the initially minted app tokens to get distributed as rewards
-     */
-    function deployAppToken(
-        string calldata _name,
-        string calldata _symbol,
-        uint256 _amount,
-        address _owner,
-        uint256 _dailyRewardEmission,
-        uint256 _rewardsDistributedPercentage
-    ) external whenNotPaused {
-        // In order to reduce gas costs, the minimal proxy pattern is used when creating new app tokens
-
-        // Deploy the app token contract
-        address appTokenProxy =
-            deployMinimal(
-                appTokenLogic,
-                abi.encodeWithSignature(
-                    "initialize(string,string,uint256,address,address,uint256)",
-                    _name,
-                    _symbol,
-                    _amount,
-                    _owner,
-                    propsTreasury,
-                    _rewardsDistributedPercentage
-                )
-            );
-
-        // Deploy the corresponding staking contract for the app token
-        address appTokenStakingProxy =
-            deployMinimal(
-                appTokenStakingLogic,
-                abi.encodeWithSignature(
-                    "initialize(address,address,address,address,uint256)",
-                    address(this),
-                    // The PropsController is responsible for the initial rewards distribution
-                    address(this),
-                    appTokenProxy,
-                    propsToken,
-                    _dailyRewardEmission
-                )
-            );
-
-        // Pause app token transfers
-        IAppToken(appTokenProxy).pause();
-
-        // Whitelist the app token owner
-        IAppToken(appTokenProxy).whitelistAddress(_owner);
-        // Whitelist the PropsController contract
-        IAppToken(appTokenProxy).whitelistAddress(address(this));
-        // Whitelist the app token staking contract
-        IAppToken(appTokenProxy).whitelistAddress(appTokenStakingProxy);
-
-        // Transfer ownership to the app token owner
-        OwnableUpgradeable(appTokenProxy).transferOwnership(_owner);
-
-        // If requested, distribute the app token rewards
-        uint256 rewards = IERC20Upgradeable(appTokenProxy).balanceOf(address(this));
-        if (rewards > 0) {
-            IERC20Upgradeable(appTokenProxy).transfer(appTokenStakingProxy, rewards);
-            IStaking(appTokenStakingProxy).notifyRewardAmount(rewards);
-        }
-
-        // Assign rewards distribution to the app token owner
-        IStaking(appTokenStakingProxy).setRewardsDistribution(_owner);
-
-        // Save the app token and its corresponding staking contract
-        appTokens.push(appTokenProxy);
-        // solhint-disable-next-line reentrancy
-        appTokenToStaking[appTokenProxy] = appTokenStakingProxy;
-
-        emit AppTokenDeployed(appTokenProxy, appTokenStakingProxy, _name, _symbol, _owner);
-    }
-
-    /**
      * @dev Delegate staking rights.
      * @param _to The account to delegate to
      */
     function delegate(address _to) external {
         delegates[msg.sender] = _to;
+        emit DelegateChanged(msg.sender, _to);
     }
 
     /**
@@ -243,7 +146,9 @@ contract PropsController is
         address[] memory _appTokens,
         uint256[] memory _amounts,
         address _account
-    ) public whenNotPaused {
+    ) public {
+        _requireNotPaused();
+
         // Convert from uint256 to int256
         int256[] memory amounts = new int256[](_amounts.length);
         for (uint8 i = 0; i < _amounts.length; i++) {
@@ -267,7 +172,9 @@ contract PropsController is
         uint8 _v,
         bytes32 _r,
         bytes32 _s
-    ) public whenNotPaused {
+    ) public {
+        _requireNotPaused();
+
         IPropsToken(propsToken).permit(_owner, _spender, _amount, _deadline, _v, _r, _s);
         stakeOnBehalf(_appTokens, _amounts, _account);
     }
@@ -280,7 +187,9 @@ contract PropsController is
      * @param _appTokens Array of app tokens to stake/unstake to/from
      * @param _amounts Array of amounts to stake/unstake to/from each app token
      */
-    function stake(address[] memory _appTokens, int256[] memory _amounts) public whenNotPaused {
+    function stake(address[] memory _appTokens, int256[] memory _amounts) public {
+        _requireNotPaused();
+
         _stake(_appTokens, _amounts, msg.sender, msg.sender, false);
     }
 
@@ -297,7 +206,9 @@ contract PropsController is
         uint8 _v,
         bytes32 _r,
         bytes32 _s
-    ) external whenNotPaused {
+    ) external {
+        _requireNotPaused();
+
         IPropsToken(propsToken).permit(_owner, _spender, _amount, _deadline, _v, _r, _s);
         stake(_appTokens, _amounts);
     }
@@ -312,8 +223,10 @@ contract PropsController is
         address[] memory _appTokens,
         int256[] memory _amounts,
         address _account
-    ) public whenNotPaused {
-        require(msg.sender == delegates[_account]);
+    ) public {
+        _requireNotPaused();
+        require(msg.sender == delegates[_account], "Unauthorized");
+
         _stake(_appTokens, _amounts, _account, _account, false);
     }
 
@@ -324,10 +237,9 @@ contract PropsController is
      * @param _appTokens Array of app tokens to stake/unstake to/from
      * @param _amounts Array of amounts to stake/unstake to/from each app token
      */
-    function stakeRewards(address[] memory _appTokens, int256[] memory _amounts)
-        public
-        whenNotPaused
-    {
+    function stakeRewards(address[] memory _appTokens, int256[] memory _amounts) public {
+        _requireNotPaused();
+
         _stake(_appTokens, _amounts, msg.sender, msg.sender, true);
     }
 
@@ -341,8 +253,10 @@ contract PropsController is
         address[] memory _appTokens,
         int256[] memory _amounts,
         address _account
-    ) public whenNotPaused {
+    ) public {
+        _requireNotPaused();
         require(msg.sender == delegates[_account]);
+
         _stake(_appTokens, _amounts, _account, _account, true);
     }
 
@@ -350,7 +264,8 @@ contract PropsController is
      * @dev Allow users to claim their app token rewards.
      * @param _appToken The app token to claim the rewards for
      */
-    function claimAppTokenRewards(address _appToken) external whenNotPaused {
+    function claimAppTokenRewards(address _appToken) external {
+        _requireNotPaused();
         require(appTokenToStaking[_appToken] != address(0), "Bad input");
 
         // Claim the rewards and transfer them to the user's wallet
@@ -365,9 +280,10 @@ contract PropsController is
      * @dev Allow app token owners to claim their app's Props rewards.
      * @param _appToken The app token to claim the rewards for
      */
-    function claimAppPropsRewards(address _appToken) external whenNotPaused {
+    function claimAppPropsRewards(address _appToken) external {
+        _requireNotPaused();
         require(appTokenToStaking[_appToken] != address(0), "Bad input");
-        require(msg.sender == OwnableUpgradeable(_appToken).owner(), "Unauthorized");
+        require(msg.sender == IOwnable(_appToken).owner(), "Unauthorized");
 
         // Claim the rewards and transfer them to the user's wallet
         uint256 reward = IStaking(sPropsAppStaking).earned(_appToken);
@@ -383,7 +299,9 @@ contract PropsController is
      * @dev Allow app token owners to claim and directly stake their app's Props rewards.
      * @param _appToken The app token to claim and stake the rewards for
      */
-    function claimAppPropsRewardsAndStake(address _appToken) external whenNotPaused {
+    function claimAppPropsRewardsAndStake(address _appToken) external {
+        _requireNotPaused();
+
         uint256 reward = IStaking(sPropsAppStaking).earned(_appToken);
         if (reward > 0) {
             IStaking(sPropsAppStaking).claimReward(_appToken);
@@ -402,7 +320,9 @@ contract PropsController is
     /**
      * @dev Allow users to claim their Props rewards.
      */
-    function claimUserPropsRewards() external whenNotPaused {
+    function claimUserPropsRewards() external {
+        _requireNotPaused();
+
         // Claim the rewards but don't transfer them to the user's wallet
         uint256 reward = IStaking(sPropsUserStaking).earned(msg.sender);
         if (reward > 0) {
@@ -432,7 +352,9 @@ contract PropsController is
     function claimUserPropsRewardsAndStake(
         address[] calldata _appTokens,
         uint256[] calldata _percentages
-    ) external whenNotPaused {
+    ) external {
+        _requireNotPaused();
+
         _claimUserPropsRewardsAndStake(_appTokens, _percentages, msg.sender);
     }
 
@@ -446,14 +368,17 @@ contract PropsController is
         address[] calldata _appTokens,
         uint256[] calldata _percentages,
         address _account
-    ) external whenNotPaused {
+    ) external {
+        _requireNotPaused();
+
         _claimUserPropsRewardsAndStake(_appTokens, _percentages, _account);
     }
 
     /**
      * @dev Allow users to unlock their escrowed Props rewards.
      */
-    function unlockUserPropsRewards() external whenNotPaused {
+    function unlockUserPropsRewards() external {
+        _requireNotPaused();
         require(block.timestamp >= rewardsEscrowUnlock[msg.sender], "Unauthorized");
 
         if (rewardsEscrow[msg.sender] > 0) {
@@ -473,10 +398,24 @@ contract PropsController is
     ****************************************/
 
     /**
+     * @dev Set the app token factory contract.
+     * @param _appTokenProxyFactory The address of the app token factory contract
+     */
+    function setAppTokenProxyFactory(address _appTokenProxyFactory) external {
+        _requireOnlyOwner();
+        require(appTokenProxyFactory == address(0));
+
+        appTokenProxyFactory = _appTokenProxyFactory;
+    }
+
+    /**
      * @dev Set the rProps token contract.
      * @param _rPropsToken The address of the rProps token contract
      */
-    function setRPropsToken(address _rPropsToken) external onlyOwner {
+    function setRPropsToken(address _rPropsToken) external {
+        _requireOnlyOwner();
+        require(rPropsToken == address(0));
+
         rPropsToken = _rPropsToken;
     }
 
@@ -484,7 +423,10 @@ contract PropsController is
      * @dev Set the sProps token contract.
      * @param _sPropsToken The address of the sProps token contract
      */
-    function setSPropsToken(address _sPropsToken) external onlyOwner {
+    function setSPropsToken(address _sPropsToken) external {
+        _requireOnlyOwner();
+        require(sPropsToken == address(0));
+
         sPropsToken = _sPropsToken;
     }
 
@@ -492,7 +434,10 @@ contract PropsController is
      * @dev Set the sProps staking contract for app Props rewards.
      * @param _sPropsAppStaking The address of the sProps staking contract for app Props rewards
      */
-    function setSPropsAppStaking(address _sPropsAppStaking) external onlyOwner {
+    function setSPropsAppStaking(address _sPropsAppStaking) external {
+        _requireOnlyOwner();
+        require(sPropsAppStaking == address(0));
+
         sPropsAppStaking = _sPropsAppStaking;
     }
 
@@ -500,7 +445,10 @@ contract PropsController is
      * @dev Set the sProps staking contract for user Props rewards.
      * @param _sPropsUserStaking The address of the sProps staking contract for user Props rewards
      */
-    function setSPropsUserStaking(address _sPropsUserStaking) external onlyOwner {
+    function setSPropsUserStaking(address _sPropsUserStaking) external {
+        _requireOnlyOwner();
+        require(sPropsUserStaking == address(0));
+
         sPropsUserStaking = _sPropsUserStaking;
     }
 
@@ -509,7 +457,7 @@ contract PropsController is
      */
     function pause() external {
         require(msg.sender == propsGuardian, "Unauthorized");
-        _pause();
+        paused = true;
     }
 
     /**
@@ -517,38 +465,25 @@ contract PropsController is
      */
     function unpause() external {
         require(msg.sender == propsGuardian, "Unauthorized");
-        _unpause();
+        paused = false;
     }
 
     /**
      * @dev Set the cooldown for the escrowed rewards.
      * @param _rewardsEscrowCooldown The cooldown for the escrowed rewards
      */
-    function setRewardsEscrowCooldown(uint256 _rewardsEscrowCooldown) external onlyOwner {
+    function setRewardsEscrowCooldown(uint256 _rewardsEscrowCooldown) external {
+        _requireOnlyOwner();
         rewardsEscrowCooldown = _rewardsEscrowCooldown;
-    }
-
-    /**
-     * @dev Set the logic contract for app token contract proxies.
-     * @param _appTokenLogic The address of the new logic contract
-     */
-    function setAppTokenLogic(address _appTokenLogic) external onlyOwner {
-        appTokenLogic = _appTokenLogic;
-    }
-
-    /**
-     * @dev Set the logic contract for app token staking contract proxies.
-     * @param _appTokenStakingLogic The address of the new logic contract
-     */
-    function setAppTokenStakingLogic(address _appTokenStakingLogic) external onlyOwner {
-        appTokenStakingLogic = _appTokenStakingLogic;
     }
 
     /**
      * @dev Whitelist an app token.
      * @param _appToken The address of the app token to whitelist
      */
-    function whitelistAppToken(address _appToken) external onlyOwner {
+    function whitelistAppToken(address _appToken) external {
+        _requireOnlyOwner();
+
         appTokensWhitelist[_appToken] = 1;
         emit AppTokenWhitelisted(_appToken);
     }
@@ -557,7 +492,9 @@ contract PropsController is
      * @dev Blacklist an app token.
      * @param _appToken The address of the app token to blacklist
      */
-    function blacklistAppToken(address _appToken) external onlyOwner {
+    function blacklistAppToken(address _appToken) external {
+        _requireOnlyOwner();
+
         appTokensWhitelist[_appToken] = 0;
         emit AppTokenBlacklisted(_appToken);
     }
@@ -570,8 +507,8 @@ contract PropsController is
      */
     function distributePropsRewards(uint256 _appRewardsPercentage, uint256 _userRewardsPercentage)
         external
-        onlyOwner
     {
+        _requireOnlyOwner();
         IRPropsToken(rPropsToken).distributeRewards(
             sPropsAppStaking,
             _appRewardsPercentage,
@@ -765,8 +702,24 @@ contract PropsController is
         }
     }
 
+    /***************************************
+                    UTILITIES
+    ****************************************/
+
     function _safeInt256(uint256 a) internal pure returns (int256) {
-        require(a <= 2**255 - 1);
+        require(a <= 2**255 - 1, "Overflow");
         return int256(a);
+    }
+
+    // Optimize the contract size by replacing modifiers (which get inlined and
+    // generate a good amount of duplicated bytecode) with internal function calls
+    // which are much more lightweight with regard to the generated bytecode size.
+
+    function _requireNotPaused() internal view {
+        require(!paused, "Paused");
+    }
+
+    function _requireOnlyOwner() internal view {
+        require(msg.sender == owner(), "Unauthorized");
     }
 }
