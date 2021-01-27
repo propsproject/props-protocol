@@ -11,7 +11,13 @@ import type {
   Staking,
   TestPropsToken,
 } from "../typechain";
-import { bn, deployContract, deployContractUpgradeable, expandTo18Decimals } from "../utils";
+import {
+  bn,
+  deployContract,
+  deployContractUpgradeable,
+  expandTo18Decimals,
+  getContractFactory,
+} from "../utils";
 
 // Constants
 const PROPS_TOKEN_AMOUNT = expandTo18Decimals(900000000);
@@ -53,39 +59,39 @@ async function main() {
     // Connect to deployed contracts
     const contractAddresses = JSON.parse(fs.readFileSync(`${network}.json`).toString());
 
-    propsToken = (await ethers.getContractFactory("TestPropsToken")).attach(
+    propsToken = getContractFactory("TestPropsToken", deployer).attach(
       contractAddresses.propsToken
     ) as TestPropsToken;
 
-    propsController = (await ethers.getContractFactory("PropsController")).attach(
+    propsController = getContractFactory("PropsController", deployer).attach(
       contractAddresses.propsController
     ) as PropsController;
 
-    rPropsToken = (await ethers.getContractFactory("RPropsToken")).attach(
+    rPropsToken = getContractFactory("RPropsToken").attach(
       contractAddresses.rPropsToken
     ) as RPropsToken;
 
-    sPropsToken = (await ethers.getContractFactory("SPropsToken")).attach(
+    sPropsToken = getContractFactory("SPropsToken").attach(
       contractAddresses.sPropsToken
     ) as SPropsToken;
 
-    sPropsAppStaking = (await ethers.getContractFactory("Staking")).attach(
+    sPropsAppStaking = getContractFactory("Staking").attach(
       contractAddresses.sPropsAppStaking
     ) as Staking;
 
-    sPropsUserStaking = (await ethers.getContractFactory("Staking")).attach(
+    sPropsUserStaking = getContractFactory("Staking").attach(
       contractAddresses.sPropsUserStaking
     ) as Staking;
 
-    appTokenLogic = (await ethers.getContractFactory("AppToken")).attach(
+    appTokenLogic = getContractFactory("AppToken").attach(
       contractAddresses.appTokenLogic
     ) as AppToken;
 
-    appTokenStakingLogic = (await ethers.getContractFactory("Staking")).attach(
+    appTokenStakingLogic = getContractFactory("Staking").attach(
       contractAddresses.appTokenStakingLogic
     ) as Staking;
 
-    appTokenProxyFactory = (await ethers.getContractFactory("AppTokenProxyFactory")).attach(
+    appTokenProxyFactory = getContractFactory("AppTokenProxyFactory").attach(
       contractAddresses.appTokenProxyFactory
     ) as AppTokenProxyFactory;
 
@@ -96,7 +102,8 @@ async function main() {
     // Deploy new contracts
     const contractAddresses: any = {};
 
-    propsToken = await deployContract("TestPropsToken", deployer, [PROPS_TOKEN_AMOUNT]);
+    propsToken = await deployContractUpgradeable("TestPropsToken", deployer, [PROPS_TOKEN_AMOUNT]);
+    await propsToken.deployed();
     contractAddresses.propsToken = propsToken.address;
 
     propsController = await deployContractUpgradeable("PropsController", deployer, [
@@ -104,17 +111,20 @@ async function main() {
       propsGuardian.address,
       propsToken.address,
     ]);
+    await propsController.deployed();
     contractAddresses.propsController = propsController.address;
 
     rPropsToken = await deployContractUpgradeable("RPropsToken", deployer, [
       propsController.address,
       propsToken.address,
     ]);
+    await rPropsToken.deployed();
     contractAddresses.rPropsToken = rPropsToken.address;
 
     sPropsToken = await deployContractUpgradeable("SPropsToken", deployer, [
       propsController.address,
     ]);
+    await sPropsToken.deployed();
     contractAddresses.sPropsToken = sPropsToken.address;
 
     sPropsAppStaking = await deployContractUpgradeable("Staking", deployer, [
@@ -124,6 +134,7 @@ async function main() {
       propsController.address,
       DAILY_REWARDS_EMISSION,
     ]);
+    await sPropsAppStaking.deployed();
     contractAddresses.sPropsAppStaking = sPropsAppStaking.address;
 
     sPropsUserStaking = await deployContractUpgradeable("Staking", deployer, [
@@ -133,6 +144,7 @@ async function main() {
       propsController.address,
       DAILY_REWARDS_EMISSION,
     ]);
+    await sPropsUserStaking.deployed();
     contractAddresses.sPropsUserStaking = sPropsUserStaking.address;
 
     appTokenLogic = await deployContract("AppToken", deployer);
@@ -141,7 +153,7 @@ async function main() {
     appTokenStakingLogic = await deployContract("Staking", deployer);
     contractAddresses.appTokenStakingLogic = appTokenStakingLogic.address;
 
-    appTokenProxyFactory = await deployContractUpgradeable("AppTokenProxyFactory", deployer, [
+    appTokenProxyFactory = await deployContract("AppTokenProxyFactory", deployer, [
       propsControllerOwner.address,
       propsController.address,
       propsTreasury.address,
@@ -149,6 +161,7 @@ async function main() {
       appTokenLogic.address,
       appTokenStakingLogic.address,
     ]);
+    await appTokenProxyFactory.deployed();
     contractAddresses.appTokenProxyFactory = appTokenProxyFactory.address;
 
     console.log("Deployment successfully done!");
@@ -159,6 +172,9 @@ async function main() {
     await propsToken.connect(deployer).setMinter(rPropsToken.address, { gasLimit: 1000000 });
 
     // Initialize all needed fields on the controller
+    await propsController
+      .connect(propsControllerOwner)
+      .setAppTokenProxyFactory(appTokenProxyFactory.address, { gasLimit: 1000000 });
     await propsController
       .connect(propsControllerOwner)
       .setRPropsToken(rPropsToken.address, { gasLimit: 1000000 });

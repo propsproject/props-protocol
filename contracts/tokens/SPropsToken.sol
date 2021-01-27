@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.6.12;
+pragma solidity >=0.6.0 <0.7.0;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
@@ -76,9 +76,6 @@ contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IS
         uint256 previousBalance,
         uint256 newBalance
     );
-
-    // The standard EIP-20 transfer event
-    event Transfer(address indexed from, address indexed to, uint256 amount);
 
     function initialize(address _owner) public initializer {
         OwnableUpgradeable.__Ownable_init();
@@ -257,7 +254,7 @@ contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IS
         address signatory = ecrecover(digest, v, r, s);
         require(signatory != address(0), "Invalid signature");
         require(nonce == nonces[signatory]++, "Invalid nonce");
-        require(now <= expiry, "Signature expired");
+        require(block.timestamp <= expiry, "Signature expired");
         return _delegate(signatory, delegatee);
     }
 
