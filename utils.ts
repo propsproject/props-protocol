@@ -109,10 +109,7 @@ export const deployContractUpgradeable = async <T extends Contract>(
   ...args: any[]
 ): Promise<T> => {
   const contractFactory = getContractFactory(name, deployer);
-  const contractInstance = await upgrades.deployProxy(contractFactory, ...args, {
-    // TODO Manually check for storage incompatibilities (the Checkpoint struct in SPropsToken)
-    unsafeAllowCustomTypes: true,
-  });
+  const contractInstance = await upgrades.deployProxy(contractFactory, ...args);
   return (await contractInstance.deployed()) as T;
 };
 
