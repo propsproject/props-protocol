@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.6.0 <0.7.0;
+
+pragma solidity 0.6.8;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
@@ -21,6 +22,10 @@ import "../interfaces/IAppToken.sol";
 contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppToken {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
+
+    /**************************************
+                     FIELDS
+    ***************************************/
 
     // The Props protocol treasury address
     address public propsTreasury;
@@ -49,12 +54,20 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
 
     mapping(address => uint256) public nonces;
 
+    /**************************************
+                     EVENTS
+    ***************************************/
+
     event AppInfoChanged(bytes indexed newAppInfo);
     event InflationRateChanged(uint256 oldInflationRate, uint256 newInflationRate);
-    event Paused();
-    event Unpaused();
     event AddressWhitelisted(address indexed account);
     event AddressBlacklisted(address indexed account);
+    event Paused();
+    event Unpaused();
+
+    /***************************************
+                   INITIALIZER
+    ****************************************/
 
     /**
      * @dev Initializer.
@@ -102,11 +115,16 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
 
         _mint(propsTreasury, propsTreasuryAmount);
         _mint(_owner, ownerAmount.sub(rewards));
-        // The initial rewards are to be distributed by the sender
+
+        // The initial rewards are to be distributed by the sender (that is, the app token factory contract)
         _mint(msg.sender, rewards);
 
         lastMint = block.timestamp;
     }
+
+    /***************************************
+                     ACTIONS
+    ****************************************/
 
     /**
      * @dev Update the IPFS hash pointing to the app information.

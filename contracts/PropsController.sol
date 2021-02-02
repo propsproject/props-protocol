@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.6.0 <0.7.0;
 
+pragma solidity 0.6.8;
+
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SignedSafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 
 import "./interfaces/IAppToken.sol";
-import "./interfaces/IOwnable.sol";
 import "./interfaces/IPropsController.sol";
 import "./interfaces/IPropsToken.sol";
-import "./interfaces/ISPropsToken.sol";
 import "./interfaces/IRPropsToken.sol";
+import "./interfaces/ISPropsToken.sol";
 import "./interfaces/IStaking.sol";
-import "./utils/Ownable.sol";
 
 /**
  * @title  PropsController
@@ -21,13 +21,17 @@ import "./utils/Ownable.sol";
  * @notice Entry point for participating in the Props protocol. All user actions
  *         should be done exclusively through this contract.
  * @dev    It is responsible for proxying staking-related actions to the appropiate
- *         app token staking contracts. Moreover, tt also handles sProps minting
+ *         app token staking contracts. Moreover, it also handles sProps minting
  *         and burning, sProps staking, swapping earned rProps for regular Props and
- *         locking users Props rewards.
+ *         locking of users Props rewards.
  */
-contract PropsController is Initializable, Ownable, IPropsController {
+contract PropsController is Initializable, OwnableUpgradeable, IPropsController {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
+
+    /**************************************
+                     FIELDS
+    ***************************************/
 
     // The Props protocol guardian (has the ability to pause/unpause the protocol)
     address public propsGuardian;
@@ -66,6 +70,7 @@ contract PropsController is Initializable, Ownable, IPropsController {
     // Set of whitelisted app tokens
     mapping(address => uint8) private appTokensWhitelist;
 
+    // Whether the contract is paused or not
     bool public paused;
 
     /**************************************
@@ -96,7 +101,7 @@ contract PropsController is Initializable, Ownable, IPropsController {
         address _propsGuardian,
         address _propsToken
     ) public initializer {
-        Ownable.__Ownable_init();
+        OwnableUpgradeable.__Ownable_init();
 
         if (_owner != msg.sender) {
             transferOwnership(_owner);
@@ -115,7 +120,7 @@ contract PropsController is Initializable, Ownable, IPropsController {
      */
     function saveAppToken(address _appToken, address _appTokenStaking) external override {
         _requireNotPaused();
-        require(msg.sender == appTokenProxyFactory, "Unauthorized");
+        _requireCaller(appTokenProxyFactory);
 
         appTokenToStaking[_appToken] = _appTokenStaking;
     }
@@ -225,7 +230,7 @@ contract PropsController is Initializable, Ownable, IPropsController {
         address _account
     ) public {
         _requireNotPaused();
-        require(msg.sender == delegates[_account], "Unauthorized");
+        _requireCaller(delegates[_account]);
 
         _stake(_appTokens, _amounts, _account, _account, false);
     }
@@ -255,7 +260,7 @@ contract PropsController is Initializable, Ownable, IPropsController {
         address _account
     ) public {
         _requireNotPaused();
-        require(msg.sender == delegates[_account]);
+        _requireCaller(delegates[_account]);
 
         _stake(_appTokens, _amounts, _account, _account, true);
     }
@@ -266,6 +271,7 @@ contract PropsController is Initializable, Ownable, IPropsController {
      */
     function claimAppTokenRewards(address _appToken) external {
         _requireNotPaused();
+
         require(appTokenToStaking[_appToken] != address(0), "Bad input");
 
         // Claim the rewards and transfer them to the user's wallet
@@ -282,8 +288,9 @@ contract PropsController is Initializable, Ownable, IPropsController {
      */
     function claimAppPropsRewards(address _appToken) external {
         _requireNotPaused();
+        _requireCaller(OwnableUpgradeable(_appToken).owner());
+
         require(appTokenToStaking[_appToken] != address(0), "Bad input");
-        require(msg.sender == IOwnable(_appToken).owner(), "Unauthorized");
 
         // Claim the rewards and transfer them to the user's wallet
         uint256 reward = IStaking(sPropsAppStaking).earned(_appToken);
@@ -379,7 +386,8 @@ contract PropsController is Initializable, Ownable, IPropsController {
      */
     function unlockUserPropsRewards() external {
         _requireNotPaused();
-        require(block.timestamp >= rewardsEscrowUnlock[msg.sender], "Unauthorized");
+
+        require(block.timestamp >= rewardsEscrowUnlock[msg.sender], "Locked");
 
         if (rewardsEscrow[msg.sender] > 0) {
             // Empty the escrow
@@ -402,8 +410,8 @@ contract PropsController is Initializable, Ownable, IPropsController {
      * @param _appTokenProxyFactory The address of the app token factory contract
      */
     function setAppTokenProxyFactory(address _appTokenProxyFactory) external {
-        _requireOnlyOwner();
-        require(appTokenProxyFactory == address(0));
+        _requireCaller(owner());
+        _requireZeroAddress(appTokenProxyFactory);
 
         appTokenProxyFactory = _appTokenProxyFactory;
     }
@@ -413,8 +421,8 @@ contract PropsController is Initializable, Ownable, IPropsController {
      * @param _rPropsToken The address of the rProps token contract
      */
     function setRPropsToken(address _rPropsToken) external {
-        _requireOnlyOwner();
-        require(rPropsToken == address(0));
+        _requireCaller(owner());
+        _requireZeroAddress(rPropsToken);
 
         rPropsToken = _rPropsToken;
     }
@@ -424,8 +432,8 @@ contract PropsController is Initializable, Ownable, IPropsController {
      * @param _sPropsToken The address of the sProps token contract
      */
     function setSPropsToken(address _sPropsToken) external {
-        _requireOnlyOwner();
-        require(sPropsToken == address(0));
+        _requireCaller(owner());
+        _requireZeroAddress(sPropsToken);
 
         sPropsToken = _sPropsToken;
     }
@@ -435,8 +443,8 @@ contract PropsController is Initializable, Ownable, IPropsController {
      * @param _sPropsAppStaking The address of the sProps staking contract for app Props rewards
      */
     function setSPropsAppStaking(address _sPropsAppStaking) external {
-        _requireOnlyOwner();
-        require(sPropsAppStaking == address(0));
+        _requireCaller(owner());
+        _requireZeroAddress(sPropsAppStaking);
 
         sPropsAppStaking = _sPropsAppStaking;
     }
@@ -446,8 +454,8 @@ contract PropsController is Initializable, Ownable, IPropsController {
      * @param _sPropsUserStaking The address of the sProps staking contract for user Props rewards
      */
     function setSPropsUserStaking(address _sPropsUserStaking) external {
-        _requireOnlyOwner();
-        require(sPropsUserStaking == address(0));
+        _requireCaller(owner());
+        _requireZeroAddress(sPropsUserStaking);
 
         sPropsUserStaking = _sPropsUserStaking;
     }
@@ -456,7 +464,8 @@ contract PropsController is Initializable, Ownable, IPropsController {
      * @dev Pause the contract.
      */
     function pause() external {
-        require(msg.sender == propsGuardian, "Unauthorized");
+        _requireCaller(propsGuardian);
+
         paused = true;
     }
 
@@ -464,7 +473,8 @@ contract PropsController is Initializable, Ownable, IPropsController {
      * @dev Unpause the contract.
      */
     function unpause() external {
-        require(msg.sender == propsGuardian, "Unauthorized");
+        _requireCaller(propsGuardian);
+
         paused = false;
     }
 
@@ -473,7 +483,8 @@ contract PropsController is Initializable, Ownable, IPropsController {
      * @param _rewardsEscrowCooldown The cooldown for the escrowed rewards
      */
     function setRewardsEscrowCooldown(uint256 _rewardsEscrowCooldown) external {
-        _requireOnlyOwner();
+        _requireCaller(owner());
+
         rewardsEscrowCooldown = _rewardsEscrowCooldown;
     }
 
@@ -482,7 +493,7 @@ contract PropsController is Initializable, Ownable, IPropsController {
      * @param _appToken The address of the app token to whitelist
      */
     function whitelistAppToken(address _appToken) external {
-        _requireOnlyOwner();
+        _requireCaller(owner());
 
         appTokensWhitelist[_appToken] = 1;
         emit AppTokenWhitelisted(_appToken);
@@ -493,7 +504,7 @@ contract PropsController is Initializable, Ownable, IPropsController {
      * @param _appToken The address of the app token to blacklist
      */
     function blacklistAppToken(address _appToken) external {
-        _requireOnlyOwner();
+        _requireCaller(owner());
 
         appTokensWhitelist[_appToken] = 0;
         emit AppTokenBlacklisted(_appToken);
@@ -508,7 +519,8 @@ contract PropsController is Initializable, Ownable, IPropsController {
     function distributePropsRewards(uint256 _appRewardsPercentage, uint256 _userRewardsPercentage)
         external
     {
-        _requireOnlyOwner();
+        _requireCaller(owner());
+
         IRPropsToken(rPropsToken).distributeRewards(
             sPropsAppStaking,
             _appRewardsPercentage,
@@ -600,7 +612,7 @@ contract PropsController is Initializable, Ownable, IPropsController {
                     } else {
                         if (_from != address(this)) {
                             // When acting on behalf of a delegator no transfers are allowed
-                            require(_from == msg.sender, "Unauthorized");
+                            _requireCaller(_from);
 
                             // Otherwise, if we are handling the principal, transfer the needed Props
                             IERC20Upgradeable(propsToken).safeTransferFrom(
@@ -637,7 +649,7 @@ contract PropsController is Initializable, Ownable, IPropsController {
         // If more tokens were unstaked than staked
         if (totalUnstakedAmount > 0) {
             // When acting on behalf of a delegator no withdraws are allowed
-            require(_from == msg.sender, "Unauthorized");
+            _requireCaller(_from);
 
             // Unstake the corresponding sProps from the user sProps staking contract
             IStaking(sPropsUserStaking).withdraw(_to, totalUnstakedAmount);
@@ -663,7 +675,7 @@ contract PropsController is Initializable, Ownable, IPropsController {
         address _account
     ) internal {
         if (_account != msg.sender) {
-            require(delegates[_account] == msg.sender, "Unauthorized");
+            _requireCaller(delegates[_account]);
         }
 
         // Claim the rewards but don't transfer them to the user's wallet
@@ -719,7 +731,11 @@ contract PropsController is Initializable, Ownable, IPropsController {
         require(!paused, "Paused");
     }
 
-    function _requireOnlyOwner() internal view {
-        require(msg.sender == owner(), "Unauthorized");
+    function _requireCaller(address _caller) internal view {
+        require(msg.sender == _caller, "Unauthorized");
+    }
+
+    function _requireZeroAddress(address _address) internal pure {
+        require(_address == address(0), "Already set");
     }
 }

@@ -148,12 +148,14 @@ async function main() {
     contractAddresses.sPropsUserStaking = sPropsUserStaking.address;
 
     appTokenLogic = await deployContract("AppToken", deployer);
+    await appTokenLogic.deployed();
     contractAddresses.appTokenLogic = appTokenLogic.address;
 
     appTokenStakingLogic = await deployContract("Staking", deployer);
+    await appTokenStakingLogic.deployed();
     contractAddresses.appTokenStakingLogic = appTokenStakingLogic.address;
 
-    appTokenProxyFactory = await deployContract("AppTokenProxyFactory", deployer, [
+    appTokenProxyFactory = await deployContractUpgradeable("AppTokenProxyFactory", deployer, [
       propsControllerOwner.address,
       propsController.address,
       propsTreasury.address,

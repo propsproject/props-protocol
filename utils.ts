@@ -3,14 +3,11 @@ import {
   BigNumber,
   BigNumberish,
   Contract,
-  ContractFactory,
   ContractReceipt,
   ContractTransaction,
   utils,
 } from "ethers";
 import { Result } from "ethers/lib/utils";
-import * as fs from "fs";
-import * as glob from "glob";
 import { ethers, upgrades } from "hardhat";
 
 // Permit typehash for ERC20 permit functionality
@@ -80,25 +77,13 @@ export const encodeParameters = (types: string[], values: any[]) => {
   return abi.encode(types, values);
 };
 
-// Get the contract factory for the given contract
-export const getContractFactory = (name: string, signer?: SignerWithAddress): ContractFactory => {
-  // For Optimism, use the .ovm artifacts
-  if (process.env.OVM) {
-    name = `${name}.ovm`;
-  }
-
-  const artifacts = glob.sync(`./artifacts/contracts/**/${name}.json`);
-  const solidityOutput = fs.readFileSync(artifacts[0]).toString();
-  return ContractFactory.fromSolidity(solidityOutput, signer);
-};
-
 // Deploys a given contract from an address
 export const deployContract = async <T extends Contract>(
   name: string,
   deployer: SignerWithAddress,
   ...args: any[]
 ): Promise<T> => {
-  const contractFactory = getContractFactory(name, deployer);
+  const contractFactory = await ethers.getContractFactory(name, deployer);
   const contractInstance = await contractFactory.deploy(...args);
   return (await contractInstance.deployed()) as T;
 };
@@ -108,7 +93,7 @@ export const deployContractUpgradeable = async <T extends Contract>(
   deployer: SignerWithAddress,
   ...args: any[]
 ): Promise<T> => {
-  const contractFactory = getContractFactory(name, deployer);
+  const contractFactory = await ethers.getContractFactory(name, deployer);
   const contractInstance = await upgrades.deployProxy(contractFactory, ...args);
   return (await contractInstance.deployed()) as T;
 };
@@ -119,7 +104,7 @@ export const getEvent = async (
   eventSignature: string,
   originatingContractName: string
 ): Promise<Result> => {
-  const contractAbi = getContractFactory(originatingContractName).interface;
+  const contractAbi = (await ethers.getContractFactory(originatingContractName)).interface;
 
   let parsedLogs: utils.LogDescription[] = [];
   txReceipt.logs.forEach((log) => {

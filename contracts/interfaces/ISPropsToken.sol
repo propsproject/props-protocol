@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.6.0 <0.7.0;
+
+pragma solidity 0.6.8;
 
 interface ISPropsToken {
     function mint(address dst, uint256 rawAmount) external;

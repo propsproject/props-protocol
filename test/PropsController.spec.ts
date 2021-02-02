@@ -149,39 +149,6 @@ describe("PropsController", () => {
     await propsController.connect(propsTreasury).distributePropsRewards(bn(800000), bn(200000));
   });
 
-  it("successfully deploys a new app token", async () => {
-    const rewardsDistributedPercentage = bn(10000);
-    const [appToken, appTokenStaking] = await deployAppToken(rewardsDistributedPercentage);
-
-    // Check that the staking contract was correctly associated with the app token
-    expect(await propsController.appTokenToStaking(appToken.address)).to.eq(
-      appTokenStaking.address
-    );
-
-    // Check basic token information
-    expect(await appToken.name()).to.eq(APP_TOKEN_NAME);
-    expect(await appToken.symbol()).to.eq(APP_TOKEN_SYMBOL);
-    expect(await appToken.totalSupply()).to.eq(APP_TOKEN_AMOUNT);
-
-    // Check that the initial supply was properly distributed (5% goes to the Props treasury)
-    expect(await appToken.balanceOf(propsTreasury.address)).to.eq(APP_TOKEN_AMOUNT.div(20));
-
-    const ownerAmount = APP_TOKEN_AMOUNT.sub(APP_TOKEN_AMOUNT.div(20));
-    expect(await appToken.balanceOf(appTokenOwner.address)).to.eq(
-      ownerAmount.sub(ownerAmount.mul(rewardsDistributedPercentage).div(1000000))
-    );
-
-    // Check basic staking information
-    expect(await appTokenStaking.stakingToken()).to.eq(propsToken.address);
-    expect(await appTokenStaking.rewardsToken()).to.eq(appToken.address);
-
-    // Check the initial rewards were properly distributed on deployment
-    expect(await appTokenStaking.rewardRate()).to.not.eq(bn(0));
-    expect(await appToken.balanceOf(appTokenStaking.address)).to.eq(
-      ownerAmount.mul(rewardsDistributedPercentage).div(1000000)
-    );
-  });
-
   it("sProps are not transferrable", async () => {
     const [appToken] = await deployAppToken();
 
@@ -791,7 +758,7 @@ describe("PropsController", () => {
 
     // Try to unlock the escrowed rewards
     await expect(propsController.connect(alice).unlockUserPropsRewards()).to.be.revertedWith(
-      "Unauthorized"
+      "Locked"
     );
 
     // Fast-forward until after the rewards cooldown period
