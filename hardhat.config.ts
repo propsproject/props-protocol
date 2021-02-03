@@ -37,8 +37,8 @@ const config: HardhatUserConfig = {
         mnemonic: MNEMONIC,
       },
     },
-    ethereumRopsten: {
-      url: `https://ropsten.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+    ethereumGoerli: {
+      url: `https://goerli.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
       accounts: {
         mnemonic: MNEMONIC,
       },

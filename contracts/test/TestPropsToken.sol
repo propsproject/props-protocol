@@ -21,7 +21,7 @@ contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, 
 
     function initialize(uint256 _amount) public initializer {
         OwnableUpgradeable.__Ownable_init();
-        ERC20Upgradeable.__ERC20_init("Props", "Props");
+        ERC20Upgradeable.__ERC20_init("Test Props", "TPROPS");
 
         _maxTotalSupply = 1e9 * (10**uint256(decimals()));
 

@@ -11,13 +11,7 @@ import type {
   Staking,
   TestPropsToken,
 } from "../typechain";
-import {
-  bn,
-  deployContract,
-  deployContractUpgradeable,
-  expandTo18Decimals,
-  getContractFactory,
-} from "../utils";
+import { bn, deployContract, deployContractUpgradeable, expandTo18Decimals } from "../utils";
 
 // Constants
 const PROPS_TOKEN_AMOUNT = expandTo18Decimals(900000000);
@@ -59,39 +53,39 @@ async function main() {
     // Connect to deployed contracts
     const contractAddresses = JSON.parse(fs.readFileSync(`${network}.json`).toString());
 
-    propsToken = getContractFactory("TestPropsToken", deployer).attach(
+    propsToken = (await ethers.getContractFactory("TestPropsToken", deployer)).attach(
       contractAddresses.propsToken
     ) as TestPropsToken;
 
-    propsController = getContractFactory("PropsController", deployer).attach(
+    propsController = (await ethers.getContractFactory("PropsController", deployer)).attach(
       contractAddresses.propsController
     ) as PropsController;
 
-    rPropsToken = getContractFactory("RPropsToken").attach(
+    rPropsToken = (await ethers.getContractFactory("RPropsToken")).attach(
       contractAddresses.rPropsToken
     ) as RPropsToken;
 
-    sPropsToken = getContractFactory("SPropsToken").attach(
+    sPropsToken = (await ethers.getContractFactory("SPropsToken")).attach(
       contractAddresses.sPropsToken
     ) as SPropsToken;
 
-    sPropsAppStaking = getContractFactory("Staking").attach(
+    sPropsAppStaking = (await ethers.getContractFactory("Staking")).attach(
       contractAddresses.sPropsAppStaking
     ) as Staking;
 
-    sPropsUserStaking = getContractFactory("Staking").attach(
+    sPropsUserStaking = (await ethers.getContractFactory("Staking")).attach(
       contractAddresses.sPropsUserStaking
     ) as Staking;
 
-    appTokenLogic = getContractFactory("AppToken").attach(
+    appTokenLogic = (await ethers.getContractFactory("AppToken")).attach(
       contractAddresses.appTokenLogic
     ) as AppToken;
 
-    appTokenStakingLogic = getContractFactory("Staking").attach(
+    appTokenStakingLogic = (await ethers.getContractFactory("Staking")).attach(
       contractAddresses.appTokenStakingLogic
     ) as Staking;
 
-    appTokenProxyFactory = getContractFactory("AppTokenProxyFactory").attach(
+    appTokenProxyFactory = (await ethers.getContractFactory("AppTokenProxyFactory")).attach(
       contractAddresses.appTokenProxyFactory
     ) as AppTokenProxyFactory;
 
