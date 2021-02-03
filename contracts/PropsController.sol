@@ -584,9 +584,9 @@ contract PropsController is Initializable, OwnableUpgradeable, IPropsController 
 
         // Handle all stakes (positive amounts)
         for (uint256 i = 0; i < _appTokens.length; i++) {
-            require(appTokensWhitelist[_appTokens[i]] != 0, "Blacklisted");
-
             if (_amounts[i] > 0) {
+                require(appTokensWhitelist[_appTokens[i]] != 0, "Blacklisted");
+
                 uint256 amountToStake = uint256(_amounts[i]);
 
                 // Update user total staked amounts
@@ -609,6 +609,12 @@ contract PropsController is Initializable, OwnableUpgradeable, IPropsController 
                     if (rewards) {
                         // Otherwise, if we are handling the rewards, get the needed Props from escrow
                         rewardsEscrow[_from] = rewardsEscrow[_from].sub(left);
+
+                        emit RewardsEscrowUpdated(
+                            _to,
+                            rewardsEscrow[_to],
+                            rewardsEscrowUnlock[_to]
+                        );
                     } else {
                         if (_from != address(this)) {
                             // When acting on behalf of a delegator no transfers are allowed
