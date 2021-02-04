@@ -8,18 +8,19 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 
-import "../interfaces/IAppToken.sol";
+import "../interfaces/IAppPoints.sol";
 
 /**
- * @title  AppToken
+ * @title  AppPoints
  * @author Props
  * @notice ERC20 token every app in the Props protocol gets associated with.
- * @dev    Each app in the Props protocol will get an associated AppToken contract.
- *         AppTokens are ERC20 compatible and mintable according to an inflation rate.
- *         Besides, AppTokens are pausable but this restriction can be overcame via
- *         whitelisting, which only the owner is allowed to perform.
+ * @dev    Each app in the Props protocol will get an associated AppPoints contract.
+ *         AppPoints are ERC20 compatible and mintable according to an inflation rate.
+ *         Besides, AppPoints are pausable (and thus transfers are restricted) but
+ *         this restriction can be overcame via whitelisting, which only the owner
+ *         is allowed to perform.
  */
-contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppToken {
+contract AppPoints is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppPoints {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
@@ -34,7 +35,7 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
     uint256 public propsTreasuryMintPercentage;
     // The delay before a newly set inflation rate goes into effect
     uint256 public inflationRateChangeDelay;
-    // The inflation rate of the app token
+    // The inflation rate of the app points token
     uint256 public inflationRate;
     // The new inflation rate that will go into effect once the delay passes
     uint256 public pendingInflationRate;
@@ -62,8 +63,6 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
     event InflationRateChanged(uint256 oldInflationRate, uint256 newInflationRate);
     event AddressWhitelisted(address indexed account);
     event AddressBlacklisted(address indexed account);
-    event Paused();
-    event Unpaused();
 
     /***************************************
                    INITIALIZER
@@ -71,12 +70,12 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
 
     /**
      * @dev Initializer.
-     * @param _name The name of the app token
-     * @param _symbol The symbol of the app token
-     * @param _amount Initial amount of app tokens to mint
-     * @param _owner The owner of the app token
+     * @param _name The name of the app points token
+     * @param _symbol The symbol of the app points token
+     * @param _amount Initial amount of app points to mint
+     * @param _owner The owner of the app points token
      * @param _propsTreasury The Props protocol treasury
-     * @param _rewardsDistributedPercentage The percentage of the app token owner's tokens that should get distributed as rewards
+     * @param _rewardsDistributedPercentage The percentage of the owner's app points that should get distributed as rewards
      */
     function initialize(
         string memory _name,
@@ -116,14 +115,15 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
         _mint(propsTreasury, propsTreasuryAmount);
         _mint(_owner, ownerAmount.sub(rewards));
 
-        // The initial rewards are to be distributed by the sender (that is, the app token factory contract)
+        // The initial rewards are to be distributed by the sender
+        // (that is, the app proxy factory contract)
         _mint(msg.sender, rewards);
 
         lastMint = block.timestamp;
     }
 
     /***************************************
-                     ACTIONS
+                  OWNER ACTIONS
     ****************************************/
 
     /**
@@ -189,6 +189,10 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
         _token.safeTransfer(_to, _amount);
     }
 
+    /***************************************
+                   USER ACTIONS
+    ****************************************/
+
     /**
      * @dev Allows for approvals to be made via off-chain signatures.
      * @param _owner The approver of the tokens
@@ -234,6 +238,10 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
         _approve(_owner, _spender, _amount);
     }
 
+    /***************************************
+                     HELPERS
+    ****************************************/
+
     function _getChainId() internal pure returns (uint256) {
         uint256 chainId;
         assembly {
@@ -243,14 +251,14 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
     }
 
     /***************************************
-                      ERC20
+              ERC20 IMPLEMENTATION
     ****************************************/
 
-    /**
-     * We use our custom ERC20 implementation in order to support pausability
-     * with whitelisting and a custom `totalSupply` implementation that takes
-     * into account the inflation rate.
-     */
+    // We use our custom ERC20 implementation in order to support pausability
+    // with whitelisting together with a custom `totalSupply` implementation
+    // that takes into account the inflation rate.
+
+    // FIELDS
 
     bool public paused;
     mapping(address => uint8) public addressesWhitelist;
@@ -264,12 +272,21 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
     string private _symbol;
     uint8 private _decimals;
 
+    // EVENTS
+
+    event Paused();
+    event Unpaused();
+
+    // INITIALIZER
+
     // solhint-disable-next-line func-name-mixedcase
     function __ERC20_init(string memory name_, string memory symbol_) internal {
         _name = name_;
         _symbol = symbol_;
         _decimals = 18;
     }
+
+    // MODIFIERS
 
     /**
      * @dev Modifier for disabling transfers when the token is paused.
@@ -278,6 +295,8 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
         require(!paused || addressesWhitelist[msg.sender] != 0, "Paused");
         _;
     }
+
+    // OWNER ACTIONS
 
     /**
      * @dev Pause transfers.
@@ -310,6 +329,8 @@ contract AppToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IAppT
         addressesWhitelist[_account] = 0;
         emit AddressBlacklisted(_account);
     }
+
+    // ERC20 ACTIONS
 
     /**
      * @dev Returns the name of the token.

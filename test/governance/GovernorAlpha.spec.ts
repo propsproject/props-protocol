@@ -5,9 +5,9 @@ import { BigNumber, ContractTransaction } from "ethers";
 import { ethers } from "hardhat";
 
 import type {
-  AppToken,
-  AppTokenProxyFactory,
-  PropsController,
+  AppPoints,
+  AppProxyFactory,
+  PropsProtocol,
   GovernorAlpha,
   SPropsToken,
   Staking,
@@ -31,23 +31,23 @@ const { expect } = chai;
 
 describe("GovernorAlpha", () => {
   let governance: SignerWithAddress;
-  let appTokenOwner: SignerWithAddress;
+  let appPointsOwner: SignerWithAddress;
   let propsTreasury: SignerWithAddress;
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
 
   let propsToken: TestPropsToken;
   let sPropsToken: SPropsToken;
-  let appTokenProxyFactory: AppTokenProxyFactory;
-  let propsController: PropsController;
+  let appPointsProxyFactory: AppProxyFactory;
+  let propsController: PropsProtocol;
   let timelock: Timelock;
   let governorAlpha: GovernorAlpha;
 
   const PROPS_TOKEN_AMOUNT = expandTo18Decimals(1000);
 
-  const APP_TOKEN_NAME = "AppToken";
-  const APP_TOKEN_SYMBOL = "AppToken";
-  const APP_TOKEN_AMOUNT = expandTo18Decimals(1000);
+  const APP_POINTS_TOKEN_NAME = "AppPoints";
+  const APP_POINTS_TOKEN_SYMBOL = "AppPoints";
+  const APP_POINTS_TOKEN_AMOUNT = expandTo18Decimals(100000);
 
   // Corresponds to 0.0003658 - taken from old Props rewards formula
   // Distributes 12.5% of the remaining rewards pool each year
@@ -58,39 +58,39 @@ describe("GovernorAlpha", () => {
   const GOVERNANCE_VOTING_DELAY = bn(1);
   const GOVERNANCE_VOTING_PERIOD = bn(5);
 
-  const deployAppToken = async (): Promise<[AppToken, Staking]> => {
-    const tx = await appTokenProxyFactory
-      .connect(appTokenOwner)
-      .deployAppToken(
-        APP_TOKEN_NAME,
-        APP_TOKEN_SYMBOL,
-        APP_TOKEN_AMOUNT,
-        appTokenOwner.address,
+  const deployApp = async (): Promise<[AppPoints, Staking]> => {
+    const tx = await appPointsProxyFactory
+      .connect(appPointsOwner)
+      .deployApp(
+        APP_POINTS_TOKEN_NAME,
+        APP_POINTS_TOKEN_SYMBOL,
+        APP_POINTS_TOKEN_AMOUNT,
+        appPointsOwner.address,
         DAILY_REWARDS_EMISSION,
         bn(0)
       );
-    const [appTokenAddress, appTokenStakingAddress] = await getEvent(
+    const [appPointsAddress, appPointsStakingAddress] = await getEvent(
       await tx.wait(),
-      "AppTokenDeployed(address,address,string,string,address)",
-      "AppTokenProxyFactory"
+      "AppDeployed(address,address,string,string,address)",
+      "AppProxyFactory"
     );
 
-    await propsController.connect(propsTreasury).whitelistAppToken(appTokenAddress);
+    await propsController.connect(propsTreasury).whitelistApp(appPointsAddress);
 
     return [
-      (await ethers.getContractFactory("AppToken")).attach(appTokenAddress) as AppToken,
-      (await ethers.getContractFactory("Staking")).attach(appTokenStakingAddress) as Staking,
+      (await ethers.getContractFactory("AppPoints")).attach(appPointsAddress) as AppPoints,
+      (await ethers.getContractFactory("Staking")).attach(appPointsStakingAddress) as Staking,
     ];
   };
 
   beforeEach(async () => {
-    [propsTreasury, governance, appTokenOwner, alice, bob] = await ethers.getSigners();
+    [propsTreasury, governance, appPointsOwner, alice, bob] = await ethers.getSigners();
 
     propsToken = await deployContractUpgradeable("TestPropsToken", propsTreasury, [
       PROPS_TOKEN_AMOUNT,
     ]);
 
-    propsController = await deployContractUpgradeable("PropsController", propsTreasury, [
+    propsController = await deployContractUpgradeable("PropsProtocol", propsTreasury, [
       propsTreasury.address,
       propsTreasury.address,
       propsToken.address,
@@ -121,29 +121,27 @@ describe("GovernorAlpha", () => {
       DAILY_REWARDS_EMISSION,
     ]);
 
-    const appTokenLogic = await deployContract<AppToken>("AppToken", propsTreasury);
-    const appTokenStakingLogic = await deployContract<Staking>("Staking", propsTreasury);
+    const appPointsLogic = await deployContract<AppPoints>("AppPoints", propsTreasury);
+    const appPointsStakingLogic = await deployContract<Staking>("Staking", propsTreasury);
 
-    appTokenProxyFactory = await deployContractUpgradeable("AppTokenProxyFactory", propsTreasury, [
+    appPointsProxyFactory = await deployContractUpgradeable("AppProxyFactory", propsTreasury, [
       propsTreasury.address,
       propsController.address,
       propsTreasury.address,
       propsToken.address,
-      appTokenLogic.address,
-      appTokenStakingLogic.address,
+      appPointsLogic.address,
+      appPointsStakingLogic.address,
     ]);
 
     // The rProps token contract is allowed to mint new Props
     await propsToken.connect(propsTreasury).setMinter(rPropsToken.address);
 
     // Initialize all needed fields on the controller
-    await propsController
-      .connect(propsTreasury)
-      .setAppTokenProxyFactory(appTokenProxyFactory.address);
+    await propsController.connect(propsTreasury).setAppProxyFactory(appPointsProxyFactory.address);
     await propsController.connect(propsTreasury).setRPropsToken(rPropsToken.address);
     await propsController.connect(propsTreasury).setSPropsToken(sPropsToken.address);
-    await propsController.connect(propsTreasury).setSPropsAppStaking(sPropsAppStaking.address);
-    await propsController.connect(propsTreasury).setSPropsUserStaking(sPropsUserStaking.address);
+    await propsController.connect(propsTreasury).setPropsAppStaking(sPropsAppStaking.address);
+    await propsController.connect(propsTreasury).setPropsUserStaking(sPropsUserStaking.address);
 
     // Distribute the rProps rewards to the sProps staking contracts
     await propsController.connect(propsTreasury).distributePropsRewards(bn(800000), bn(200000));
@@ -166,13 +164,13 @@ describe("GovernorAlpha", () => {
   });
 
   it("basic governance flow", async () => {
-    const [appToken] = await deployAppToken();
+    const [appPoints] = await deployApp();
 
     // Stake and get sProps
     const stakeAmount = expandTo18Decimals(100);
     await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
     await propsToken.connect(alice).approve(propsController.address, stakeAmount);
-    await propsController.connect(alice).stake([appToken.address], [stakeAmount]);
+    await propsController.connect(alice).stake([appPoints.address], [stakeAmount]);
 
     expect(await sPropsToken.balanceOf(alice.address)).to.eq(stakeAmount);
 

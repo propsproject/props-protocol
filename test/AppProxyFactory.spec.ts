@@ -5,9 +5,9 @@ import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 
 import type {
-  AppToken,
-  AppTokenProxyFactory,
-  PropsController,
+  AppPoints,
+  AppProxyFactory,
+  PropsProtocol,
   Staking,
   TestPropsToken,
 } from "../typechain";
@@ -22,59 +22,59 @@ import {
 chai.use(solidity);
 const { expect } = chai;
 
-describe("AppTokenProxyFactory", () => {
+describe("AppProxyFactory", () => {
   let propsTreasury: SignerWithAddress;
-  let appTokenOwner: SignerWithAddress;
+  let appPointsOwner: SignerWithAddress;
 
   let propsToken: TestPropsToken;
-  let appTokenProxyFactory: AppTokenProxyFactory;
-  let propsController: PropsController;
+  let appPointsProxyFactory: AppProxyFactory;
+  let propsController: PropsProtocol;
 
   const PROPS_TOKEN_AMOUNT = expandTo18Decimals(100000);
 
-  const APP_TOKEN_NAME = "AppToken";
-  const APP_TOKEN_SYMBOL = "AppToken";
-  const APP_TOKEN_AMOUNT = expandTo18Decimals(100000);
+  const APP_POINTS_TOKEN_NAME = "AppPoints";
+  const APP_POINTS_TOKEN_SYMBOL = "AppPoints";
+  const APP_POINTS_TOKEN_AMOUNT = expandTo18Decimals(100000);
 
   // Corresponds to 0.0003658 - taken from old Props rewards formula
   // Distributes 12.5% of the remaining rewards pool each year
   const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
 
-  const deployAppToken = async (
+  const deployApp = async (
     rewardsDistributedPercentage: BigNumber = bn(0)
-  ): Promise<[AppToken, Staking]> => {
-    const tx = await appTokenProxyFactory
-      .connect(appTokenOwner)
-      .deployAppToken(
-        APP_TOKEN_NAME,
-        APP_TOKEN_SYMBOL,
-        APP_TOKEN_AMOUNT,
-        appTokenOwner.address,
+  ): Promise<[AppPoints, Staking]> => {
+    const tx = await appPointsProxyFactory
+      .connect(appPointsOwner)
+      .deployApp(
+        APP_POINTS_TOKEN_NAME,
+        APP_POINTS_TOKEN_SYMBOL,
+        APP_POINTS_TOKEN_AMOUNT,
+        appPointsOwner.address,
         DAILY_REWARDS_EMISSION,
         rewardsDistributedPercentage
       );
-    const [appTokenAddress, appTokenStakingAddress] = await getEvent(
+    const [appPointsAddress, appPointsStakingAddress] = await getEvent(
       await tx.wait(),
-      "AppTokenDeployed(address,address,string,string,address)",
-      "AppTokenProxyFactory"
+      "AppDeployed(address,address,string,string,address)",
+      "AppProxyFactory"
     );
 
-    await propsController.connect(propsTreasury).whitelistAppToken(appTokenAddress);
+    await propsController.connect(propsTreasury).whitelistApp(appPointsAddress);
 
     return [
-      (await ethers.getContractFactory("AppToken")).attach(appTokenAddress) as AppToken,
-      (await ethers.getContractFactory("Staking")).attach(appTokenStakingAddress) as Staking,
+      (await ethers.getContractFactory("AppPoints")).attach(appPointsAddress) as AppPoints,
+      (await ethers.getContractFactory("Staking")).attach(appPointsStakingAddress) as Staking,
     ];
   };
 
   beforeEach(async () => {
-    [propsTreasury, appTokenOwner] = await ethers.getSigners();
+    [propsTreasury, appPointsOwner] = await ethers.getSigners();
 
     propsToken = await deployContractUpgradeable("TestPropsToken", propsTreasury, [
       PROPS_TOKEN_AMOUNT,
     ]);
 
-    propsController = await deployContractUpgradeable("PropsController", propsTreasury, [
+    propsController = await deployContractUpgradeable("PropsProtocol", propsTreasury, [
       propsTreasury.address,
       propsTreasury.address,
       propsToken.address,
@@ -105,29 +105,27 @@ describe("AppTokenProxyFactory", () => {
       DAILY_REWARDS_EMISSION,
     ]);
 
-    const appTokenLogic = await deployContract<AppToken>("AppToken", propsTreasury);
-    const appTokenStakingLogic = await deployContract<Staking>("Staking", propsTreasury);
+    const appPointsLogic = await deployContract<AppPoints>("AppPoints", propsTreasury);
+    const appPointsStakingLogic = await deployContract<Staking>("Staking", propsTreasury);
 
-    appTokenProxyFactory = await deployContractUpgradeable("AppTokenProxyFactory", propsTreasury, [
+    appPointsProxyFactory = await deployContractUpgradeable("AppProxyFactory", propsTreasury, [
       propsTreasury.address,
       propsController.address,
       propsTreasury.address,
       propsToken.address,
-      appTokenLogic.address,
-      appTokenStakingLogic.address,
+      appPointsLogic.address,
+      appPointsStakingLogic.address,
     ]);
 
     // The rProps token contract is allowed to mint new Props
     await propsToken.connect(propsTreasury).setMinter(rPropsToken.address);
 
     // Initialize all needed fields on the controller
-    await propsController
-      .connect(propsTreasury)
-      .setAppTokenProxyFactory(appTokenProxyFactory.address);
+    await propsController.connect(propsTreasury).setAppProxyFactory(appPointsProxyFactory.address);
     await propsController.connect(propsTreasury).setRPropsToken(rPropsToken.address);
     await propsController.connect(propsTreasury).setSPropsToken(sPropsToken.address);
-    await propsController.connect(propsTreasury).setSPropsAppStaking(sPropsAppStaking.address);
-    await propsController.connect(propsTreasury).setSPropsUserStaking(sPropsUserStaking.address);
+    await propsController.connect(propsTreasury).setPropsAppStaking(sPropsAppStaking.address);
+    await propsController.connect(propsTreasury).setPropsUserStaking(sPropsUserStaking.address);
 
     // Distribute the rProps rewards to the sProps staking contracts
     await propsController.connect(propsTreasury).distributePropsRewards(bn(800000), bn(200000));
@@ -135,33 +133,33 @@ describe("AppTokenProxyFactory", () => {
 
   it("successfully deploys a new app token", async () => {
     const rewardsDistributedPercentage = bn(10000);
-    const [appToken, appTokenStaking] = await deployAppToken(rewardsDistributedPercentage);
+    const [appPoints, appPointsStaking] = await deployApp(rewardsDistributedPercentage);
 
     // Check that the staking contract was correctly associated with the app token
-    expect(await propsController.appTokenToStaking(appToken.address)).to.eq(
-      appTokenStaking.address
+    expect(await propsController.appPointsStaking(appPoints.address)).to.eq(
+      appPointsStaking.address
     );
 
     // Check basic token information
-    expect(await appToken.name()).to.eq(APP_TOKEN_NAME);
-    expect(await appToken.symbol()).to.eq(APP_TOKEN_SYMBOL);
-    expect(await appToken.totalSupply()).to.eq(APP_TOKEN_AMOUNT);
+    expect(await appPoints.name()).to.eq(APP_POINTS_TOKEN_NAME);
+    expect(await appPoints.symbol()).to.eq(APP_POINTS_TOKEN_SYMBOL);
+    expect(await appPoints.totalSupply()).to.eq(APP_POINTS_TOKEN_AMOUNT);
 
     // Check that the initial supply was properly distributed (5% goes to the Props treasury)
-    expect(await appToken.balanceOf(propsTreasury.address)).to.eq(APP_TOKEN_AMOUNT.div(20));
+    expect(await appPoints.balanceOf(propsTreasury.address)).to.eq(APP_POINTS_TOKEN_AMOUNT.div(20));
 
-    const ownerAmount = APP_TOKEN_AMOUNT.sub(APP_TOKEN_AMOUNT.div(20));
-    expect(await appToken.balanceOf(appTokenOwner.address)).to.eq(
+    const ownerAmount = APP_POINTS_TOKEN_AMOUNT.sub(APP_POINTS_TOKEN_AMOUNT.div(20));
+    expect(await appPoints.balanceOf(appPointsOwner.address)).to.eq(
       ownerAmount.sub(ownerAmount.mul(rewardsDistributedPercentage).div(1000000))
     );
 
     // Check basic staking information
-    expect(await appTokenStaking.stakingToken()).to.eq(propsToken.address);
-    expect(await appTokenStaking.rewardsToken()).to.eq(appToken.address);
+    expect(await appPointsStaking.stakingToken()).to.eq(propsToken.address);
+    expect(await appPointsStaking.rewardsToken()).to.eq(appPoints.address);
 
     // Check the initial rewards were properly distributed on deployment
-    expect(await appTokenStaking.rewardRate()).to.not.eq(bn(0));
-    expect(await appToken.balanceOf(appTokenStaking.address)).to.eq(
+    expect(await appPointsStaking.rewardRate()).to.not.eq(bn(0));
+    expect(await appPoints.balanceOf(appPointsStaking.address)).to.eq(
       ownerAmount.mul(rewardsDistributedPercentage).div(1000000)
     );
   });
@@ -171,13 +169,13 @@ describe("AppTokenProxyFactory", () => {
 
     // Only the owner is allowed to change the logic contracts
     await expect(
-      appTokenProxyFactory.connect(appTokenOwner).setAppTokenLogic(mockAddress)
-    ).to.be.revertedWith("Ownable: caller is not the owner");
+      appPointsProxyFactory.connect(appPointsOwner).changeAppPointsLogic(mockAddress)
+    ).to.be.revertedWith("Unauthorized");
     await expect(
-      appTokenProxyFactory.connect(appTokenOwner).setAppTokenStakingLogic(mockAddress)
-    ).to.be.revertedWith("Ownable: caller is not the owner");
+      appPointsProxyFactory.connect(appPointsOwner).changeAppPointsStakingLogic(mockAddress)
+    ).to.be.revertedWith("Unauthorized");
 
-    await appTokenProxyFactory.connect(propsTreasury).setAppTokenLogic(mockAddress);
-    await appTokenProxyFactory.connect(propsTreasury).setAppTokenStakingLogic(mockAddress);
+    await appPointsProxyFactory.connect(propsTreasury).changeAppPointsLogic(mockAddress);
+    await appPointsProxyFactory.connect(propsTreasury).changeAppPointsStakingLogic(mockAddress);
   });
 });

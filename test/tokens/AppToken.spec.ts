@@ -5,7 +5,7 @@ import { solidity } from "ethereum-waffle";
 import { ethers } from "hardhat";
 
 import accounts from "../../test-accounts";
-import type { AppToken, TestErc20 } from "../../typechain";
+import type { AppPoints, TestErc20 } from "../../typechain";
 import {
   bn,
   daysToTimestamp,
@@ -21,86 +21,90 @@ import {
 chai.use(solidity);
 const { expect } = chai;
 
-describe("AppToken", () => {
-  let appTokenOwner: SignerWithAddress;
+describe("AppPoints", () => {
+  let appPointsOwner: SignerWithAddress;
   let propsTreasury: SignerWithAddress;
   let alice: SignerWithAddress;
 
-  let appToken: AppToken;
+  let appPoints: AppPoints;
 
-  const APP_TOKEN_NAME = "AppToken";
-  const APP_TOKEN_SYMBOL = "AppToken";
-  const APP_TOKEN_AMOUNT = expandTo18Decimals(1000);
+  const APP_POINTS_TOKEN_NAME = "AppPoints";
+  const APP_POINTS_TOKEN_SYMBOL = "AppPoints";
+  const APP_POINTS_TOKEN_AMOUNT = expandTo18Decimals(100000);
 
   beforeEach(async () => {
-    [appTokenOwner, propsTreasury, alice] = await ethers.getSigners();
+    [appPointsOwner, propsTreasury, alice] = await ethers.getSigners();
 
-    appToken = await deployContractUpgradeable("AppToken", appTokenOwner, [
-      APP_TOKEN_NAME,
-      APP_TOKEN_SYMBOL,
-      APP_TOKEN_AMOUNT,
-      appTokenOwner.address,
+    appPoints = await deployContractUpgradeable("AppPoints", appPointsOwner, [
+      APP_POINTS_TOKEN_NAME,
+      APP_POINTS_TOKEN_SYMBOL,
+      APP_POINTS_TOKEN_AMOUNT,
+      appPointsOwner.address,
       propsTreasury.address,
       bn(0),
     ]);
   });
 
   it("correctly mints and distributes initial token amounts on initialization", async () => {
-    const propsTreasuryMintPercentage = await appToken.propsTreasuryMintPercentage();
-    const appTokenOwnerBalance = await appToken.balanceOf(appTokenOwner.address);
-    const propsTreasuryBalance = await appToken.balanceOf(propsTreasury.address);
+    const propsTreasuryMintPercentage = await appPoints.propsTreasuryMintPercentage();
+    const appPointsOwnerBalance = await appPoints.balanceOf(appPointsOwner.address);
+    const propsTreasuryBalance = await appPoints.balanceOf(propsTreasury.address);
 
     // Proper percentages are distributed to the app token owner and the Props treasury
-    expect(appTokenOwnerBalance).to.eq(APP_TOKEN_AMOUNT.sub(propsTreasuryBalance));
-    expect(propsTreasuryBalance).to.eq(APP_TOKEN_AMOUNT.mul(propsTreasuryMintPercentage).div(1e6));
+    expect(appPointsOwnerBalance).to.eq(APP_POINTS_TOKEN_AMOUNT.sub(propsTreasuryBalance));
+    expect(propsTreasuryBalance).to.eq(
+      APP_POINTS_TOKEN_AMOUNT.mul(propsTreasuryMintPercentage).div(1e6)
+    );
   });
 
   it("proper permissioning", async () => {
     // Only the app token owner can mint
-    await expect(appToken.connect(propsTreasury).mint()).to.be.revertedWith(
+    await expect(appPoints.connect(propsTreasury).mint()).to.be.revertedWith(
       "Ownable: caller is not the owner"
     );
-    await appToken.connect(appTokenOwner).mint();
+    await appPoints.connect(appPointsOwner).mint();
 
     // Only the app token owner can change the inflation rate
-    await expect(appToken.connect(propsTreasury).changeInflationRate(bn(1))).to.be.revertedWith(
+    await expect(appPoints.connect(propsTreasury).changeInflationRate(bn(1))).to.be.revertedWith(
       "Ownable: caller is not the owner"
     );
-    await appToken.connect(appTokenOwner).changeInflationRate(bn(1));
+    await appPoints.connect(appPointsOwner).changeInflationRate(bn(1));
 
     // Only the app token owner can recover tokens
-    await appToken.connect(propsTreasury).transfer(appToken.address, bn(1));
+    await appPoints.connect(propsTreasury).transfer(appPoints.address, bn(1));
     await expect(
-      appToken.connect(propsTreasury).recoverTokens(appToken.address, propsTreasury.address, bn(1))
+      appPoints
+        .connect(propsTreasury)
+        .recoverTokens(appPoints.address, propsTreasury.address, bn(1))
     ).to.be.revertedWith("Ownable: caller is not the owner");
-    await appToken
-      .connect(appTokenOwner)
-      .recoverTokens(appToken.address, propsTreasury.address, bn(1));
+    await appPoints
+      .connect(appPointsOwner)
+      .recoverTokens(appPoints.address, propsTreasury.address, bn(1));
   });
 
   it("handles mints according to an inflation rate", async () => {
     // Initially, the inflation rate is 0
-    expect(await appToken.inflationRate()).to.eq(bn(0));
+    expect(await appPoints.inflationRate()).to.eq(bn(0));
 
     // That is, no additional tokens will get minted
-    await appToken.connect(appTokenOwner).mint();
-    expect(await appToken.totalSupply()).to.eq(APP_TOKEN_AMOUNT);
+    await appPoints.connect(appPointsOwner).mint();
+    expect(await appPoints.totalSupply()).to.eq(APP_POINTS_TOKEN_AMOUNT);
 
     const newInflationRate = bn(100);
 
     // There is a delay before a change in the inflation rate goes into effect
-    await appToken.connect(appTokenOwner).changeInflationRate(newInflationRate);
-    await appToken.connect(appTokenOwner).mint();
-    expect(await appToken.totalSupply()).to.eq(APP_TOKEN_AMOUNT);
+    await appPoints.connect(appPointsOwner).changeInflationRate(newInflationRate);
+    await appPoints.connect(appPointsOwner).mint();
+    expect(await appPoints.totalSupply()).to.eq(APP_POINTS_TOKEN_AMOUNT);
 
     // Fast-forward until after the inflation rate delay
-    await mineBlock((await now()).add(await appToken.inflationRateChangeDelay()).add(1));
+    await mineBlock((await now()).add(await appPoints.inflationRateChangeDelay()).add(1));
 
     // New tokens can get minted once the delay for the inflation rate passed
-    const initialMintTime = await appToken.lastMint();
-    const newMintTime = await getTxTimestamp(await appToken.connect(appTokenOwner).mint());
-    expect(await appToken.totalSupply()).to.eq(
-      APP_TOKEN_AMOUNT.add(newInflationRate.mul(newMintTime.sub(initialMintTime)))
+    const initialMintTime = await appPoints.lastMint();
+    const newMintTime = await getTxTimestamp(await appPoints.connect(appPointsOwner).mint());
+    expect(await appPoints.totalSupply()).to.eq(
+      APP_POINTS_TOKEN_AMOUNT.add(newInflationRate.mul(newMintTime.sub(initialMintTime)))
     );
   });
 
@@ -108,14 +112,14 @@ describe("AppToken", () => {
     const newInflationRate = bn(100);
 
     // There is a delay before a change in the inflation rate goes into effect
-    await appToken.connect(appTokenOwner).changeInflationRate(newInflationRate);
-    expect(await appToken.totalSupply()).to.eq(APP_TOKEN_AMOUNT);
+    await appPoints.connect(appPointsOwner).changeInflationRate(newInflationRate);
+    expect(await appPoints.totalSupply()).to.eq(APP_POINTS_TOKEN_AMOUNT);
 
     // Fast-forward until after the inflation rate delay
-    await mineBlock((await now()).add(await appToken.inflationRateChangeDelay()).add(1));
+    await mineBlock((await now()).add(await appPoints.inflationRateChangeDelay()).add(1));
 
     // Calling totalSupply should take into account the new inflation rate
-    expect(await appToken.totalSupply()).to.be.gte(APP_TOKEN_AMOUNT);
+    expect(await appPoints.totalSupply()).to.be.gte(APP_POINTS_TOKEN_AMOUNT);
   });
 
   it("recover tokens accidentally sent to contract", async () => {
@@ -126,11 +130,11 @@ describe("AppToken", () => {
     ]);
 
     // Transfer to app token contract
-    await erc20.connect(alice).transfer(appToken.address, bn(100));
+    await erc20.connect(alice).transfer(appPoints.address, bn(100));
     expect(await erc20.balanceOf(alice.address)).to.eq(bn(0));
 
     // Have the app token owner recover the tokens
-    await appToken.connect(appTokenOwner).recoverTokens(erc20.address, alice.address, bn(100));
+    await appPoints.connect(appPointsOwner).recoverTokens(erc20.address, alice.address, bn(100));
     expect(await erc20.balanceOf(alice.address)).to.eq(bn(100));
   });
 
@@ -138,13 +142,13 @@ describe("AppToken", () => {
     const permitValue = bn(100);
     const permitDeadline = (await now()).add(daysToTimestamp(1));
     const approvalDigest = await getApprovalDigest(
-      appToken,
+      appPoints,
       {
-        owner: appTokenOwner.address,
+        owner: appPointsOwner.address,
         spender: alice.address,
         value: permitValue,
       },
-      await appToken.nonces(alice.address),
+      await appPoints.nonces(alice.address),
       permitDeadline
     );
 
@@ -153,17 +157,17 @@ describe("AppToken", () => {
       Buffer.from(approvalDigest.slice(2), "hex"),
       Buffer.from(
         accounts
-          .find(({ privateKey }) => getPublicKey(privateKey) === appTokenOwner.address)!
+          .find(({ privateKey }) => getPublicKey(privateKey) === appPointsOwner.address)!
           .privateKey.slice(2),
         "hex"
       )
     );
 
     // Call permit
-    await appToken
+    await appPoints
       .connect(alice)
       .permit(
-        appTokenOwner.address,
+        appPointsOwner.address,
         alice.address,
         permitValue,
         permitDeadline,
@@ -173,14 +177,14 @@ describe("AppToken", () => {
       );
 
     // The approval indeed took place
-    expect(await appToken.allowance(appTokenOwner.address, alice.address)).to.eq(permitValue);
+    expect(await appPoints.allowance(appPointsOwner.address, alice.address)).to.eq(permitValue);
 
     // Replay attack fails
     expect(
-      appToken
+      appPoints
         .connect(alice)
         .permit(
-          appTokenOwner.address,
+          appPointsOwner.address,
           alice.address,
           permitValue,
           permitDeadline,
@@ -193,28 +197,28 @@ describe("AppToken", () => {
 
   it("non-transferrable when paused", async () => {
     // Pause
-    await appToken.connect(appTokenOwner).pause();
+    await appPoints.connect(appPointsOwner).pause();
 
     // Try transferring
     await expect(
-      appToken.connect(appTokenOwner).transfer(alice.address, bn(100))
+      appPoints.connect(appPointsOwner).transfer(alice.address, bn(100))
     ).to.be.revertedWith("Paused");
 
     // Whitelist the app token owner
-    await appToken.connect(appTokenOwner).whitelistAddress(appTokenOwner.address);
+    await appPoints.connect(appPointsOwner).whitelistAddress(appPointsOwner.address);
 
     // Only whitelisted addresses are able to transfer
-    await appToken.connect(appTokenOwner).transfer(alice.address, bn(100));
+    await appPoints.connect(appPointsOwner).transfer(alice.address, bn(100));
     await expect(
-      appToken.connect(alice).transfer(appTokenOwner.address, bn(100))
+      appPoints.connect(alice).transfer(appPointsOwner.address, bn(100))
     ).to.be.revertedWith("Paused");
 
     // Blacklist the app token owner
-    await appToken.connect(appTokenOwner).blacklistAddress(appTokenOwner.address);
+    await appPoints.connect(appPointsOwner).blacklistAddress(appPointsOwner.address);
 
     // After blacklist, transfers will fail once again
     await expect(
-      appToken.connect(appTokenOwner).transfer(alice.address, bn(100))
+      appPoints.connect(appPointsOwner).transfer(alice.address, bn(100))
     ).to.be.revertedWith("Paused");
   });
 });

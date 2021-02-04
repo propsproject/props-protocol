@@ -164,25 +164,25 @@ describe("Staking", () => {
 
     // Only the owner can stake
     await expect(staking.connect(alice).stake(alice.address, stakeAmount)).to.be.revertedWith(
-      "Ownable: caller is not the owner"
+      "Unauthorized"
     );
     await staking.connect(stakingOwner).stake(alice.address, stakeAmount);
 
     // Only the owner can withdraw
     await expect(staking.connect(alice).withdraw(alice.address, stakeAmount)).to.be.revertedWith(
-      "Ownable: caller is not the owner"
+      "Unauthorized"
     );
     await staking.connect(stakingOwner).withdraw(alice.address, stakeAmount);
 
     // Only the owner can claim rewards
     await expect(staking.connect(alice).claimReward(alice.address)).to.be.revertedWith(
-      "Ownable: caller is not the owner"
+      "Unauthorized"
     );
     await staking.connect(stakingOwner).claimReward(alice.address);
 
     // Only the rewards distribution can distribute new rewards (not even the owner can do it)
     await expect(staking.connect(stakingOwner).notifyRewardAmount(bn(100))).to.be.revertedWith(
-      "Caller is not the designated rewards distribution address"
+      "Unauthorized"
     );
     await rewardsToken.connect(rewardsDistribution).transfer(staking.address, stakeAmount);
     await staking.connect(rewardsDistribution).notifyRewardAmount(bn(100));

@@ -2,7 +2,6 @@
 
 pragma solidity 0.6.8;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -17,15 +16,22 @@ import "../interfaces/ISPropsToken.sol";
  * @dev    sProps tokens represent Props stake shares (each sProps token
  *         corresponds to a staked Props token). sProps are not transferrable,
  *         only mintable and burnable. Minting and burning are actions
- *         restricted to the owner of the contract.
+ *         restricted to the controller of the contract.
  *         Changes to the original Compound contract:
  *         - the contract is ownable and upgradeable
  *         - transfer-related actions are forbidden (the contract simply
  *           reverts on transferring or approving)
  *         - mint and burn functions were added
  */
-contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, ISPropsToken {
+contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken {
     using SafeMathUpgradeable for uint256;
+
+    /**************************************
+                     FIELDS
+    ***************************************/
+
+    // The sProps token controller
+    address public controller;
 
     string private _name;
     string private _symbol;
@@ -64,6 +70,10 @@ contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IS
     // A record of states for signing / validating signatures
     mapping(address => uint256) public nonces;
 
+    /**************************************
+                     EVENTS
+    ***************************************/
+
     // An event thats emitted when an account changes its delegate
     event DelegateChanged(
         address indexed delegator,
@@ -78,12 +88,21 @@ contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IS
         uint256 newBalance
     );
 
-    function initialize(address _owner) public initializer {
-        OwnableUpgradeable.__Ownable_init();
+    /**************************************
+                    MODIFIERS
+    ***************************************/
 
-        if (_owner != msg.sender) {
-            transferOwnership(_owner);
-        }
+    modifier only(address _account) {
+        require(msg.sender == _account, "Unauthorized");
+        _;
+    }
+
+    /***************************************
+                   INITIALIZER
+    ****************************************/
+
+    function initialize(address _controller) public initializer {
+        controller = _controller;
 
         _name = "sProps";
         _symbol = "sProps";
@@ -97,6 +116,54 @@ contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IS
             "Delegation(address delegatee,uint256 nonce,uint256 expiry)"
         );
     }
+
+    /***************************************
+                CONTROLLER ACTIONS
+    ****************************************/
+
+    /**
+     * @dev Mint new tokens.
+     * @param dst The address of the destination account
+     * @param rawAmount The number of tokens to be minted
+     */
+    function mint(address dst, uint256 rawAmount) external override only(controller) {
+        require(dst != address(0), "Cannot mint to the zero address");
+
+        // Mint the amount
+        uint96 amount = safe96(rawAmount);
+        _totalSupply = safe96(_totalSupply.add(amount));
+
+        // Transfer the amount to the destination account
+        _balances[dst] = add96(_balances[dst], amount);
+        emit Transfer(address(0), dst, amount);
+
+        // Move delegates
+        _moveDelegates(address(0), delegates[dst], amount);
+    }
+
+    /**
+     * @dev Burn existing tokens.
+     * @param src The address of the source account
+     * @param rawAmount The number of tokens to be burned
+     */
+    function burn(address src, uint256 rawAmount) external override only(controller) {
+        require(src != address(0), "Cannot burn from the zero address");
+
+        // Burn the amount
+        uint96 amount = safe96(rawAmount);
+        _totalSupply = safe96(_totalSupply.sub(amount));
+
+        // Transfer the amount from the source account
+        _balances[src] = sub96(_balances[src], amount);
+        emit Transfer(src, address(0), amount);
+
+        // Move delegates
+        _moveDelegates(delegates[src], address(0), amount);
+    }
+
+    /***************************************
+                  ERC20 ACTIONS
+    ****************************************/
 
     /**
      * @dev EIP-20 token name for this token.
@@ -146,46 +213,6 @@ contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IS
     }
 
     /**
-     * @dev Mint new tokens.
-     * @param dst The address of the destination account
-     * @param rawAmount The number of tokens to be minted
-     */
-    function mint(address dst, uint256 rawAmount) external override onlyOwner {
-        require(dst != address(0), "Cannot mint to the zero address");
-
-        // Mint the amount
-        uint96 amount = safe96(rawAmount);
-        _totalSupply = safe96(_totalSupply.add(amount));
-
-        // Transfer the amount to the destination account
-        _balances[dst] = add96(_balances[dst], amount);
-        emit Transfer(address(0), dst, amount);
-
-        // Move delegates
-        _moveDelegates(address(0), delegates[dst], amount);
-    }
-
-    /**
-     * @dev Burn existing tokens.
-     * @param src The address of the source account
-     * @param rawAmount The number of tokens to be burned
-     */
-    function burn(address src, uint256 rawAmount) external override onlyOwner {
-        require(src != address(0), "Cannot burn from the zero address");
-
-        // Burn the amount
-        uint96 amount = safe96(rawAmount);
-        _totalSupply = safe96(_totalSupply.sub(amount));
-
-        // Transfer the amount from the source account
-        _balances[src] = sub96(_balances[src], amount);
-        emit Transfer(src, address(0), amount);
-
-        // Move delegates
-        _moveDelegates(delegates[src], address(0), amount);
-    }
-
-    /**
      * @notice Approve `spender` to transfer up to `amount` from `src`.
      * @param spender The address of the account which may transfer tokens
      * @param rawAmount The number of tokens that are approved (2^256-1 means infinite)
@@ -220,6 +247,10 @@ contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IS
     ) external override returns (bool) {
         revert("sProps are not transferrable");
     }
+
+    /***************************************
+               DELEGATION ACTIONS
+    ****************************************/
 
     /**
      * @dev Delegate votes from `msg.sender` to `delegatee`.
@@ -315,6 +346,10 @@ contract SPropsToken is Initializable, OwnableUpgradeable, IERC20Upgradeable, IS
         }
         return checkpoints[account][lower].votes;
     }
+
+    /***************************************
+                     HELPERS
+    ****************************************/
 
     function _delegate(address delegator, address delegatee) internal {
         address currentDelegate = delegates[delegator];

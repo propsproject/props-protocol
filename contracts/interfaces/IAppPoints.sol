@@ -2,7 +2,7 @@
 
 pragma solidity 0.6.8;
 
-interface IAppToken {
+interface IAppPoints {
     function pause() external;
 
     function unpause() external;

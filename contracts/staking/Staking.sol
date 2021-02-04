@@ -2,7 +2,6 @@
 
 pragma solidity 0.6.8;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/MathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -21,7 +20,7 @@ import "../interfaces/IStaking.sol";
  *         to the contract.
  *         Changes to the original Synthetix contract:
  *         - the contract is upgradeable
- *         - the contract is ownable and only the owner is able to perform state-changing
+ *         - the contract is ownable and only the controller is able to perform state-changing
  *           actions (this means individual users cannot directly interact with instances
  *           of this contract)
  *         - the rewards get distributed in a perpetual fashion, closely following a
@@ -30,20 +29,28 @@ import "../interfaces/IStaking.sol";
  *         - the `rewardsDuration` variable gets calculated from the `dailyRewardsEmission`
  *           parameter on initialization, which specifies the percentage of the remaining
  *           rewards pool that should get distributed each day
- *         - the staked and withdrawn amounts are implicit (the contract trusts its owner
+ *         - the staked and withdrawn amounts are implicit (the contract trusts its controller
  *           to provide correct values), no staking tokens are transferred to or from this
  *           contract
- *         - on claiming, rewards are tranferred to the owner of the contract instead of
- *           the actual recipient, the owner being responsible for handling the rewards as
+ *         - on claiming, rewards are tranferred to the controller of the contract instead of
+ *           the actual recipient, the controller being responsible for handling the rewards as
  *           it sees fit
  */
-contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable, IStaking {
+contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
+
+    /**************************************
+                     FIELDS
+    ***************************************/
+
+    // The staking controller
+    address public controller;
 
     // The address responsible for distributing the rewards
     address public rewardsDistribution;
 
+    // Tokens involved in staking
     address public rewardsToken;
     address public stakingToken;
 
@@ -70,10 +77,23 @@ contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
     // Mapping of the staked balances of each user
     mapping(address => uint256) private _balances;
 
+    /**************************************
+                     EVENTS
+    ***************************************/
+
     event RewardAdded(uint256 reward);
     event Staked(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount);
     event RewardPaid(address indexed user, uint256 reward);
+
+    /**************************************
+                    MODIFIERS
+    ***************************************/
+
+    modifier only(address _account) {
+        require(msg.sender == _account, "Unauthorized");
+        _;
+    }
 
     /***************************************
                    INITIALIZER
@@ -81,31 +101,25 @@ contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
 
     /**
      * @dev Initializer.
-     * @param _owner The owner of the contract
+     * @param _controller The staking controller
      * @param _rewardsDistribution The designated rewards distribution address
      * @param _rewardsToken The token rewards are denominated in
      * @param _stakingToken The token stakes are denominated in
      * @param _dailyRewardEmission The percentage of the remaining rewards pool to get distributed each day
      */
     function initialize(
-        address _owner,
+        address _controller,
         address _rewardsDistribution,
         address _rewardsToken,
         address _stakingToken,
         uint256 _dailyRewardEmission
     ) public initializer {
-        OwnableUpgradeable.__Ownable_init();
         ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
-        if (_owner != msg.sender) {
-            transferOwnership(_owner);
-        }
-
+        controller = _controller;
         rewardsDistribution = _rewardsDistribution;
-
         rewardsToken = _rewardsToken;
         stakingToken = _stakingToken;
-
         rewardsDuration = uint256(1e18).div(_dailyRewardEmission).mul(1 days);
     }
 
@@ -163,7 +177,7 @@ contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
     }
 
     /***************************************
-                     ACTIONS
+                CONTROLLER ACTIONS
     ****************************************/
 
     /**
@@ -174,7 +188,7 @@ contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
     function stake(address _account, uint256 _amount)
         external
         override
-        onlyOwner
+        only(controller)
         nonReentrant
         updateReward(_account)
         updateRewardRate
@@ -193,7 +207,7 @@ contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
     function withdraw(address _account, uint256 _amount)
         external
         override
-        onlyOwner
+        only(controller)
         nonReentrant
         updateReward(_account)
     {
@@ -210,17 +224,21 @@ contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
     function claimReward(address _account)
         external
         override
-        onlyOwner
+        only(controller)
         nonReentrant
         updateReward(_account)
     {
         uint256 reward = rewards[_account];
         if (reward > 0) {
             rewards[_account] = 0;
-            IERC20Upgradeable(rewardsToken).safeTransfer(owner(), reward);
+            IERC20Upgradeable(rewardsToken).safeTransfer(controller, reward);
             emit RewardPaid(_account, reward);
         }
     }
+
+    /***************************************
+          REWARDS DISTRIBUTION ACTIONS
+    ****************************************/
 
     /**
      * @dev Notifies the contract that new rewards have been added and updates any
@@ -230,7 +248,7 @@ contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
     function notifyRewardAmount(uint256 _reward)
         external
         override
-        onlyRewardsDistribution
+        only(rewardsDistribution)
         updateReward(address(0))
     {
         if (block.timestamp >= periodFinish) {
@@ -257,13 +275,18 @@ contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
 
     /**
      * @dev Change the reward distribution address.
+     * @param _account The new rewards distribution address
      */
-    function setRewardsDistribution(address _account) external override onlyRewardsDistribution {
+    function changeRewardsDistribution(address _account)
+        external
+        override
+        only(rewardsDistribution)
+    {
         rewardsDistribution = _account;
     }
 
     /***************************************
-                     HELPERS
+                    MODIFIERS
     ****************************************/
 
     /**
@@ -297,16 +320,5 @@ contract Staking is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeabl
             periodFinish = block.timestamp.add(rewardsDuration);
             lastRewardRateUpdate = block.timestamp;
         }
-    }
-
-    /**
-     * @dev Only allow the `rewardsDistribution` address to call the corresponding function.
-     */
-    modifier onlyRewardsDistribution() {
-        require(
-            msg.sender == rewardsDistribution,
-            "Caller is not the designated rewards distribution address"
-        );
-        _;
     }
 }

@@ -75,7 +75,7 @@ describe("RPropsToken", () => {
           sPropsUserStaking.address,
           bn(300000)
         )
-    ).to.be.revertedWith("Ownable: caller is not the owner");
+    ).to.be.revertedWith("Unauthorized");
 
     // The distribution percentages must add up to 100%
     await expect(
@@ -87,7 +87,7 @@ describe("RPropsToken", () => {
           sPropsUserStaking.address,
           bn(400000)
         )
-    ).to.be.revertedWith("Bad input");
+    ).to.be.revertedWith("Invalid percentages");
 
     const rPropsToMint = (await propsToken.maxTotalSupply()).sub(await propsToken.totalSupply());
 
@@ -141,9 +141,7 @@ describe("RPropsToken", () => {
     await rPropsToken.connect(propsController).transfer(alice.address, earned);
 
     // Only the owner can swap rProps for Props
-    await expect(rPropsToken.connect(alice).swap(alice.address)).to.be.revertedWith(
-      "Ownable: caller is not the owner"
-    );
+    await expect(rPropsToken.connect(alice).swap(alice.address)).to.be.revertedWith("Unauthorized");
 
     // Swap Alice's rProps for regular Props
     await rPropsToken.connect(propsController).swap(alice.address);

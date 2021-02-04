@@ -2,7 +2,6 @@
 
 pragma solidity 0.6.8;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
@@ -18,46 +17,68 @@ import "../interfaces/IStaking.sol";
  * @dev    The rProps token represents future Props rewards. Its role is to get
  *         distributed to the app and user Props staking contracts and have the
  *         rewards in those contracts be earned in rProps. The rProps token is
- *         then swappable for regular Props tokens.
+ *         then swappable for regular Props tokens. This acts as a workaround
+ *         for having to mint all left Props tokens beforehand.
  */
-contract RPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IRPropsToken {
+contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
     using SafeMathUpgradeable for uint256;
 
+    /**************************************
+                     FIELDS
+    ***************************************/
+
+    // The rProps token controller
+    address public controller;
+
+    // Props protocol related tokens
     address public propsToken;
+
+    /**************************************
+                    MODIFIERS
+    ***************************************/
+
+    modifier only(address _account) {
+        require(msg.sender == _account, "Unauthorized");
+        _;
+    }
+
+    /***************************************
+                   INITIALIZER
+    ****************************************/
 
     /**
      * @dev Initializer.
-     * @param _owner The owner of the contract
+     * @param _controller The rProps token controller
      * @param _propsToken The address of the Props token contract
      */
-    function initialize(address _owner, address _propsToken) public initializer {
-        OwnableUpgradeable.__Ownable_init();
-        ERC20Upgradeable.__ERC20_init("rProps", "rProps");
+    function initialize(address _controller, address _propsToken) public initializer {
+        ERC20Upgradeable.__ERC20_init("rProps", "RPROPS");
 
-        if (_owner != msg.sender) {
-            transferOwnership(_owner);
-        }
-
+        controller = _controller;
         propsToken = _propsToken;
     }
+
+    /***************************************
+                CONTROLLER ACTIONS
+    ****************************************/
 
     /**
      * @dev Distribute rProps rewards to the app and user Props staking contracts.
      *      This action mints the maximum possible amount of rProps and calls the
-     *      rewards distribution action to the staking contracts.
-     * @param _sPropsAppStaking The Props staking contract for apps
+     *      rewards distribution action on the staking contracts.
+     * @param _propsAppStaking The app Props staking contract
      * @param _appRewardsPercentage The percentage of minted rProps to get distributed to apps
-     * @param _sPropsUserStaking The Props staking contract for users
+     * @param _propsUserStaking The user Props staking contract
      * @param _userRewardsPercentage The percentage of minted rProps to get distributed to users
      */
     function distributeRewards(
-        address _sPropsAppStaking,
+        address _propsAppStaking,
         uint256 _appRewardsPercentage,
-        address _sPropsUserStaking,
+        address _propsUserStaking,
         uint256 _userRewardsPercentage
-    ) external override onlyOwner {
+    ) external override only(controller) {
         // The percentages must add up to 100%
-        require(_appRewardsPercentage.add(_userRewardsPercentage) == 1e6, "Bad input");
+        require(_appRewardsPercentage.add(_userRewardsPercentage) == 1e6, "Invalid percentages");
 
         // Mint all available rProps
         uint256 totalToMint =
@@ -65,31 +86,31 @@ contract RPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IRP
                 IERC20Upgradeable(propsToken).totalSupply()
             );
 
-        if (totalToMint > 0) {
-            // Distribute app rewards
-            uint256 appRewards = totalToMint.mul(_appRewardsPercentage).div(1e6);
-            _mint(_sPropsAppStaking, appRewards);
-            IStaking(_sPropsAppStaking).notifyRewardAmount(balanceOf(_sPropsAppStaking));
+        require(totalToMint > 0, "No rewards left for distribution");
 
-            // Distribute user rewards
-            uint256 userRewards = totalToMint.sub(appRewards);
-            _mint(_sPropsUserStaking, userRewards);
-            IStaking(_sPropsUserStaking).notifyRewardAmount(balanceOf(_sPropsUserStaking));
-        }
+        // Distribute app rProps rewards
+        uint256 appRewards = totalToMint.mul(_appRewardsPercentage).div(1e6);
+        _mint(_propsAppStaking, appRewards);
+        IStaking(_propsAppStaking).notifyRewardAmount(balanceOf(_propsAppStaking));
+
+        // Distribute user rProps rewards
+        uint256 userRewards = totalToMint.sub(appRewards);
+        _mint(_propsUserStaking, userRewards);
+        IStaking(_propsUserStaking).notifyRewardAmount(balanceOf(_propsUserStaking));
     }
 
     /**
      * @dev Swap an account's rProps balance for regular Props.
-     * @param account The swap recipient
+     * @param _account The swap recipient
      */
-    function swap(address account) external override onlyOwner {
-        uint256 amount = balanceOf(account);
+    function swap(address _account) external override only(controller) {
+        uint256 amount = balanceOf(_account);
         if (amount > 0) {
             // Burn the rProps
-            _burn(account, amount);
+            _burn(_account, amount);
 
             // Mint Props
-            IPropsToken(propsToken).mint(account, amount);
+            IPropsToken(propsToken).mint(_account, amount);
         }
     }
 }

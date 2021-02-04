@@ -14,9 +14,8 @@ import "../interfaces/ISPropsToken.sol";
  *         Changes by: Props
  * @notice Governance contract in the Props protocol.
  * @dev    Changes to the original Compound contract:
- *         - the contract is upgradeable
  *         - the `votingDelay` and `votingPeriod` are passed in the
- *           initializer instead of being hardcoded in the contract
+ *           constructor instead of being hardcoded in the contract
  */
 contract GovernorAlpha {
     using SafeMathUpgradeable for uint256;
