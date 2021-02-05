@@ -2,17 +2,16 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-wit
 import chai from "chai";
 import * as ethUtil from "ethereumjs-util";
 import { solidity } from "ethereum-waffle";
+import * as sigUtil from "eth-sig-util";
 import { ethers } from "hardhat";
 
-import accounts from "../../test-accounts";
 import type { AppPoints, TestErc20 } from "../../typechain";
 import {
   bn,
   daysToTimestamp,
   deployContractUpgradeable,
   expandTo18Decimals,
-  getApprovalDigest,
-  getPublicKey,
+  getPrivateKey,
   getTxTimestamp,
   mineBlock,
   now,
@@ -139,58 +138,75 @@ describe("AppPoints", () => {
   });
 
   it("approve via off-chain signature (permit)", async () => {
-    const permitValue = bn(100);
-    const permitDeadline = (await now()).add(daysToTimestamp(1));
-    const approvalDigest = await getApprovalDigest(
-      appPoints,
-      {
-        owner: appPointsOwner.address,
-        spender: alice.address,
-        value: permitValue,
+    // Sign the permit
+    const permitMessage = {
+      owner: appPointsOwner.address,
+      spender: alice.address,
+      value: bn(100).toString(),
+      nonce: (await appPoints.nonces(appPointsOwner.address)).toString(),
+      deadline: (await now()).add(daysToTimestamp(1)).toString(),
+    };
+
+    const permitData = {
+      domain: {
+        chainId: (await ethers.provider.getNetwork()).chainId,
+        name: await appPoints.name(),
+        verifyingContract: appPoints.address,
+        version: "1",
       },
-      await appPoints.nonces(alice.address),
-      permitDeadline
+      message: permitMessage,
+      primaryType: "Permit" as const,
+      types: {
+        EIP712Domain: [
+          { name: "name", type: "string" },
+          { name: "version", type: "string" },
+          { name: "chainId", type: "uint256" },
+          { name: "verifyingContract", type: "address" },
+        ],
+        Permit: [
+          { name: "owner", type: "address" },
+          { name: "spender", type: "address" },
+          { name: "value", type: "uint256" },
+          { name: "nonce", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+        ],
+      },
+    };
+
+    const permitSig = ethUtil.fromRpcSig(
+      sigUtil.signTypedData_v4(getPrivateKey(appPointsOwner.address), { data: permitData })
     );
 
-    // Sign the approval digest
-    const sig = ethUtil.ecsign(
-      Buffer.from(approvalDigest.slice(2), "hex"),
-      Buffer.from(
-        accounts
-          .find(({ privateKey }) => getPublicKey(privateKey) === appPointsOwner.address)!
-          .privateKey.slice(2),
-        "hex"
-      )
-    );
-
-    // Call permit
+    // Permit
     await appPoints
       .connect(alice)
       .permit(
-        appPointsOwner.address,
-        alice.address,
-        permitValue,
-        permitDeadline,
-        sig.v,
-        sig.r,
-        sig.s
+        permitMessage.owner,
+        permitMessage.spender,
+        permitMessage.value,
+        permitMessage.deadline,
+        permitSig.v,
+        permitSig.r,
+        permitSig.s
       );
 
     // The approval indeed took place
-    expect(await appPoints.allowance(appPointsOwner.address, alice.address)).to.eq(permitValue);
+    expect(await appPoints.allowance(appPointsOwner.address, alice.address)).to.eq(
+      permitMessage.value
+    );
 
     // Replay attack fails
     expect(
       appPoints
         .connect(alice)
         .permit(
-          appPointsOwner.address,
-          alice.address,
-          permitValue,
-          permitDeadline,
-          sig.v,
-          sig.r,
-          sig.s
+          permitMessage.owner,
+          permitMessage.spender,
+          permitMessage.value,
+          permitMessage.deadline,
+          permitSig.v,
+          permitSig.r,
+          permitSig.s
         )
     ).to.be.revertedWith("Invalid signature");
   });

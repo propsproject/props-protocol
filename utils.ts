@@ -10,66 +10,16 @@ import {
 import { Result } from "ethers/lib/utils";
 import { ethers, upgrades } from "hardhat";
 
-// Permit typehash for ERC20 permit functionality
-const PERMIT_TYPEHASH = utils.keccak256(
-  utils.toUtf8Bytes(
-    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-  )
-);
+import accounts from "./test-accounts";
 
-// Utility for getting the domain separator for ERC20 permit functionality
-const getDomainSeparator = (name: string, tokenAddress: string): string => {
-  return utils.keccak256(
-    utils.defaultAbiCoder.encode(
-      ["bytes32", "bytes32", "bytes32", "uint256", "address"],
-      [
-        utils.keccak256(
-          utils.toUtf8Bytes(
-            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-          )
-        ),
-        utils.keccak256(utils.toUtf8Bytes(name)),
-        utils.keccak256(utils.toUtf8Bytes("1")),
-        ethers.provider.network.chainId,
-        tokenAddress,
-      ]
-    )
+// Gets the private key of a given test account address
+export const getPrivateKey = (address: string): Buffer =>
+  Buffer.from(
+    accounts
+      .find(({ privateKey }) => new ethers.Wallet(privateKey).address === address)!
+      .privateKey.slice(2),
+    "hex"
   );
-};
-
-// Get approval digest for ERC20 permit functionality
-export const getApprovalDigest = async (
-  token: Contract,
-  approve: {
-    owner: string;
-    spender: string;
-    value: BigNumber;
-  },
-  nonce: BigNumber,
-  deadline: BigNumber
-): Promise<string> => {
-  const name = await token.name();
-  const DOMAIN_SEPARATOR = getDomainSeparator(name, token.address);
-  return utils.keccak256(
-    utils.solidityPack(
-      ["bytes1", "bytes1", "bytes32", "bytes32"],
-      [
-        "0x19",
-        "0x01",
-        DOMAIN_SEPARATOR,
-        utils.keccak256(
-          utils.defaultAbiCoder.encode(
-            ["bytes32", "address", "address", "uint256", "uint256", "uint256"],
-            [PERMIT_TYPEHASH, approve.owner, approve.spender, approve.value, nonce, deadline]
-          )
-        ),
-      ]
-    )
-  );
-};
-
-// Generates the public key from a given private key
-export const getPublicKey = (privateKey: string): string => new ethers.Wallet(privateKey).address;
 
 // Encode a governance action's parameters
 export const encodeParameters = (types: string[], values: any[]) => {

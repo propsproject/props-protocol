@@ -9,6 +9,8 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
+import "./utils/MetaTransactionProvider.sol";
+
 import "./interfaces/IPropsProtocol.sol";
 import "./interfaces/IPropsToken.sol";
 import "./interfaces/IRPropsToken.sol";
@@ -25,7 +27,12 @@ import "./interfaces/IStaking.sol";
  *         sProps staking, swapping earned rProps for regular Props and escrowing
  *         user Props rewards.
  */
-contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
+contract PropsProtocol is
+    Initializable,
+    PausableUpgradeable,
+    MetaTransactionProvider,
+    IPropsProtocol
+{
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
@@ -92,7 +99,7 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
     ***************************************/
 
     modifier only(address _account) {
-        require(msg.sender == _account, "Unauthorized");
+        require(msgSender() == _account, "Unauthorized");
         _;
     }
 
@@ -122,6 +129,7 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
         address _propsToken
     ) public initializer {
         PausableUpgradeable.__Pausable_init();
+        MetaTransactionProvider.__MetaTransactionProvider_init("PropsProtocol", "1", 1);
 
         controller = _controller;
         guardian = _guardian;
@@ -282,8 +290,8 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
      * @param _to The account to delegate to
      */
     function delegate(address _to) external whenNotPaused {
-        delegates[msg.sender] = _to;
-        emit DelegateChanged(msg.sender, _to);
+        delegates[msgSender()] = _to;
+        emit DelegateChanged(msgSender(), _to);
     }
 
     /**
@@ -306,12 +314,11 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
             amounts[i] = _safeInt256(_amounts[i]);
         }
 
-        _stake(_apps, amounts, msg.sender, _account, false);
+        _stake(_apps, amounts, msgSender(), _account, false);
     }
 
     /**
-     * @dev Same as above but uses an off-chain signature to approve and
-     *      stake in the same transaction.
+     * @dev Same as `stakeOnBehalf`, but uses a permit for approving Props transfers.
      */
     function stakeOnBehalfWithPermit(
         address[] calldata _apps,
@@ -338,12 +345,11 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
      * @param _amounts Array of amounts to stake/unstake to/from each app
      */
     function stake(address[] memory _apps, int256[] memory _amounts) public whenNotPaused {
-        _stake(_apps, _amounts, msg.sender, msg.sender, false);
+        _stake(_apps, _amounts, msgSender(), msgSender(), false);
     }
 
     /**
-     * @dev Same as above but uses an off-chain signature to approve and
-     *      stake in the same transaction.
+     * @dev Same as `stake`, but uses a permit for approving Props transfers.
      */
     function stakeWithPermit(
         address[] calldata _apps,
@@ -382,7 +388,7 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
      * @param _amounts Array of amounts to stake/unstake to/from each app
      */
     function stakeRewards(address[] memory _apps, int256[] memory _amounts) public whenNotPaused {
-        _stake(_apps, _amounts, msg.sender, msg.sender, true);
+        _stake(_apps, _amounts, msgSender(), msgSender(), true);
     }
 
     /**
@@ -405,10 +411,10 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
      */
     function claimAppPointsRewards(address _app) external validApp(_app) whenNotPaused {
         // Claim the rewards and transfer them to the user's wallet
-        uint256 reward = IStaking(appPointsStaking[_app]).earned(msg.sender);
+        uint256 reward = IStaking(appPointsStaking[_app]).earned(msgSender());
         if (reward > 0) {
-            IStaking(appPointsStaking[_app]).claimReward(msg.sender);
-            IERC20Upgradeable(_app).safeTransfer(msg.sender, reward);
+            IStaking(appPointsStaking[_app]).claimReward(msgSender());
+            IERC20Upgradeable(_app).safeTransfer(msgSender(), reward);
         }
     }
 
@@ -426,9 +432,9 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
         uint256 reward = IStaking(propsAppStaking).earned(_app);
         if (reward > 0) {
             IStaking(propsAppStaking).claimReward(_app);
-            IERC20Upgradeable(rPropsToken).safeTransfer(msg.sender, reward);
+            IERC20Upgradeable(rPropsToken).safeTransfer(msgSender(), reward);
             // Since the rewards are in rProps, swap it for regular Props
-            IRPropsToken(rPropsToken).swap(msg.sender);
+            IRPropsToken(rPropsToken).swap(msgSender());
         }
     }
 
@@ -450,10 +456,10 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
 
             address[] memory _apps = new address[](1);
             _apps[0] = _app;
-            uint256[] memory _amounts = new uint256[](1);
-            _amounts[0] = reward;
+            int256[] memory _amounts = new int256[](1);
+            _amounts[0] = _safeInt256(reward);
 
-            this.stakeOnBehalf(_apps, _amounts, msg.sender);
+            _stake(_apps, _amounts, address(this), msgSender(), false);
         }
     }
 
@@ -461,21 +467,21 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
      * @dev Allow users to claim their Props rewards.
      */
     function claimUserPropsRewards() external whenNotPaused {
-        uint256 reward = IStaking(propsUserStaking).earned(msg.sender);
+        uint256 reward = IStaking(propsUserStaking).earned(msgSender());
         if (reward > 0) {
             // Claim the rewards but don't transfer them to the user's wallet
-            IStaking(propsUserStaking).claimReward(msg.sender);
+            IStaking(propsUserStaking).claimReward(msgSender());
             // Since the rewards are in rProps, swap it for regular Props
             IRPropsToken(rPropsToken).swap(address(this));
 
             // Place the rewards in the escrow and extend the cooldown period
-            rewardsEscrow[msg.sender] = rewardsEscrow[msg.sender].add(reward);
-            rewardsEscrowUnlock[msg.sender] = block.timestamp.add(rewardsEscrowCooldown);
+            rewardsEscrow[msgSender()] = rewardsEscrow[msgSender()].add(reward);
+            rewardsEscrowUnlock[msgSender()] = block.timestamp.add(rewardsEscrowCooldown);
 
             emit RewardsEscrowUpdated(
-                msg.sender,
-                rewardsEscrow[msg.sender],
-                rewardsEscrowUnlock[msg.sender]
+                msgSender(),
+                rewardsEscrow[msgSender()],
+                rewardsEscrowUnlock[msgSender()]
             );
         }
     }
@@ -491,7 +497,7 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
         address[] calldata _apps,
         uint256[] calldata _percentages
     ) external whenNotPaused {
-        _claimUserPropsRewardsAndStake(_apps, _percentages, msg.sender);
+        _claimUserPropsRewardsAndStake(_apps, _percentages, msgSender());
     }
 
     /**
@@ -512,17 +518,17 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
      * @dev Allow users to unlock their escrowed Props rewards.
      */
     function unlockUserPropsRewards() external whenNotPaused {
-        require(block.timestamp >= rewardsEscrowUnlock[msg.sender], "Rewards locked");
+        require(block.timestamp >= rewardsEscrowUnlock[msgSender()], "Rewards locked");
 
-        if (rewardsEscrow[msg.sender] > 0) {
+        if (rewardsEscrow[msgSender()] > 0) {
             // Empty the escrow
-            uint256 escrowedRewards = rewardsEscrow[msg.sender];
-            rewardsEscrow[msg.sender] = 0;
+            uint256 escrowedRewards = rewardsEscrow[msgSender()];
+            rewardsEscrow[msgSender()] = 0;
 
             // Transfer the rewards to the user's wallet
-            IERC20Upgradeable(propsToken).safeTransfer(msg.sender, escrowedRewards);
+            IERC20Upgradeable(propsToken).safeTransfer(msgSender(), escrowedRewards);
 
-            emit RewardsEscrowUpdated(msg.sender, 0, 0);
+            emit RewardsEscrowUpdated(msgSender(), 0, 0);
         }
     }
 
@@ -533,7 +539,9 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
     function _stake(
         address[] memory _apps,
         int256[] memory _amounts,
+        // Where should the stake funds come from?
         address _from,
+        // Where should the stakes go to?
         address _to,
         bool _rewards
     ) internal {
@@ -600,13 +608,13 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
                         rewardsEscrow[_from] = rewardsEscrow[_from].sub(left);
 
                         emit RewardsEscrowUpdated(
-                            _to,
-                            rewardsEscrow[_to],
-                            rewardsEscrowUnlock[_to]
+                            _from,
+                            rewardsEscrow[_from],
+                            rewardsEscrowUnlock[_from]
                         );
                     } else if (_from != address(this)) {
                         // When acting on behalf of a delegator no transfers are allowed
-                        require(msg.sender == _from, "Unauthorized");
+                        require(msgSender() == _from, "Unauthorized");
 
                         // Otherwise, if we are handling the principal, transfer the needed Props
                         IERC20Upgradeable(propsToken).safeTransferFrom(_from, address(this), left);
@@ -638,7 +646,7 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
         // If more tokens were unstaked than staked
         if (totalUnstakedAmount > 0) {
             // When acting on behalf of a delegator no withdraws are allowed
-            require(msg.sender == _from, "Unauthorized");
+            require(msgSender() == _from, "Unauthorized");
 
             // Unstake the corresponding sProps from the user Props staking contract
             IStaking(propsUserStaking).withdraw(_to, totalUnstakedAmount);
@@ -691,7 +699,7 @@ contract PropsProtocol is Initializable, PausableUpgradeable, IPropsProtocol {
             // The given percentages must add up to 100%
             require(totalPercentage == 1e6, "Invalid percentages");
 
-            if (_account == msg.sender) {
+            if (_account == msgSender()) {
                 stakeRewards(_apps, amounts);
             } else {
                 stakeRewardsAsDelegate(_apps, amounts, _account);
