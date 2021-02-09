@@ -17,5 +17,7 @@ interface IStaking {
 
     function notifyRewardAmount(uint256 _reward) external;
 
+    function withdrawReward(uint256 _delay) external;
+
     function changeRewardsDistribution(address _account) external;
 }

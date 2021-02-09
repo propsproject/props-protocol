@@ -364,4 +364,49 @@ describe("Staking", () => {
 
     expect(carolEarned.sub(localCarolEarned).abs().lte(carolEarned.div(10000))).to.be.true;
   });
+
+  it("withdraw not yet distributed rewards during an on-going rewards period", async () => {
+    const rewardsDuration = await staking.rewardsDuration();
+    const reward = expandTo18Decimals(1000);
+    const stakeAmount = expandTo18Decimals(10);
+
+    // Distribute reward
+    await rewardsToken.connect(rewardsDistribution).transfer(staking.address, reward);
+    const distributionStartTime = await getTxTimestamp(
+      await staking.connect(rewardsDistribution).notifyRewardAmount(reward)
+    );
+
+    const firstRewardRate = await staking.rewardRate();
+
+    // First stake
+    await staking.connect(stakingOwner).stake(alice.address, stakeAmount);
+
+    // Fast-forward until ~middle of the rewards period
+    await mineBlock(distributionStartTime.add(rewardsDuration.div(2)));
+
+    const withdrawPeriodFinish = await staking.periodFinish();
+
+    // Withdraw any not yet distributed rewards
+    const withdrawTime = await getTxTimestamp(
+      await staking.connect(rewardsDistribution).withdrawReward(daysToTimestamp(1))
+    );
+
+    const secondRewardRate = await staking.rewardRate();
+
+    // Fast-forward until after the end of the rewards period
+    await mineBlock(distributionStartTime.add(rewardsDuration).add(daysToTimestamp(1)));
+
+    // Check that the only staker earned the correct amount (ensure results are within .01%)
+    const earned = await staking.earned(alice.address);
+    const localEarned = firstRewardRate
+      .mul(withdrawTime.sub(distributionStartTime))
+      .add(secondRewardRate.mul(distributionStartTime.add(rewardsDuration).sub(withdrawTime)));
+    expect(earned.sub(localEarned).abs().lte(earned.div(10000))).to.be.true;
+    expect(earned.lte(await rewardsToken.balanceOf(staking.address)));
+
+    // Check that the correct amount of rewards was withdrawn
+    expect(
+      firstRewardRate.mul(withdrawPeriodFinish.sub(withdrawTime.add(daysToTimestamp(1))))
+    ).to.eq(await rewardsToken.balanceOf(rewardsDistribution.address));
+  });
 });

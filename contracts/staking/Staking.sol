@@ -274,6 +274,32 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
     }
 
     /**
+     * @dev Withdraw any outstanding rewards that were not yet distributed to stakers.
+     * @param _delay Delay from the current timestamp for calculating the rewards amount to get withdrawn
+     */
+    function withdrawReward(uint256 _delay)
+        external
+        override
+        only(rewardsDistribution)
+        updateReward(address(0))
+    {
+        // Enforce a delay of at least 1 day in order to take into account any precision loss
+        // in calculating the earned rewards of stakers
+        if (_delay >= 1 days && block.timestamp.add(_delay) < periodFinish) {
+            // Compute the amount of rewards to get withdrawn
+            uint256 remainingForWithdraw = periodFinish.sub(block.timestamp.add(_delay));
+            uint256 leftoverForWithdraw = remainingForWithdraw.mul(rewardRate);
+            IERC20Upgradeable(rewardsToken).safeTransfer(rewardsDistribution, leftoverForWithdraw);
+
+            // Update the reward rate to take into account the above withdrawal
+            uint256 remainingForDistribution = _delay;
+            uint256 leftoverForDistribution = remainingForDistribution.mul(rewardRate);
+            rewardRate = leftoverForDistribution.div(rewardsDuration);
+            periodFinish = block.timestamp.add(rewardsDuration);
+        }
+    }
+
+    /**
      * @dev Change the reward distribution address.
      * @param _account The new rewards distribution address
      */
