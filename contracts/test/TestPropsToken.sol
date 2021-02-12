@@ -23,6 +23,7 @@ contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, 
         OwnableUpgradeable.__Ownable_init();
         ERC20Upgradeable.__ERC20_init("Test Props", "TPROPS");
 
+        _minter = msg.sender;
         _maxTotalSupply = 1e9 * (10**uint256(decimals()));
 
         PERMIT_TYPEHASH = keccak256(
@@ -61,6 +62,11 @@ contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, 
     function mint(address _account, uint256 _amount) external override {
         require(msg.sender == _minter, "Only the minter can mint new tokens");
         _mint(_account, _amount);
+    }
+
+    function burn(address _account, uint256 _amount) external override {
+        require(msg.sender == _minter, "Only the minter can burn existing tokens");
+        _burn(_account, _amount);
     }
 
     function permit(
