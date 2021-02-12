@@ -1,0 +1,3 @@
+[submodule "fx-portal"]
+	path = fx-portal
+	url = git@github.com:jdkanani/fx-portal.git

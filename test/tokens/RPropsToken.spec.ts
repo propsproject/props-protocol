@@ -17,62 +17,63 @@ chai.use(solidity);
 const { expect } = chai;
 
 describe("RPropsToken", () => {
-  let propsController: SignerWithAddress;
-  let propsTreasury: SignerWithAddress;
+  let deployer: SignerWithAddress;
+  let controller: SignerWithAddress;
   let alice: SignerWithAddress;
 
   let propsToken: TestPropsToken;
   let rPropsToken: RPropsToken;
-  let sPropsAppStaking: Staking;
-  let sPropsUserStaking: Staking;
+  let propsAppStaking: Staking;
+  let propsUserStaking: Staking;
 
   const PROPS_TOKEN_AMOUNT = expandTo18Decimals(100000);
-
   // Corresponds to 0.0003658 - taken from old Props rewards formula
   // Distributes 12.5% of the remaining rewards pool each year
   const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
 
   beforeEach(async () => {
-    [propsController, propsTreasury, alice] = await ethers.getSigners();
+    [deployer, controller, alice] = await ethers.getSigners();
 
-    propsToken = await deployContractUpgradeable("TestPropsToken", propsTreasury, [
-      PROPS_TOKEN_AMOUNT,
-    ]);
+    propsToken = await deployContractUpgradeable("TestPropsToken", deployer, PROPS_TOKEN_AMOUNT);
 
-    rPropsToken = await deployContractUpgradeable("RPropsToken", propsTreasury, [
-      propsController.address,
-      propsToken.address,
-    ]);
+    rPropsToken = await deployContractUpgradeable(
+      "RPropsToken",
+      deployer,
+      controller.address,
+      propsToken.address
+    );
 
-    sPropsAppStaking = await deployContractUpgradeable("Staking", propsTreasury, [
-      propsController.address,
+    propsAppStaking = await deployContractUpgradeable(
+      "Staking",
+      deployer,
+      controller.address,
       rPropsToken.address,
       rPropsToken.address,
-      propsController.address,
-      DAILY_REWARDS_EMISSION,
-    ]);
+      DAILY_REWARDS_EMISSION
+    );
 
-    sPropsUserStaking = await deployContractUpgradeable("Staking", propsTreasury, [
-      propsController.address,
+    propsUserStaking = await deployContractUpgradeable(
+      "Staking",
+      deployer,
+      controller.address,
       rPropsToken.address,
       rPropsToken.address,
-      propsController.address,
-      DAILY_REWARDS_EMISSION,
-    ]);
+      DAILY_REWARDS_EMISSION
+    );
 
-    // The rProps token contract is allowed to mint new Props
-    propsToken.connect(propsTreasury).setMinter(rPropsToken.address);
+    // Set needed parameters
+    propsToken.connect(deployer).setMinter(rPropsToken.address);
   });
 
-  it("distribute rewards to the app and user staking contracts", async () => {
+  it("distribute rewards to the app and user Props staking contracts", async () => {
     // Only the owner is permissioned to distribute the rewards
     await expect(
       rPropsToken
-        .connect(propsTreasury)
+        .connect(alice)
         .distributeRewards(
-          sPropsAppStaking.address,
+          propsAppStaking.address,
           bn(700000),
-          sPropsUserStaking.address,
+          propsUserStaking.address,
           bn(300000)
         )
     ).to.be.revertedWith("Unauthorized");
@@ -80,11 +81,11 @@ describe("RPropsToken", () => {
     // The distribution percentages must add up to 100%
     await expect(
       rPropsToken
-        .connect(propsController)
+        .connect(controller)
         .distributeRewards(
-          sPropsAppStaking.address,
+          propsAppStaking.address,
           bn(700000),
-          sPropsUserStaking.address,
+          propsUserStaking.address,
           bn(400000)
         )
     ).to.be.revertedWith("Invalid percentages");
@@ -93,58 +94,44 @@ describe("RPropsToken", () => {
 
     // Distribute the rewards
     await rPropsToken
-      .connect(propsController)
-      .distributeRewards(
-        sPropsAppStaking.address,
-        bn(700000),
-        sPropsUserStaking.address,
-        bn(300000)
-      );
+      .connect(controller)
+      .distributeRewards(propsAppStaking.address, bn(700000), propsUserStaking.address, bn(300000));
 
-    const rPropsForAppRewards = await rPropsToken.balanceOf(sPropsAppStaking.address);
-    const rPropsForUserRewards = await rPropsToken.balanceOf(sPropsUserStaking.address);
+    const rPropsForAppRewards = await rPropsToken.balanceOf(propsAppStaking.address);
+    const rPropsForUserRewards = await rPropsToken.balanceOf(propsUserStaking.address);
 
     // Check the rewards were indeed deposited in the staking contracts and the rewards periods began
     expect(rPropsForAppRewards).to.eq(rPropsToMint.mul(70).div(100));
-    expect(await sPropsAppStaking.periodFinish()).to.not.eq(bn(0));
+    expect(await propsAppStaking.periodFinish()).to.not.eq(bn(0));
     expect(rPropsForUserRewards).to.eq(rPropsToMint.sub(rPropsForAppRewards));
-    expect(await sPropsUserStaking.periodFinish()).to.not.eq(bn(0));
+    expect(await propsUserStaking.periodFinish()).to.not.eq(bn(0));
   });
 
   it("swap rProps to Props", async () => {
     // First, distribute the rewards in order to get some rProps minted
     await rPropsToken
-      .connect(propsController)
-      .distributeRewards(
-        sPropsAppStaking.address,
-        bn(700000),
-        sPropsUserStaking.address,
-        bn(300000)
-      );
+      .connect(controller)
+      .distributeRewards(propsAppStaking.address, bn(700000), propsUserStaking.address, bn(300000));
 
     // Stake
-    await propsToken
-      .connect(propsTreasury)
-      .transfer(propsController.address, expandTo18Decimals(100));
-    await propsToken
-      .connect(propsController)
-      .approve(sPropsUserStaking.address, expandTo18Decimals(100));
-    await sPropsUserStaking.connect(propsController).stake(alice.address, expandTo18Decimals(100));
+    await propsToken.connect(deployer).transfer(controller.address, expandTo18Decimals(100));
+    await propsToken.connect(controller).approve(propsUserStaking.address, expandTo18Decimals(100));
+    await propsUserStaking.connect(controller).stake(alice.address, expandTo18Decimals(100));
 
     // Fast-forward to let some time for the rProps rewards to accrue
     await mineBlock((await now()).add(daysToTimestamp(10)));
 
-    const earned = await sPropsUserStaking.earned(alice.address);
+    const earned = await propsUserStaking.earned(alice.address);
 
     // Claim reward and transfer to Alice (initially, it will get owned by the staking contract's owner)
-    await sPropsUserStaking.connect(propsController).claimReward(alice.address);
-    await rPropsToken.connect(propsController).transfer(alice.address, earned);
+    await propsUserStaking.connect(controller).claimReward(alice.address);
+    await rPropsToken.connect(controller).transfer(alice.address, earned);
 
     // Only the owner can swap rProps for Props
     await expect(rPropsToken.connect(alice).swap(alice.address)).to.be.revertedWith("Unauthorized");
 
     // Swap Alice's rProps for regular Props
-    await rPropsToken.connect(propsController).swap(alice.address);
+    await rPropsToken.connect(controller).swap(alice.address);
 
     // Check that the earned reward is now in Alice's Props wallet
     expect(await propsToken.balanceOf(alice.address)).to.eq(earned);

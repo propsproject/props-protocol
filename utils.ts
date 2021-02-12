@@ -44,7 +44,7 @@ export const deployContractUpgradeable = async <T extends Contract>(
   ...args: any[]
 ): Promise<T> => {
   const contractFactory = await ethers.getContractFactory(name, deployer);
-  const contractInstance = await upgrades.deployProxy(contractFactory, ...args);
+  const contractInstance = await upgrades.deployProxy(contractFactory, [...args]);
   return (await contractInstance.deployed()) as T;
 };
 

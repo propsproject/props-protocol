@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.6.8;
+pragma solidity 0.7.3;
 
 interface IAppPoints {
     function pause() external;
 
     function unpause() external;
 
-    function whitelistAddress(address _account) external;
+    function whitelistForTransfers(address _account) external;
 
-    function blacklistAddress(address _account) external;
+    function blacklistForTransfers(address _account) external;
 }

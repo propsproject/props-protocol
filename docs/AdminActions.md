@@ -1,5 +1,7 @@
 ## Admin Actions
 
+WARNING: Some information might be out of date
+
 All administrative actions related to Props-owned contracts are to be executed by four designated addresses: the upgradeability admin, the `PropsController` owner, the `AppTokenProxyFactory` owner and the Props guardian.
 
 As the name suggests, the upgradeability admin is responsible and allowed to upgrade any upgradeable contracts in the Props protocol. More details on how the upgrades are done and how the upgradeability owner is able to transfer its role to other designated addresses can be found in OpenZeppelin's [docs](https://docs.openzeppelin.com/cli/2.8/contracts-architecture#upgrades).

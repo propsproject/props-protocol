@@ -7,8 +7,8 @@ import * as sigUtil from "eth-sig-util";
 import { ethers } from "hardhat";
 
 import type {
-  AppPoints,
-  AppProxyFactory,
+  AppPointsL2,
+  AppProxyFactoryL2,
   PropsProtocol,
   RPropsToken,
   SPropsToken,
@@ -32,7 +32,11 @@ chai.use(solidity);
 const { expect } = chai;
 
 describe("PropsProtocol", () => {
-  let propsTreasury: SignerWithAddress;
+  let deployer: SignerWithAddress;
+  let controller: SignerWithAddress;
+  let treasury: SignerWithAddress;
+  let guardian: SignerWithAddress;
+  let appProxyFactoryBridge: SignerWithAddress;
   let appOwner: SignerWithAddress;
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
@@ -42,108 +46,124 @@ describe("PropsProtocol", () => {
   let sPropsToken: SPropsToken;
   let propsAppStaking: Staking;
   let propsUserStaking: Staking;
-  let appProxyFactory: AppProxyFactory;
+  let appProxyFactory: AppProxyFactoryL2;
   let propsProtocol: PropsProtocol;
 
   const PROPS_TOKEN_AMOUNT = expandTo18Decimals(100000);
-
   const APP_POINTS_TOKEN_NAME = "AppPoints";
   const APP_POINTS_TOKEN_SYMBOL = "AppPoints";
   const APP_POINTS_TOKEN_AMOUNT = expandTo18Decimals(100000);
-
   // Corresponds to 0.0003658 - taken from old Props rewards formula
   // Distributes 12.5% of the remaining rewards pool each year
   const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
 
-  const deployApp = async (
-    rewardsDistributedPercentage: BigNumber = bn(0)
-  ): Promise<[AppPoints, Staking]> => {
+  const deployApp = async (): Promise<[AppPointsL2, Staking]> => {
     const tx = await appProxyFactory
-      .connect(appOwner)
+      .connect(appProxyFactoryBridge)
       .deployApp(
+        "0x0000000000000000000000000000000000000000",
         APP_POINTS_TOKEN_NAME,
         APP_POINTS_TOKEN_SYMBOL,
-        APP_POINTS_TOKEN_AMOUNT,
         appOwner.address,
-        DAILY_REWARDS_EMISSION,
-        rewardsDistributedPercentage
+        DAILY_REWARDS_EMISSION
       );
-    const [appPointsAddress, appPointsStakingAddress] = await getEvent(
+    const [, appPointsAddress, appPointsStakingAddress] = await getEvent(
       await tx.wait(),
-      "AppDeployed(address,address,string,string,address)",
-      "AppProxyFactory"
+      "AppDeployed(address,address,address,string,string,address)",
+      "AppProxyFactoryL2"
     );
 
-    await propsProtocol.connect(propsTreasury).whitelistApp(appPointsAddress);
+    const appPoints = (await ethers.getContractFactory("AppPointsL2")).attach(
+      appPointsAddress
+    ) as AppPointsL2;
+
+    // Mint to the app owner (workaround for moving app points tokens across the bridge)
+    await appPoints.connect(appOwner).mint(appOwner.address, APP_POINTS_TOKEN_AMOUNT);
+
+    await propsProtocol.connect(controller).whitelistApp(appPointsAddress);
 
     return [
-      (await ethers.getContractFactory("AppPoints")).attach(appPointsAddress) as AppPoints,
+      appPoints,
       (await ethers.getContractFactory("Staking")).attach(appPointsStakingAddress) as Staking,
     ];
   };
 
   beforeEach(async () => {
-    [propsTreasury, appOwner, alice, bob] = await ethers.getSigners();
+    [
+      deployer,
+      controller,
+      treasury,
+      guardian,
+      appProxyFactoryBridge,
+      appOwner,
+      alice,
+      bob,
+    ] = await ethers.getSigners();
 
-    propsToken = await deployContractUpgradeable("TestPropsToken", propsTreasury, [
-      PROPS_TOKEN_AMOUNT,
-    ]);
+    propsToken = await deployContractUpgradeable("TestPropsToken", deployer, PROPS_TOKEN_AMOUNT);
 
-    propsProtocol = await deployContractUpgradeable("PropsProtocol", propsTreasury, [
-      propsTreasury.address,
-      propsTreasury.address,
-      propsToken.address,
-    ]);
+    propsProtocol = await deployContractUpgradeable(
+      "PropsProtocol",
+      deployer,
+      controller.address,
+      guardian.address,
+      propsToken.address
+    );
 
-    rPropsToken = await deployContractUpgradeable("RPropsToken", propsTreasury, [
+    rPropsToken = await deployContractUpgradeable(
+      "RPropsToken",
+      deployer,
       propsProtocol.address,
-      propsToken.address,
-    ]);
+      propsToken.address
+    );
 
-    sPropsToken = await deployContractUpgradeable("SPropsToken", propsTreasury, [
-      propsProtocol.address,
-    ]);
+    sPropsToken = await deployContractUpgradeable("SPropsToken", deployer, propsProtocol.address);
 
-    propsAppStaking = await deployContractUpgradeable("Staking", propsTreasury, [
+    propsAppStaking = await deployContractUpgradeable(
+      "Staking",
+      deployer,
       propsProtocol.address,
       rPropsToken.address,
       rPropsToken.address,
-      propsProtocol.address,
-      DAILY_REWARDS_EMISSION,
-    ]);
+      DAILY_REWARDS_EMISSION
+    );
 
-    propsUserStaking = await deployContractUpgradeable("Staking", propsTreasury, [
+    propsUserStaking = await deployContractUpgradeable(
+      "Staking",
+      deployer,
       propsProtocol.address,
       rPropsToken.address,
       rPropsToken.address,
-      propsProtocol.address,
-      DAILY_REWARDS_EMISSION,
-    ]);
+      DAILY_REWARDS_EMISSION
+    );
 
-    const appPointsLogic = await deployContract<AppPoints>("AppPoints", propsTreasury);
-    const appPointsStakingLogic = await deployContract<Staking>("Staking", propsTreasury);
+    const appPointsLogic = await deployContract("AppPointsL2", deployer);
+    const appPointsStakingLogic = await deployContract("Staking", deployer);
 
-    appProxyFactory = await deployContractUpgradeable("AppProxyFactory", propsTreasury, [
-      propsTreasury.address,
+    appProxyFactory = await deployContractUpgradeable(
+      "AppProxyFactoryL2",
+      deployer,
+      controller.address,
       propsProtocol.address,
-      propsTreasury.address,
+      treasury.address,
       propsToken.address,
       appPointsLogic.address,
-      appPointsStakingLogic.address,
-    ]);
+      appPointsStakingLogic.address
+    );
 
-    // The rProps token contract is allowed to mint new Props
-    await propsToken.connect(propsTreasury).setMinter(rPropsToken.address);
-
-    // Initialize all needed fields on the controller
-    await propsProtocol.connect(propsTreasury).setAppProxyFactory(appProxyFactory.address);
-    await propsProtocol.connect(propsTreasury).setRPropsToken(rPropsToken.address);
-    await propsProtocol.connect(propsTreasury).setSPropsToken(sPropsToken.address);
-    await propsProtocol.connect(propsTreasury).setPropsAppStaking(propsAppStaking.address);
-    await propsProtocol.connect(propsTreasury).setPropsUserStaking(propsUserStaking.address);
+    // Set needed parameters
+    await propsToken.connect(deployer).setMinter(rPropsToken.address);
+    await appProxyFactory
+      .connect(controller)
+      .setAppProxyFactoryBridge(appProxyFactoryBridge.address);
+    await propsProtocol.connect(controller).setAppProxyFactory(appProxyFactory.address);
+    await propsProtocol.connect(controller).setRPropsToken(rPropsToken.address);
+    await propsProtocol.connect(controller).setSPropsToken(sPropsToken.address);
+    await propsProtocol.connect(controller).setPropsAppStaking(propsAppStaking.address);
+    await propsProtocol.connect(controller).setPropsUserStaking(propsUserStaking.address);
 
     // Distribute the rProps rewards to the sProps staking contracts
-    await propsProtocol.connect(propsTreasury).distributePropsRewards(bn(800000), bn(200000));
+    await propsProtocol.connect(controller).distributePropsRewards(bn(800000), bn(200000));
   });
 
   it("sProps are not transferrable", async () => {
@@ -151,7 +171,7 @@ describe("PropsProtocol", () => {
 
     // Stake
     const stakeAmount = expandTo18Decimals(100);
-    await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
+    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
     await propsToken.connect(alice).approve(propsProtocol.address, stakeAmount);
     await propsProtocol.connect(alice).stake([appPoints.address], [stakeAmount]);
 
@@ -166,15 +186,15 @@ describe("PropsProtocol", () => {
 
     // Stake
     const stakeAmount = expandTo18Decimals(100);
-    await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
+    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
     await propsToken.connect(alice).approve(propsProtocol.address, stakeAmount);
     await propsProtocol.connect(alice).stake([appPoints.address], [stakeAmount]);
 
     // Check the sProps balance and staked amounts
-    expect(await sPropsToken.balanceOf(alice.address)).to.eq(expandTo18Decimals(100));
-    expect(await appPointsStaking.balanceOf(alice.address)).to.eq(expandTo18Decimals(100));
-    expect(await propsAppStaking.balanceOf(appPoints.address)).to.eq(expandTo18Decimals(100));
-    expect(await propsUserStaking.balanceOf(alice.address)).to.eq(expandTo18Decimals(100));
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(stakeAmount);
+    expect(await appPointsStaking.balanceOf(alice.address)).to.eq(stakeAmount);
+    expect(await propsAppStaking.balanceOf(appPoints.address)).to.eq(stakeAmount);
+    expect(await propsUserStaking.balanceOf(alice.address)).to.eq(stakeAmount);
 
     // Rebalance
     const adjustment = expandTo18Decimals(-70);
@@ -194,7 +214,7 @@ describe("PropsProtocol", () => {
 
     // Stake to two apps
     const [stakeAmount1, stakeAmount2] = [expandTo18Decimals(100), expandTo18Decimals(50)];
-    await propsToken.connect(propsTreasury).transfer(alice.address, expandTo18Decimals(150));
+    await propsToken.connect(deployer).transfer(alice.address, expandTo18Decimals(150));
     await propsToken.connect(alice).approve(propsProtocol.address, expandTo18Decimals(150));
     await propsProtocol
       .connect(alice)
@@ -210,7 +230,7 @@ describe("PropsProtocol", () => {
 
     // Rebalance
     const [adjustment1, adjustment2] = [expandTo18Decimals(-80), expandTo18Decimals(100)];
-    await propsToken.connect(propsTreasury).transfer(alice.address, expandTo18Decimals(20));
+    await propsToken.connect(deployer).transfer(alice.address, expandTo18Decimals(20));
     await propsToken.connect(alice).approve(propsProtocol.address, expandTo18Decimals(20));
     await propsProtocol
       .connect(alice)
@@ -236,7 +256,7 @@ describe("PropsProtocol", () => {
       expandTo18Decimals(50),
       expandTo18Decimals(80),
     ];
-    await propsToken.connect(propsTreasury).transfer(alice.address, expandTo18Decimals(230));
+    await propsToken.connect(deployer).transfer(alice.address, expandTo18Decimals(230));
     await propsToken.connect(alice).approve(propsProtocol.address, expandTo18Decimals(230));
     await propsProtocol
       .connect(alice)
@@ -339,7 +359,7 @@ describe("PropsProtocol", () => {
     );
 
     // Stake with permit
-    await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
+    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
     await propsProtocol
       .connect(alice)
       .stakeWithPermit(
@@ -361,124 +381,12 @@ describe("PropsProtocol", () => {
     expect(await propsUserStaking.balanceOf(alice.address)).to.eq(stakeAmount);
   });
 
-  // it("stake with permit by signature", async () => {
-  //   const [appPoints, appPointsStaking] = await deployApp();
-
-  //   const stakeAmount = expandTo18Decimals(100);
-
-  //   // Sign the permit
-  //   const permitMessage = {
-  //     owner: alice.address,
-  //     spender: propsProtocol.address,
-  //     value: stakeAmount.toString(),
-  //     nonce: (await propsToken.nonces(alice.address)).toString(),
-  //     deadline: (await now()).add(daysToTimestamp(1)).toString(),
-  //   };
-
-  //   const permitData = {
-  //     domain: {
-  //       chainId: (await ethers.provider.getNetwork()).chainId,
-  //       name: await propsToken.name(),
-  //       verifyingContract: propsToken.address,
-  //       version: "1",
-  //     },
-  //     message: permitMessage,
-  //     primaryType: "Permit" as const,
-  //     types: {
-  //       EIP712Domain: [
-  //         { name: "name", type: "string" },
-  //         { name: "version", type: "string" },
-  //         { name: "chainId", type: "uint256" },
-  //         { name: "verifyingContract", type: "address" },
-  //       ],
-  //       Permit: [
-  //         { name: "owner", type: "address" },
-  //         { name: "spender", type: "address" },
-  //         { name: "value", type: "uint256" },
-  //         { name: "nonce", type: "uint256" },
-  //         { name: "deadline", type: "uint256" },
-  //       ],
-  //     },
-  //   };
-
-  //   const permitSig = ethUtil.fromRpcSig(
-  //     sigUtil.signTypedData_v4(getPrivateKey(alice.address), { data: permitData })
-  //   );
-
-  //   // Sign the stake
-  //   const stakeMessage = {
-  //     signer: alice.address,
-  //     apps: [appPoints.address],
-  //     amounts: [stakeAmount.toString()],
-  //     nonce: (await propsToken.nonces(alice.address)).toString(),
-  //     deadline: (await now()).add(daysToTimestamp(1)).toString(),
-  //   };
-
-  //   const stakeData = {
-  //     domain: {
-  //       chainId: (await ethers.provider.getNetwork()).chainId,
-  //       name: "PropsProtocol",
-  //       verifyingContract: propsProtocol.address,
-  //       version: "1",
-  //     },
-  //     message: stakeMessage,
-  //     primaryType: "Stake" as const,
-  //     types: {
-  //       EIP712Domain: [
-  //         { name: "name", type: "string" },
-  //         { name: "version", type: "string" },
-  //         { name: "chainId", type: "uint256" },
-  //         { name: "verifyingContract", type: "address" },
-  //       ],
-  //       Stake: [
-  //         { name: "signer", type: "address" },
-  //         { name: "apps", type: "address[]" },
-  //         { name: "amounts", type: "int256[]" },
-  //         { name: "nonce", type: "uint256" },
-  //         { name: "deadline", type: "uint256" },
-  //       ],
-  //     },
-  //   };
-
-  //   const stakeSig = ethUtil.fromRpcSig(
-  //     sigUtil.signTypedData_v4(getPrivateKey(alice.address), { data: stakeData })
-  //   );
-
-  //   // Stake with permit by signature
-  //   await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
-  //   await propsProtocol
-  //     // Since this is a stake by signature, we don't necessarily need Alice to send the transaction
-  //     .connect(propsTreasury)
-  //     .stakeWithPermitBySig(
-  //       stakeMessage.signer,
-  //       stakeMessage.apps,
-  //       stakeMessage.amounts,
-  //       stakeMessage.deadline,
-  //       stakeSig.v,
-  //       stakeSig.r,
-  //       stakeSig.s,
-  //       permitMessage.owner,
-  //       permitMessage.spender,
-  //       permitMessage.value,
-  //       permitMessage.deadline,
-  //       permitSig.v,
-  //       permitSig.r,
-  //       permitSig.s
-  //     );
-
-  //   // Check the sProps balance and staked amounts
-  //   expect(await sPropsToken.balanceOf(alice.address)).to.eq(stakeAmount);
-  //   expect(await appPointsStaking.balanceOf(alice.address)).to.eq(stakeAmount);
-  //   expect(await propsAppStaking.balanceOf(appPoints.address)).to.eq(stakeAmount);
-  //   expect(await propsUserStaking.balanceOf(alice.address)).to.eq(stakeAmount);
-  // });
-
   it("stake on behalf", async () => {
     const [appPoints, appPointsStaking] = await deployApp();
 
     // Stake
     const stakeAmount = expandTo18Decimals(100);
-    await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
+    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
     await propsToken.connect(alice).approve(propsProtocol.address, stakeAmount);
     await propsProtocol
       .connect(alice)
@@ -495,81 +403,6 @@ describe("PropsProtocol", () => {
     expect(await appPointsStaking.balanceOf(alice.address)).to.eq(bn(0));
     expect(await propsUserStaking.balanceOf(alice.address)).to.eq(bn(0));
   });
-
-  // it("stake on behalf by signature", async () => {
-  //   const [appPoints, appPointsStaking] = await deployApp();
-
-  //   const stakeAmount = expandTo18Decimals(100);
-
-  //   // Sign the stake
-  //   const stakeMessage = {
-  //     signer: alice.address,
-  //     apps: [appPoints.address],
-  //     amounts: [stakeAmount.toString()],
-  //     account: bob.address,
-  //     nonce: (await propsToken.nonces(alice.address)).toString(),
-  //     deadline: (await now()).add(daysToTimestamp(1)).toString(),
-  //   };
-
-  //   const stakeData = {
-  //     domain: {
-  //       chainId: (await ethers.provider.getNetwork()).chainId,
-  //       name: "PropsProtocol",
-  //       verifyingContract: propsProtocol.address,
-  //       version: "1",
-  //     },
-  //     message: stakeMessage,
-  //     primaryType: "StakeOnBehalf" as const,
-  //     types: {
-  //       EIP712Domain: [
-  //         { name: "name", type: "string" },
-  //         { name: "version", type: "string" },
-  //         { name: "chainId", type: "uint256" },
-  //         { name: "verifyingContract", type: "address" },
-  //       ],
-  //       StakeOnBehalf: [
-  //         { name: "signer", type: "address" },
-  //         { name: "apps", type: "address[]" },
-  //         { name: "amounts", type: "uint256[]" },
-  //         { name: "account", type: "address" },
-  //         { name: "nonce", type: "uint256" },
-  //         { name: "deadline", type: "uint256" },
-  //       ],
-  //     },
-  //   };
-
-  //   const stakeSig = ethUtil.fromRpcSig(
-  //     sigUtil.signTypedData_v4(getPrivateKey(alice.address), { data: stakeData })
-  //   );
-
-  //   // Stake
-  //   await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
-  //   await propsToken.connect(alice).approve(propsProtocol.address, stakeAmount);
-  //   await propsProtocol
-  //     // Since this is a stake by signature, we don't necessarily need Alice to send the transaction
-  //     .connect(propsTreasury)
-  //     .stakeOnBehalfBySig(
-  //       stakeMessage.signer,
-  //       stakeMessage.apps,
-  //       stakeMessage.amounts,
-  //       stakeMessage.account,
-  //       stakeMessage.deadline,
-  //       stakeSig.v,
-  //       stakeSig.r,
-  //       stakeSig.s
-  //     );
-
-  //   // Check the sProps balance and staked amounts are all under Bob's ownership
-  //   expect(await sPropsToken.balanceOf(bob.address)).to.eq(stakeAmount);
-  //   expect(await appPointsStaking.balanceOf(bob.address)).to.eq(stakeAmount);
-  //   expect(await propsAppStaking.balanceOf(appPoints.address)).to.eq(stakeAmount);
-  //   expect(await propsUserStaking.balanceOf(bob.address)).to.eq(stakeAmount);
-
-  //   // Check Alice has nothing staked
-  //   expect(await sPropsToken.balanceOf(alice.address)).to.eq(bn(0));
-  //   expect(await appPointsStaking.balanceOf(alice.address)).to.eq(bn(0));
-  //   expect(await propsUserStaking.balanceOf(alice.address)).to.eq(bn(0));
-  // });
 
   it("stake on behalf with permit", async () => {
     const [appPoints, appPointsStaking] = await deployApp();
@@ -616,7 +449,7 @@ describe("PropsProtocol", () => {
     );
 
     // Stake on behalf with permit
-    await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
+    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
     await propsProtocol
       .connect(alice)
       .stakeOnBehalfWithPermit(
@@ -644,131 +477,12 @@ describe("PropsProtocol", () => {
     expect(await propsUserStaking.balanceOf(alice.address)).to.eq(bn(0));
   });
 
-  // it("stake on behalf with permit by signature", async () => {
-  //   const [appPoints, appPointsStaking] = await deployApp();
-
-  //   const stakeAmount = expandTo18Decimals(100);
-
-  //   // Sign the permit
-  //   const permitMessage = {
-  //     owner: alice.address,
-  //     spender: propsProtocol.address,
-  //     value: stakeAmount.toString(),
-  //     nonce: (await propsToken.nonces(alice.address)).toString(),
-  //     deadline: (await now()).add(daysToTimestamp(1)).toString(),
-  //   };
-
-  //   const permitData = {
-  //     domain: {
-  //       chainId: (await ethers.provider.getNetwork()).chainId,
-  //       name: await propsToken.name(),
-  //       verifyingContract: propsToken.address,
-  //       version: "1",
-  //     },
-  //     message: permitMessage,
-  //     primaryType: "Permit" as const,
-  //     types: {
-  //       EIP712Domain: [
-  //         { name: "name", type: "string" },
-  //         { name: "version", type: "string" },
-  //         { name: "chainId", type: "uint256" },
-  //         { name: "verifyingContract", type: "address" },
-  //       ],
-  //       Permit: [
-  //         { name: "owner", type: "address" },
-  //         { name: "spender", type: "address" },
-  //         { name: "value", type: "uint256" },
-  //         { name: "nonce", type: "uint256" },
-  //         { name: "deadline", type: "uint256" },
-  //       ],
-  //     },
-  //   };
-
-  //   const permitSig = ethUtil.fromRpcSig(
-  //     sigUtil.signTypedData_v4(getPrivateKey(alice.address), { data: permitData })
-  //   );
-
-  //   // Sign the stake
-  //   const stakeMessage = {
-  //     signer: alice.address,
-  //     apps: [appPoints.address],
-  //     amounts: [stakeAmount.toString()],
-  //     account: bob.address,
-  //     nonce: (await propsToken.nonces(alice.address)).toString(),
-  //     deadline: (await now()).add(daysToTimestamp(1)).toString(),
-  //   };
-
-  //   const stakeData = {
-  //     domain: {
-  //       chainId: (await ethers.provider.getNetwork()).chainId,
-  //       name: "PropsProtocol",
-  //       verifyingContract: propsProtocol.address,
-  //       version: "1",
-  //     },
-  //     message: stakeMessage,
-  //     primaryType: "StakeOnBehalf" as const,
-  //     types: {
-  //       EIP712Domain: [
-  //         { name: "name", type: "string" },
-  //         { name: "version", type: "string" },
-  //         { name: "chainId", type: "uint256" },
-  //         { name: "verifyingContract", type: "address" },
-  //       ],
-  //       StakeOnBehalf: [
-  //         { name: "signer", type: "address" },
-  //         { name: "apps", type: "address[]" },
-  //         { name: "amounts", type: "uint256[]" },
-  //         { name: "account", type: "address" },
-  //         { name: "nonce", type: "uint256" },
-  //         { name: "deadline", type: "uint256" },
-  //       ],
-  //     },
-  //   };
-
-  //   const stakeSig = ethUtil.fromRpcSig(
-  //     sigUtil.signTypedData_v4(getPrivateKey(alice.address), { data: stakeData })
-  //   );
-
-  //   // Stake on behalf with permit
-  //   await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
-  //   await propsProtocol
-  //     .connect(alice)
-  //     .stakeOnBehalfWithPermitBySig(
-  //       stakeMessage.signer,
-  //       stakeMessage.apps,
-  //       stakeMessage.amounts,
-  //       stakeMessage.account,
-  //       stakeMessage.deadline,
-  //       stakeSig.v,
-  //       stakeSig.r,
-  //       stakeSig.s,
-  //       permitMessage.owner,
-  //       permitMessage.spender,
-  //       permitMessage.value,
-  //       permitMessage.deadline,
-  //       permitSig.v,
-  //       permitSig.r,
-  //       permitSig.s
-  //     );
-
-  //   // Check the sProps balance and staked amounts are all under Bob's ownership
-  //   expect(await sPropsToken.balanceOf(bob.address)).to.eq(stakeAmount);
-  //   expect(await appPointsStaking.balanceOf(bob.address)).to.eq(stakeAmount);
-  //   expect(await propsAppStaking.balanceOf(appPoints.address)).to.eq(stakeAmount);
-  //   expect(await propsUserStaking.balanceOf(bob.address)).to.eq(stakeAmount);
-
-  //   // Check that Alice has nothing staked
-  //   expect(await sPropsToken.balanceOf(alice.address)).to.eq(bn(0));
-  //   expect(await appPointsStaking.balanceOf(alice.address)).to.eq(bn(0));
-  //   expect(await propsUserStaking.balanceOf(alice.address)).to.eq(bn(0));
-  // });
-
   it("basic rewards staking adjustment to a single app", async () => {
     const [appPoints, appPointsStaking] = await deployApp();
 
     // Stake
     const principalStakeAmount = expandTo18Decimals(100);
-    await propsToken.connect(propsTreasury).transfer(alice.address, principalStakeAmount);
+    await propsToken.connect(deployer).transfer(alice.address, principalStakeAmount);
     await propsToken.connect(alice).approve(propsProtocol.address, principalStakeAmount);
     await propsProtocol.connect(alice).stake([appPoints.address], [principalStakeAmount]);
 
@@ -832,7 +546,7 @@ describe("PropsProtocol", () => {
       expandTo18Decimals(50),
       expandTo18Decimals(70),
     ];
-    await propsToken.connect(propsTreasury).transfer(alice.address, expandTo18Decimals(120));
+    await propsToken.connect(deployer).transfer(alice.address, expandTo18Decimals(120));
     await propsToken.connect(alice).approve(propsProtocol.address, expandTo18Decimals(120));
     await propsProtocol
       .connect(alice)
@@ -917,7 +631,7 @@ describe("PropsProtocol", () => {
 
     // Stake
     const stakeAmount = expandTo18Decimals(100);
-    await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
+    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
     await propsToken.connect(alice).approve(propsProtocol.address, stakeAmount);
     await propsProtocol.connect(alice).stake([appPoints.address], [stakeAmount]);
 
@@ -939,7 +653,7 @@ describe("PropsProtocol", () => {
 
     // Stake
     const stakeAmount = expandTo18Decimals(100);
-    await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
+    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
     await propsToken.connect(alice).approve(propsProtocol.address, stakeAmount);
     await propsProtocol.connect(alice).stake([appPoints.address], [stakeAmount]);
 
@@ -969,7 +683,7 @@ describe("PropsProtocol", () => {
 
     // Stake
     const stakeAmount = expandTo18Decimals(100);
-    await propsToken.connect(propsTreasury).transfer(alice.address, expandTo18Decimals(120));
+    await propsToken.connect(deployer).transfer(alice.address, expandTo18Decimals(120));
     await propsToken.connect(alice).approve(propsProtocol.address, expandTo18Decimals(120));
     await propsProtocol.connect(alice).stake([appPoints.address], [stakeAmount]);
 
@@ -992,7 +706,7 @@ describe("PropsProtocol", () => {
 
     // Stake
     const stakeAmount = expandTo18Decimals(100);
-    await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
+    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
     await propsToken.connect(alice).approve(propsProtocol.address, stakeAmount);
     await propsProtocol.connect(alice).stake([appPoints.address], [stakeAmount]);
 
@@ -1021,7 +735,7 @@ describe("PropsProtocol", () => {
 
     // Stake
     const [stakeAmount1, stakeAmount2] = [expandTo18Decimals(50), expandTo18Decimals(70)];
-    await propsToken.connect(propsTreasury).transfer(alice.address, expandTo18Decimals(120));
+    await propsToken.connect(deployer).transfer(alice.address, expandTo18Decimals(120));
     await propsToken.connect(alice).approve(propsProtocol.address, expandTo18Decimals(120));
     await propsProtocol
       .connect(alice)
@@ -1078,7 +792,7 @@ describe("PropsProtocol", () => {
 
     // Stake
     const stakeAmount = expandTo18Decimals(100);
-    await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
+    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
     await propsToken.connect(alice).approve(propsProtocol.address, stakeAmount);
     await propsProtocol.connect(alice).stake([appPoints.address], [stakeAmount]);
 
@@ -1115,7 +829,7 @@ describe("PropsProtocol", () => {
 
     // Stake
     const [stakeAmount1, stakeAmount2] = [expandTo18Decimals(50), expandTo18Decimals(70)];
-    await propsToken.connect(propsTreasury).transfer(alice.address, expandTo18Decimals(120));
+    await propsToken.connect(deployer).transfer(alice.address, expandTo18Decimals(120));
     await propsToken.connect(alice).approve(propsProtocol.address, expandTo18Decimals(120));
     await propsProtocol
       .connect(alice)
@@ -1163,7 +877,7 @@ describe("PropsProtocol", () => {
 
     // Stake
     const [stakeAmount1, stakeAmount2] = [expandTo18Decimals(50), expandTo18Decimals(70)];
-    await propsToken.connect(propsTreasury).transfer(alice.address, expandTo18Decimals(120));
+    await propsToken.connect(deployer).transfer(alice.address, expandTo18Decimals(120));
     await propsToken.connect(alice).approve(propsProtocol.address, expandTo18Decimals(120));
     await propsProtocol
       .connect(alice)
@@ -1212,7 +926,7 @@ describe("PropsProtocol", () => {
 
     // Stake
     const [stakeAmount1, stakeAmount2] = [expandTo18Decimals(50), expandTo18Decimals(70)];
-    await propsToken.connect(propsTreasury).transfer(alice.address, expandTo18Decimals(120));
+    await propsToken.connect(deployer).transfer(alice.address, expandTo18Decimals(120));
     await propsToken.connect(alice).approve(propsProtocol.address, expandTo18Decimals(120));
     await propsProtocol
       .connect(alice)
@@ -1265,29 +979,29 @@ describe("PropsProtocol", () => {
   });
 
   it("proper permissioning", async () => {
-    // Only the owner can set the rewards escrow cooldown
+    // Only the controller can set the rewards escrow cooldown
     await expect(
       propsProtocol.connect(alice).changeRewardsEscrowCooldown(bn(10))
     ).to.be.revertedWith("Unauthorized");
-    expect(await propsProtocol.connect(propsTreasury).changeRewardsEscrowCooldown(bn(10)));
+    expect(await propsProtocol.connect(controller).changeRewardsEscrowCooldown(bn(10)));
 
     const mockAddress = bob.address;
 
-    // Only the owner can whitelist apps
+    // Only the controller can whitelist apps
     await expect(propsProtocol.connect(alice).whitelistApp(mockAddress)).to.be.revertedWith(
       "Unauthorized"
     );
-    expect(await propsProtocol.connect(propsTreasury).whitelistApp(mockAddress));
+    expect(await propsProtocol.connect(controller).whitelistApp(mockAddress));
 
-    // Only the owner can blacklist apps
+    // Only the controller can blacklist apps
     await expect(propsProtocol.connect(alice).blacklistApp(mockAddress)).to.be.revertedWith(
       "Unauthorized"
     );
-    expect(await propsProtocol.connect(propsTreasury).blacklistApp(mockAddress));
+    expect(await propsProtocol.connect(controller).blacklistApp(mockAddress));
 
     // Only the guardian can pause the controller
     await expect(propsProtocol.connect(alice).pause()).to.be.revertedWith("Unauthorized");
-    expect(await propsProtocol.connect(propsTreasury).pause());
+    expect(await propsProtocol.connect(guardian).pause());
   });
 
   it("no user actions are available when paused", async () => {
@@ -1295,11 +1009,11 @@ describe("PropsProtocol", () => {
 
     // Prepare staking
     const stakeAmount = expandTo18Decimals(100);
-    await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
+    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
     await propsToken.connect(alice).approve(propsProtocol.address, stakeAmount);
 
     // Pause the contract
-    await propsProtocol.connect(propsTreasury).pause();
+    await propsProtocol.connect(guardian).pause();
 
     // No action is available when paused
     await expect(
@@ -1310,7 +1024,7 @@ describe("PropsProtocol", () => {
     );
 
     // Unpause the contract
-    await propsProtocol.connect(propsTreasury).unpause();
+    await propsProtocol.connect(guardian).unpause();
 
     // Actions are once again available
     await propsProtocol.connect(alice).stake([appPoints.address], [stakeAmount]);
@@ -1361,7 +1075,7 @@ describe("PropsProtocol", () => {
     );
 
     // Stake on behalf with permit
-    await propsToken.connect(propsTreasury).transfer(alice.address, stakeAmount);
+    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
     await propsToken.connect(alice).approve(propsProtocol.address, stakeAmount);
     await propsProtocol
       // Since this is a meta-transaction, anyone is able to relay it

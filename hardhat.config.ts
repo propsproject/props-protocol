@@ -12,14 +12,12 @@ import "solidity-coverage";
 
 import accounts from "./test-accounts";
 
-const MNEMONIC = "hip mention twenty random stairs nasty pistol essay giraffe season shuffle ring";
-
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
   solidity: {
     compilers: [
       {
-        version: "0.6.8",
+        version: "0.7.3",
         settings: {
           optimizer: {
             enabled: true,
@@ -31,28 +29,22 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: { accounts },
-    ethereumLocal: {
+    local: {
       url: "http://localhost:8545",
       accounts: {
-        mnemonic: MNEMONIC,
+        mnemonic: process.env.MNEMONIC,
       },
     },
-    ethereumGoerli: {
+    goerli: {
       url: `https://goerli.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
       accounts: {
-        mnemonic: MNEMONIC,
+        mnemonic: process.env.MNEMONIC,
       },
     },
-    arbitrumLocal: {
-      url: "http://localhost:8547",
+    mumbai: {
+      url: "https://rpc-mumbai.matic.today",
       accounts: {
-        mnemonic: MNEMONIC,
-      },
-    },
-    arbitrumKovan: {
-      url: "https://kovan3.arbitrum.io/rpc",
-      accounts: {
-        mnemonic: MNEMONIC,
+        mnemonic: process.env.MNEMONIC,
       },
     },
   },

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.6.8;
+pragma solidity 0.7.3;
 
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 
@@ -50,7 +50,7 @@ contract Timelock {
 
     mapping(bytes32 => bool) public queuedTransactions;
 
-    constructor(address admin_, uint256 delay_) public {
+    constructor(address admin_, uint256 delay_) {
         require(delay_ >= MINIMUM_DELAY, "Delay must exceed minimum delay");
         require(delay_ <= MAXIMUM_DELAY, "Delay must not exceed maximum delay");
 

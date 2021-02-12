@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.6.8;
+pragma solidity 0.7.3;
 
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
@@ -233,7 +233,7 @@ contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken {
     /**
      * @dev sProps are not transferrable, so here we simply revert.
      */
-    function transfer(address, uint256) external override returns (bool) {
+    function transfer(address, uint256) external pure override returns (bool) {
         revert("sProps are not transferrable");
     }
 
@@ -244,7 +244,7 @@ contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken {
         address,
         address,
         uint256
-    ) external override returns (bool) {
+    ) external pure override returns (bool) {
         revert("sProps are not transferrable");
     }
 

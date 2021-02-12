@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.6.8;
+pragma solidity 0.7.3;
 
 import "@openzeppelin/contracts-upgradeable/math/MathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
@@ -50,9 +50,8 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
     // The address responsible for distributing the rewards
     address public rewardsDistribution;
 
-    // Tokens involved in staking
+    // Token to be used for rewards
     address public rewardsToken;
-    address public stakingToken;
 
     // The finish time of the current rewards period
     uint256 public periodFinish;
@@ -104,14 +103,12 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
      * @param _controller The staking controller
      * @param _rewardsDistribution The designated rewards distribution address
      * @param _rewardsToken The token rewards are denominated in
-     * @param _stakingToken The token stakes are denominated in
      * @param _dailyRewardEmission The percentage of the remaining rewards pool to get distributed each day
      */
     function initialize(
         address _controller,
         address _rewardsDistribution,
         address _rewardsToken,
-        address _stakingToken,
         uint256 _dailyRewardEmission
     ) public initializer {
         ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
@@ -119,7 +116,6 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
         controller = _controller;
         rewardsDistribution = _rewardsDistribution;
         rewardsToken = _rewardsToken;
-        stakingToken = _stakingToken;
         rewardsDuration = uint256(1e18).div(_dailyRewardEmission).mul(1 days);
     }
 

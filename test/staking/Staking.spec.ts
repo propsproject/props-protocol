@@ -18,7 +18,7 @@ chai.use(solidity);
 const { expect } = chai;
 
 describe("Staking", () => {
-  let stakingOwner: SignerWithAddress;
+  let controller: SignerWithAddress;
   let rewardsDistribution: SignerWithAddress;
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
@@ -41,27 +41,32 @@ describe("Staking", () => {
   const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
 
   beforeEach(async () => {
-    [stakingOwner, rewardsDistribution, alice, bob, carol] = await ethers.getSigners();
+    [controller, rewardsDistribution, alice, bob, carol] = await ethers.getSigners();
 
-    stakingToken = await deployContractUpgradeable("TestERC20", stakingOwner, [
+    stakingToken = await deployContractUpgradeable(
+      "TestERC20",
+      controller,
       STAKING_TOKEN_NAME,
       STAKING_TOKEN_SYMBOL,
-      STAKING_TOKEN_AMOUNT,
-    ]);
+      STAKING_TOKEN_AMOUNT
+    );
 
-    rewardsToken = await deployContractUpgradeable("TestERC20", rewardsDistribution, [
+    rewardsToken = await deployContractUpgradeable(
+      "TestERC20",
+      rewardsDistribution,
       REWARDS_TOKEN_NAME,
       REWARDS_TOKEN_SYMBOL,
-      REWARDS_TOKEN_AMOUNT,
-    ]);
+      REWARDS_TOKEN_AMOUNT
+    );
 
-    staking = await deployContractUpgradeable("Staking", stakingOwner, [
-      stakingOwner.address,
+    staking = await deployContractUpgradeable(
+      "Staking",
+      controller,
+      controller.address,
       rewardsDistribution.address,
       rewardsToken.address,
-      stakingToken.address,
-      DAILY_REWARDS_EMISSION,
-    ]);
+      DAILY_REWARDS_EMISSION
+    );
   });
 
   it("distributing new rewards correctly sets different parameters", async () => {
@@ -102,7 +107,7 @@ describe("Staking", () => {
     const firstPeriodFinish = await staking.periodFinish();
 
     // First stake
-    await staking.connect(stakingOwner).stake(alice.address, stakeAmount);
+    await staking.connect(controller).stake(alice.address, stakeAmount);
 
     // Check the total staked amount
     expect(await staking.totalSupply()).to.eq(stakeAmount);
@@ -116,7 +121,7 @@ describe("Staking", () => {
 
     // Second stake
     const secondStakeTime = await getTxTimestamp(
-      await staking.connect(stakingOwner).stake(bob.address, stakeAmount)
+      await staking.connect(controller).stake(bob.address, stakeAmount)
     );
 
     // Check the total staked amount
@@ -134,7 +139,7 @@ describe("Staking", () => {
     await mineBlock((await staking.lastRewardRateUpdate()).add(daysToTimestamp(1).div(2)));
 
     // Third stake
-    await staking.connect(stakingOwner).stake(carol.address, stakeAmount);
+    await staking.connect(controller).stake(carol.address, stakeAmount);
 
     // Check the total staked amount
     expect(await staking.totalSupply()).to.eq(stakeAmount.mul(3));
@@ -148,7 +153,7 @@ describe("Staking", () => {
 
     // Fourth stake
     const fourthStakeTime = await getTxTimestamp(
-      await staking.connect(stakingOwner).stake(carol.address, stakeAmount)
+      await staking.connect(controller).stake(carol.address, stakeAmount)
     );
 
     expect(await staking.totalSupply()).to.eq(stakeAmount.mul(4));
@@ -166,22 +171,22 @@ describe("Staking", () => {
     await expect(staking.connect(alice).stake(alice.address, stakeAmount)).to.be.revertedWith(
       "Unauthorized"
     );
-    await staking.connect(stakingOwner).stake(alice.address, stakeAmount);
+    await staking.connect(controller).stake(alice.address, stakeAmount);
 
     // Only the owner can withdraw
     await expect(staking.connect(alice).withdraw(alice.address, stakeAmount)).to.be.revertedWith(
       "Unauthorized"
     );
-    await staking.connect(stakingOwner).withdraw(alice.address, stakeAmount);
+    await staking.connect(controller).withdraw(alice.address, stakeAmount);
 
     // Only the owner can claim rewards
     await expect(staking.connect(alice).claimReward(alice.address)).to.be.revertedWith(
       "Unauthorized"
     );
-    await staking.connect(stakingOwner).claimReward(alice.address);
+    await staking.connect(controller).claimReward(alice.address);
 
     // Only the rewards distribution can distribute new rewards (not even the owner can do it)
-    await expect(staking.connect(stakingOwner).notifyRewardAmount(bn(100))).to.be.revertedWith(
+    await expect(staking.connect(controller).notifyRewardAmount(bn(100))).to.be.revertedWith(
       "Unauthorized"
     );
     await rewardsToken.connect(rewardsDistribution).transfer(staking.address, stakeAmount);
@@ -234,7 +239,7 @@ describe("Staking", () => {
     await staking.connect(rewardsDistribution).notifyRewardAmount(reward);
 
     // First stake
-    await staking.connect(stakingOwner).stake(alice.address, stakeAmount);
+    await staking.connect(controller).stake(alice.address, stakeAmount);
 
     // Fast-forward until the end of the rewards period
     await mineBlock((await staking.periodFinish()).add(1));
@@ -258,14 +263,14 @@ describe("Staking", () => {
     const firstRewardRate = await staking.rewardRate();
 
     // First stake
-    await staking.connect(stakingOwner).stake(alice.address, stakeAmount);
+    await staking.connect(controller).stake(alice.address, stakeAmount);
 
     // Fast-forward until ~middle of the rewards period
     await mineBlock(distributionStartTime.add(rewardsDuration.div(2)));
 
     // Second stake (will trigger a reward rate update)
     const secondStakeTime = await getTxTimestamp(
-      await staking.connect(stakingOwner).stake(bob.address, stakeAmount)
+      await staking.connect(controller).stake(bob.address, stakeAmount)
     );
 
     const secondRewardRate = await staking.rewardRate();
@@ -306,14 +311,14 @@ describe("Staking", () => {
     const firstRewardRate = await staking.rewardRate();
 
     // First stake
-    await staking.connect(stakingOwner).stake(alice.address, stakeAmount.mul(2));
+    await staking.connect(controller).stake(alice.address, stakeAmount.mul(2));
 
     // Fast-forward until ~middle of the rewards period
     await mineBlock(distributionStartTime.add(rewardsDuration.div(2)));
 
     // Second stake (will trigger a reward rate update and extend the rewards period)
     const secondStakeTime = await getTxTimestamp(
-      await staking.connect(stakingOwner).stake(bob.address, stakeAmount)
+      await staking.connect(controller).stake(bob.address, stakeAmount)
     );
 
     const secondRewardRate = await staking.rewardRate();
@@ -323,12 +328,12 @@ describe("Staking", () => {
 
     // Fully unstake with Alice
     const unstakeTime = await getTxTimestamp(
-      await staking.connect(stakingOwner).withdraw(alice.address, stakeAmount.mul(2))
+      await staking.connect(controller).withdraw(alice.address, stakeAmount.mul(2))
     );
 
     // Third stake
     const thirdStakeTime = await getTxTimestamp(
-      await staking.connect(stakingOwner).stake(carol.address, stakeAmount)
+      await staking.connect(controller).stake(carol.address, stakeAmount)
     );
 
     const thirdRewardRate = await staking.rewardRate();
@@ -379,7 +384,7 @@ describe("Staking", () => {
     const firstRewardRate = await staking.rewardRate();
 
     // First stake
-    await staking.connect(stakingOwner).stake(alice.address, stakeAmount);
+    await staking.connect(controller).stake(alice.address, stakeAmount);
 
     // Fast-forward until ~middle of the rewards period
     await mineBlock(distributionStartTime.add(rewardsDuration.div(2)));

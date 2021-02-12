@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.6.8;
+pragma solidity 0.7.3;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
@@ -16,6 +16,7 @@ import "../interfaces/ISPropsToken.sol";
  * @dev    Changes to the original Compound contract:
  *         - the `votingDelay` and `votingPeriod` are passed in the
  *           constructor instead of being hardcoded in the contract
+ *         - minor changes for Solidity 0.7
  */
 contract GovernorAlpha {
     using SafeMathUpgradeable for uint256;
@@ -142,7 +143,7 @@ contract GovernorAlpha {
         address sPropsToken_,
         uint256 votingDelay_,
         uint256 votingPeriod_
-    ) public {
+    ) {
         timelock = TimelockInterface(timelock_);
         sPropsToken = sPropsToken_;
         votingDelay = votingDelay_;
@@ -187,24 +188,21 @@ contract GovernorAlpha {
         uint256 endBlock = startBlock.add(votingPeriod);
 
         proposalCount++;
-        Proposal memory newProposal =
-            Proposal({
-                id: proposalCount,
-                proposer: msg.sender,
-                eta: 0,
-                targets: targets,
-                values: values,
-                signatures: signatures,
-                calldatas: calldatas,
-                startBlock: startBlock,
-                endBlock: endBlock,
-                forVotes: 0,
-                againstVotes: 0,
-                canceled: false,
-                executed: false
-            });
+        Proposal storage newProposal = proposals[proposalCount];
+        newProposal.id = proposalCount;
+        newProposal.proposer = msg.sender;
+        newProposal.eta = 0;
+        newProposal.targets = targets;
+        newProposal.values = values;
+        newProposal.signatures = signatures;
+        newProposal.calldatas = calldatas;
+        newProposal.startBlock = startBlock;
+        newProposal.endBlock = endBlock;
+        newProposal.forVotes = 0;
+        newProposal.againstVotes = 0;
+        newProposal.canceled = false;
+        newProposal.executed = false;
 
-        proposals[newProposal.id] = newProposal;
         latestProposalIds[newProposal.proposer] = newProposal.id;
 
         emit ProposalCreated(

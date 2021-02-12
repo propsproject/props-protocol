@@ -1,8 +1,7 @@
 {
   "name": "props-protocol",
   "version": "0.0.2",
-  "description": "",
-  "main": "index.js",
+  "description": "Props Protocol v2",
   "scripts": {
     "build": "npm run clean && npm run compile",
     "clean": "hardhat clean",
