@@ -89,7 +89,6 @@ async function main() {
         propsProtocol.address,
         rPropsToken.address,
         rPropsToken.address,
-        propsProtocol.address,
         DAILY_REWARDS_EMISSION
       );
       addresses["propsAppStaking"] = propsAppStaking.address;
@@ -101,7 +100,6 @@ async function main() {
         propsProtocol.address,
         rPropsToken.address,
         rPropsToken.address,
-        propsProtocol.address,
         DAILY_REWARDS_EMISSION
       );
       addresses["propsUserStaking"] = propsUserStaking.address;

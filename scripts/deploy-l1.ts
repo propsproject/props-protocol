@@ -64,7 +64,7 @@ async function main() {
       console.log("Connecting `AppProxyFactory` to `AppProxyFactoryBridge`");
       await appProxyFactory
         .connect(controller)
-        .setAppProxyFactoryBridge(appProxyFactoryBridge.address);
+        .changeAppProxyFactoryBridge(appProxyFactoryBridge.address);
 
       fs.writeFileSync(`${l1Network}.json`, JSON.stringify(addresses, null, 2));
     } else {
