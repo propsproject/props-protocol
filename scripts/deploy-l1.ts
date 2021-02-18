@@ -65,7 +65,7 @@ async function main() {
       addresses["propsTokenBridge"] = propsTokenBridge.address;
 
       console.log("Connecting `PropsToken` to `PropsTokenBridge`");
-      await propsToken.connect(deployer).setMinter(propsTokenBridge.address);
+      await propsToken.connect(deployer).addMinter(propsTokenBridge.address);
 
       console.log("Deploying `AppPoints` logic");
       appPointsLogic = await deployContract("AppPointsL1", deployer);
@@ -126,9 +126,9 @@ async function main() {
       propsTokenBridge = (await ethers.getContractFactory("PropsTokenBridgeL1", deployer)).attach(
         l1Addresses.propsTokenBridge
       ) as PropsTokenBridgeL1;
-      await propsToken
-        .connect(deployer)
-        .approve(propsTokenBridge.address, expandTo18Decimals(1000));
+      await propsToken.connect(deployer).approve(propsTokenBridge.address, expandTo18Decimals(100));
+      // TODO: Investigate flakiness
+      await new Promise((resolve) => setTimeout(resolve, 10000));
       await propsTokenBridge.connect(deployer).deposit(deployer.address, expandTo18Decimals(100));
 
       console.log("Deploying test app");

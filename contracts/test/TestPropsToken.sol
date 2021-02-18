@@ -8,8 +8,8 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 import "../interfaces/IPropsToken.sol";
 
+// TODO: Have different L1 and L2 token versions
 contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IPropsToken {
-    address private _minter;
     uint256 private _maxTotalSupply;
 
     // solhint-disable-next-line var-name-mixedcase
@@ -17,13 +17,15 @@ contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, 
     // solhint-disable-next-line var-name-mixedcase
     bytes32 public DOMAIN_SEPARATOR;
 
+    mapping(address => bool) public minters;
+
     mapping(address => uint256) public nonces;
 
     function initialize(uint256 _amount) public initializer {
         OwnableUpgradeable.__Ownable_init();
         ERC20Upgradeable.__ERC20_init("Test Props", "TPROPS");
 
-        _minter = msg.sender;
+        minters[msg.sender] = true;
         _maxTotalSupply = 1e9 * (10**uint256(decimals()));
 
         PERMIT_TYPEHASH = keccak256(
@@ -55,17 +57,21 @@ contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, 
         return _maxTotalSupply;
     }
 
-    function setMinter(address _newMinter) external onlyOwner {
-        _minter = _newMinter;
+    function addMinter(address _minter) external onlyOwner {
+        minters[_minter] = true;
+    }
+
+    function removeMinter(address _minter) external onlyOwner {
+        minters[_minter] = false;
     }
 
     function mint(address _account, uint256 _amount) external override {
-        require(msg.sender == _minter, "Only the minter can mint new tokens");
+        require(minters[msg.sender], "Only a minter can mint new tokens");
         _mint(_account, _amount);
     }
 
     function burn(address _account, uint256 _amount) external override {
-        require(msg.sender == _minter, "Only the minter can burn existing tokens");
+        require(minters[msg.sender], "Only a minter can burn existing tokens");
         _burn(_account, _amount);
     }
 

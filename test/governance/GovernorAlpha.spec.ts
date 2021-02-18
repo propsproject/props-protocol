@@ -152,7 +152,7 @@ describe("GovernorAlpha", () => {
     );
 
     // Set needed parameters
-    await propsToken.connect(deployer).setMinter(rPropsToken.address);
+    await propsToken.connect(deployer).addMinter(rPropsToken.address);
     await appProxyFactory
       .connect(controller)
       .setAppProxyFactoryBridge(appProxyFactoryBridge.address);

@@ -20,6 +20,7 @@ import "../interfaces/IStaking.sol";
  *         then swappable for regular Props tokens. This acts as a workaround
  *         for having to mint all left Props tokens beforehand.
  */
+// TODO: Have different L1 and L2 token versions
 contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
     using SafeMathUpgradeable for uint256;
 

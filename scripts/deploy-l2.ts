@@ -13,7 +13,7 @@ import type {
   RPropsToken,
   SPropsToken,
 } from "../typechain";
-import { bn, deployContract, deployContractUpgradeable, expandTo18Decimals } from "../utils";
+import { bn, deployContract, deployContractUpgradeable } from "../utils";
 
 // Constants
 const PROPS_TOKEN_AMOUNT = bn(0);
@@ -74,7 +74,7 @@ async function main() {
       addresses["propsTokenBridge"] = propsTokenBridge.address;
 
       console.log("Connecting `PropsToken` to `PropsTokenBridge`");
-      await propsToken.connect(deployer).setMinter(propsTokenBridge.address);
+      await propsToken.connect(deployer).addMinter(propsTokenBridge.address);
 
       console.log("Deploying `PropsProtocol`");
       propsProtocol = await deployContractUpgradeable(
@@ -157,7 +157,7 @@ async function main() {
         .setAppProxyFactoryBridge(appProxyFactoryBridge.address);
 
       console.log("Setting required parameters");
-      await propsToken.connect(deployer).setMinter(rPropsToken.address);
+      await propsToken.connect(deployer).addMinter(rPropsToken.address);
       await propsProtocol.connect(controller).setAppProxyFactory(appProxyFactory.address);
       await propsProtocol.connect(controller).setRPropsToken(rPropsToken.address);
       await propsProtocol.connect(controller).setSPropsToken(sPropsToken.address);
@@ -186,14 +186,6 @@ async function main() {
       await appProxyFactoryBridge
         .connect(deployer)
         .setFxRootTunnel(l1Addresses.appProxyFactoryBridge);
-    } else if (process.env.TEST) {
-      console.log("Checking test app");
-      appProxyFactory = (await ethers.getContractFactory("AppProxyFactoryL2", deployer)).attach(
-        l2Addresses.appProxyFactory
-      ) as AppProxyFactoryL2;
-      console.log(
-        await appProxyFactory.l1ToL2AppPoints("0x96433c19383eee7f53552f155c0d274fcbd6967f")
-      );
     }
   }
 }

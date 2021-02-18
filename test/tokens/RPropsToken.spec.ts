@@ -62,7 +62,7 @@ describe("RPropsToken", () => {
     );
 
     // Set needed parameters
-    propsToken.connect(deployer).setMinter(rPropsToken.address);
+    propsToken.connect(deployer).addMinter(rPropsToken.address);
   });
 
   it("distribute rewards to the app and user Props staking contracts", async () => {
