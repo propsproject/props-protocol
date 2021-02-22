@@ -7,9 +7,8 @@ import type {
   AppProxyFactoryL2,
   AppProxyFactoryBridgeL2,
   Staking,
-  TestPropsToken,
+  TestPropsTokenL2,
   PropsProtocol,
-  PropsTokenBridgeL2,
   RPropsToken,
   SPropsToken,
 } from "../typechain";
@@ -21,6 +20,9 @@ const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
 // Taken from https://github.com/jdkanani/fx-portal
 // TODO: Support mainnet
 const FX_CHILD_ADDRESS = "0xCf73231F28B7331BBe3124B907840A94851f9f11";
+// Taken from https://github.com/maticnetwork/static/blob/master/network/testnet/mumbai/index.json
+// TODO: Support mainnet
+const CHILD_CHAIN_MANAGER_PROXY_ADDRESS = "0xb5505a6d998549090530911180f38aC5130101c6";
 
 // Accounts
 let deployer: SignerWithAddress;
@@ -30,8 +32,7 @@ let guardian: SignerWithAddress;
 let misc: SignerWithAddress;
 
 // Contracts
-let propsToken: TestPropsToken;
-let propsTokenBridge: PropsTokenBridgeL2;
+let propsToken: TestPropsTokenL2;
 let propsProtocol: PropsProtocol;
 let rPropsToken: RPropsToken;
 let sPropsToken: SPropsToken;
@@ -61,20 +62,13 @@ async function main() {
       console.log("Starting deployment...");
 
       console.log("Deploying `PropsToken`");
-      propsToken = await deployContractUpgradeable("TestPropsToken", deployer, PROPS_TOKEN_AMOUNT);
-      addresses["propsToken"] = propsToken.address;
-
-      console.log("Deploying `PropsTokenBridge`");
-      propsTokenBridge = await deployContract(
-        "PropsTokenBridgeL2",
+      propsToken = await deployContractUpgradeable(
+        "TestPropsTokenL2",
         deployer,
-        FX_CHILD_ADDRESS,
-        propsToken.address
+        PROPS_TOKEN_AMOUNT,
+        CHILD_CHAIN_MANAGER_PROXY_ADDRESS
       );
-      addresses["propsTokenBridge"] = propsTokenBridge.address;
-
-      console.log("Connecting `PropsToken` to `PropsTokenBridge`");
-      await propsToken.connect(deployer).addMinter(propsTokenBridge.address);
+      addresses["propsToken"] = propsToken.address;
 
       console.log("Deploying `PropsProtocol`");
       propsProtocol = await deployContractUpgradeable(
@@ -157,7 +151,7 @@ async function main() {
         .setAppProxyFactoryBridge(appProxyFactoryBridge.address);
 
       console.log("Setting required parameters");
-      await propsToken.connect(deployer).addMinter(rPropsToken.address);
+      await propsToken.connect(deployer).setMinter(rPropsToken.address);
       await propsProtocol.connect(controller).setAppProxyFactory(appProxyFactory.address);
       await propsProtocol.connect(controller).setRPropsToken(rPropsToken.address);
       await propsProtocol.connect(controller).setSPropsToken(sPropsToken.address);
@@ -173,12 +167,6 @@ async function main() {
     const l2Addresses = JSON.parse(fs.readFileSync(`${l2Network}.json`).toString());
 
     if (process.env.CONNECT) {
-      console.log("Connecting `PropsTokenBridge` to L1");
-      propsTokenBridge = (await ethers.getContractFactory("PropsTokenBridgeL2", deployer)).attach(
-        l2Addresses.propsTokenBridge
-      ) as PropsTokenBridgeL2;
-      await propsTokenBridge.connect(deployer).setFxRootTunnel(l1Addresses.propsTokenBridge);
-
       console.log("Connecting `AppProxyFactoryBridge` to L1");
       appProxyFactoryBridge = (
         await ethers.getContractFactory("AppProxyFactoryBridgeL2", deployer)

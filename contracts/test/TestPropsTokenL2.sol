@@ -3,30 +3,33 @@
 pragma solidity 0.7.3;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 import "../interfaces/IPropsToken.sol";
 
-// TODO: Have different L1 and L2 token versions
-contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IPropsToken {
-    uint256 private _maxTotalSupply;
+contract TestPropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IPropsToken {
+    using SafeMathUpgradeable for uint256;
+
+    address private _minter;
+
+    address public childChainManager;
+    uint256 public override maxTotalSupply;
 
     // solhint-disable-next-line var-name-mixedcase
     bytes32 public PERMIT_TYPEHASH;
     // solhint-disable-next-line var-name-mixedcase
     bytes32 public DOMAIN_SEPARATOR;
 
-    mapping(address => bool) public minters;
-
     mapping(address => uint256) public nonces;
 
-    function initialize(uint256 _amount) public initializer {
+    function initialize(uint256 _maxTotalSupply, address _childChainManager) public initializer {
         OwnableUpgradeable.__Ownable_init();
         ERC20Upgradeable.__ERC20_init("Test Props", "TPROPS");
 
-        minters[msg.sender] = true;
-        _maxTotalSupply = 1e9 * (10**uint256(decimals()));
+        childChainManager = _childChainManager;
+        maxTotalSupply = _maxTotalSupply;
 
         PERMIT_TYPEHASH = keccak256(
             "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
@@ -43,8 +46,6 @@ contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, 
             )
         );
 
-        _mint(msg.sender, _amount);
-
         // 1 million Props reserved for testing (redeemable from the faucet)
         _mint(address(this), 1000000 * 10**18);
     }
@@ -53,26 +54,23 @@ contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, 
         this.transfer(msg.sender, 1000 * 10**18);
     }
 
-    function maxTotalSupply() external view override returns (uint256) {
-        return _maxTotalSupply;
+    function deposit(address _account, bytes calldata _data) external {
+        require(msg.sender == childChainManager, "Unauthorized");
+        _mint(_account, abi.decode(_data, (uint256)));
     }
 
-    function addMinter(address _minter) external onlyOwner {
-        minters[_minter] = true;
+    function withdraw(uint256 amount) external {
+        _burn(msg.sender, amount);
     }
 
-    function removeMinter(address _minter) external onlyOwner {
-        minters[_minter] = false;
+    function setMinter(address _newMinter) external onlyOwner {
+        _minter = _newMinter;
     }
 
     function mint(address _account, uint256 _amount) external override {
-        require(minters[msg.sender], "Only a minter can mint new tokens");
+        require(msg.sender == _minter, "Unauthorized");
+        require(totalSupply().add(_amount) <= maxTotalSupply, "Amount exceeds max total supply");
         _mint(_account, _amount);
-    }
-
-    function burn(address _account, uint256 _amount) external override {
-        require(minters[msg.sender], "Only a minter can burn existing tokens");
-        _burn(_account, _amount);
     }
 
     function permit(
