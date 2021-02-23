@@ -26,7 +26,8 @@ describe("RPropsToken", () => {
   let propsAppStaking: Staking;
   let propsUserStaking: Staking;
 
-  const PROPS_TOKEN_AMOUNT = expandTo18Decimals(100000);
+  const PROPS_TOKEN_AMOUNT = expandTo18Decimals(100000000);
+  const RPROPS_TOKEN_AMOUNT = expandTo18Decimals(10000);
   // Corresponds to 0.0003658 - taken from old Props rewards formula
   // Distributes 12.5% of the remaining rewards pool each year
   const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
@@ -39,6 +40,7 @@ describe("RPropsToken", () => {
     rPropsToken = await deployContractUpgradeable(
       "RPropsToken",
       deployer,
+      RPROPS_TOKEN_AMOUNT,
       controller.address,
       propsToken.address
     );
@@ -90,8 +92,6 @@ describe("RPropsToken", () => {
         )
     ).to.be.revertedWith("Invalid percentages");
 
-    const rPropsToMint = (await propsToken.maxTotalSupply()).sub(await propsToken.totalSupply());
-
     // Distribute the rewards
     await rPropsToken
       .connect(controller)
@@ -101,9 +101,9 @@ describe("RPropsToken", () => {
     const rPropsForUserRewards = await rPropsToken.balanceOf(propsUserStaking.address);
 
     // Check the rewards were indeed deposited in the staking contracts and the rewards periods began
-    expect(rPropsForAppRewards).to.eq(rPropsToMint.mul(70).div(100));
+    expect(rPropsForAppRewards).to.eq(RPROPS_TOKEN_AMOUNT.mul(70).div(100));
     expect(await propsAppStaking.periodFinish()).to.not.eq(bn(0));
-    expect(rPropsForUserRewards).to.eq(rPropsToMint.sub(rPropsForAppRewards));
+    expect(rPropsForUserRewards).to.eq(RPROPS_TOKEN_AMOUNT.sub(rPropsForAppRewards));
     expect(await propsUserStaking.periodFinish()).to.not.eq(bn(0));
   });
 

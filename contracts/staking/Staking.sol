@@ -26,6 +26,8 @@ import "../interfaces/IStaking.sol";
  *         - the rewards get distributed in a perpetual fashion, closely following a
  *           diminishing returns curve (at most once per day, the `rewardRate`
  *           and `periodFinish` variables get updated via the `updateRewardRate` modifier)
+ *         - any outstanding rewards (not yet earned by any staker) can be withdrawn by the
+ *           designated rewards distribution account
  *         - the `rewardsDuration` variable gets calculated from the `dailyRewardsEmission`
  *           parameter on initialization, which specifies the percentage of the remaining
  *           rewards pool that should get distributed each day
@@ -81,6 +83,7 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
     ***************************************/
 
     event RewardAdded(uint256 reward);
+    event RewardWithdrawn(uint256 reward);
     event Staked(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount);
     event RewardPaid(address indexed user, uint256 reward);
@@ -92,6 +95,39 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
     modifier only(address _account) {
         require(msg.sender == _account, "Unauthorized");
         _;
+    }
+
+    /**
+     * @dev Update reward parameters, before executing the corresponding function.
+     */
+    modifier updateReward(address _account) {
+        rewardPerTokenStored = rewardPerToken();
+        lastUpdateTime = lastTimeRewardApplicable();
+        if (_account != address(0)) {
+            rewards[_account] = earned(_account);
+            userRewardPerTokenPaid[_account] = rewardPerTokenStored;
+        }
+        _;
+    }
+
+    /**
+     * @dev Update the reward rate and rewards period finish time, mimicking a perpetual distribution.
+     */
+    modifier updateRewardRate() {
+        _;
+        if (lastRewardRateUpdate == 0) {
+            // First update has no effect
+            lastRewardRateUpdate = block.timestamp;
+        } else if (
+            block.timestamp < periodFinish && block.timestamp.sub(lastRewardRateUpdate) >= 1 days
+        ) {
+            // At most once per day, further updates change the `rewardRate` and `periodFinish` variables
+            uint256 remaining = periodFinish.sub(block.timestamp);
+            uint256 leftover = remaining.mul(rewardRate);
+            rewardRate = leftover.div(rewardsDuration);
+            periodFinish = block.timestamp.add(rewardsDuration);
+            lastRewardRateUpdate = block.timestamp;
+        }
     }
 
     /***************************************
@@ -262,7 +298,7 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
         // very high values of rewardRate in the earned and rewardsPerToken functions;
         // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
         uint256 balance = IERC20Upgradeable(rewardsToken).balanceOf(address(this));
-        require(rewardRate <= balance.div(rewardsDuration), "Provided reward too high");
+        require(rewardRate <= balance.div(rewardsDuration), "Reward too high");
 
         lastUpdateTime = block.timestamp;
         periodFinish = block.timestamp.add(rewardsDuration);
@@ -271,28 +307,35 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
 
     /**
      * @dev Withdraw any outstanding rewards that were not yet distributed to stakers.
-     * @param _delay Delay from the current timestamp for calculating the rewards amount to get withdrawn
+     * @param _amount The amount of outstanding rewards to get withdrawn
      */
-    function withdrawReward(uint256 _delay)
+    function withdrawReward(uint256 _amount)
         external
         override
         only(rewardsDistribution)
         updateReward(address(0))
     {
-        // Enforce a delay of at least 1 day in order to take into account any precision loss
-        // in calculating the earned rewards of stakers
-        if (_delay >= 1 days && block.timestamp.add(_delay) < periodFinish) {
-            // Compute the amount of rewards to get withdrawn
-            uint256 remainingForWithdraw = periodFinish.sub(block.timestamp.add(_delay));
-            uint256 leftoverForWithdraw = remainingForWithdraw.mul(rewardRate);
-            IERC20Upgradeable(rewardsToken).safeTransfer(rewardsDistribution, leftoverForWithdraw);
+        // Compute the amount of rewards that are yet to be distributed (enforce
+        // a delay of 1 day in order to take into account any loss of precision)
+        uint256 leftToDistribute = periodFinish.sub(block.timestamp.add(1 days)).mul(rewardRate);
+        require(_amount <= leftToDistribute, "Amount exceeds outstanding rewards");
 
-            // Update the reward rate to take into account the above withdrawal
-            uint256 remainingForDistribution = _delay;
-            uint256 leftoverForDistribution = remainingForDistribution.mul(rewardRate);
-            rewardRate = leftoverForDistribution.div(rewardsDuration);
-            periodFinish = block.timestamp.add(rewardsDuration);
-        }
+        IERC20Upgradeable(rewardsToken).safeTransfer(rewardsDistribution, _amount);
+
+        uint256 remaining = periodFinish.sub(block.timestamp);
+        uint256 leftover = remaining.mul(rewardRate).sub(_amount);
+        rewardRate = leftover.div(rewardsDuration);
+
+        // Ensure the provided reward amount is not more than the balance in the contract.
+        // This keeps the reward rate in the right range, preventing overflows due to
+        // very high values of rewardRate in the earned and rewardsPerToken functions;
+        // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
+        uint256 balance = IERC20Upgradeable(rewardsToken).balanceOf(address(this));
+        require(rewardRate <= balance.div(rewardsDuration), "Reward too high");
+
+        lastUpdateTime = block.timestamp;
+        periodFinish = block.timestamp.add(rewardsDuration);
+        emit RewardWithdrawn(_amount);
     }
 
     /**
@@ -305,42 +348,5 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
         only(rewardsDistribution)
     {
         rewardsDistribution = _account;
-    }
-
-    /***************************************
-                    MODIFIERS
-    ****************************************/
-
-    /**
-     * @dev Update reward parameters, before executing the corresponding function.
-     */
-    modifier updateReward(address _account) {
-        rewardPerTokenStored = rewardPerToken();
-        lastUpdateTime = lastTimeRewardApplicable();
-        if (_account != address(0)) {
-            rewards[_account] = earned(_account);
-            userRewardPerTokenPaid[_account] = rewardPerTokenStored;
-        }
-        _;
-    }
-
-    /**
-     * @dev Update the reward rate and rewards period finish time, mimicking a perpetual distribution.
-     */
-    modifier updateRewardRate() {
-        _;
-        if (lastRewardRateUpdate == 0) {
-            // First update has no effect
-            lastRewardRateUpdate = block.timestamp;
-        } else if (
-            block.timestamp < periodFinish && block.timestamp.sub(lastRewardRateUpdate) >= 1 days
-        ) {
-            // At most once per day, further updates change the `rewardRate` and `periodFinish` variables
-            uint256 remaining = periodFinish.sub(block.timestamp);
-            uint256 leftover = remaining.mul(rewardRate);
-            rewardRate = leftover.div(rewardsDuration);
-            periodFinish = block.timestamp.add(rewardsDuration);
-            lastRewardRateUpdate = block.timestamp;
-        }
     }
 }

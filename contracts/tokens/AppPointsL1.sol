@@ -101,7 +101,7 @@ contract AppPointsL1 is Initializable, AppPointsCommon {
      * @dev Mint additional tokens according to the current inflation rate.
      *      The amount of tokens to get minted is determined by both the last
      *      mint time and the inflation rate (given by the following formula:
-     *      (`currentTime` - `lastMint`) * `inflationRate`).
+     *      (`currentTime` - `lastMintTime`) * `inflationRate`).
      */
     function mint() external onlyOwner {
         // If the delay for the new inflation rate passed, update the inflation rate

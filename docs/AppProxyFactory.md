@@ -1,12 +1,19 @@
 ## `AppProxyFactory`
 
-The `AppProxyFactory` contract is responsible for deploying new apps to be integrated within the Props protocol. It comes in two variants, one for deploying new apps on layer 1 and another for deploying on layer 2. However, external actors can only interact with the layer 1 variant of the factory. An L1 app deployment will create a layer 1 AppPoints token but will also trigger an app deployment on layer 2 (via an L1 - L2 bridge).
+The `AppProxyFactory` contract is responsible for deploying new apps that are to be integrated within the Props protocol. As AppPoints tokens, it comes in two variants, one for deploying new apps on L1 and another for a similar deployment on L2. However, external actors can only interact with the L1 variant of the factory. An L2 app deployment can only be triggered indirectly via an L1 app deployment (deploying a new app on L1 will trigger a corresponding app deployment on L2 via the L1 - L2 bridge). The major difference between the L1 and L2 variants of the factory is that the L1 factory will only create an L1 AppPoints token, while the L2 factory will create both an L2 AppPoints token together with a corresponding staking contract for the L2 AppPoints tokens.
+
+Contracts of interest:
+
+- `AppProxyFactoryL1`: includes L1-specific factory functionality
+- `AppProxyFactoryL2`: includes L2-specific factory functionality
 
 ## Architecture
 
+The following functions are only available on the L1 variant of the factory:
+
 ##### Deploy app
 
-Deploy a new app for integration withing the Props protocol. This action will deploy an AppPoints token on layer 1 and an AppPoints token together with a corresponding staking contract for the token on layer 2. The new app will also be automatically integrated within the Props protocol on layer 2.
+Deploy a new app for integration within the Props protocol. This action will deploy an AppPoints token on L1 but will also trigger a corresponding deployment on L2 which will create an L2 AppPoints token together with a corresponding staking contract for it. The new app will also be automatically integrated within the Props protocol on L2.
 
 ```solidity
 function deployApp(

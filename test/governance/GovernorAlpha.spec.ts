@@ -46,7 +46,8 @@ describe("GovernorAlpha", () => {
   let timelock: Timelock;
   let governorAlpha: GovernorAlpha;
 
-  const PROPS_TOKEN_AMOUNT = expandTo18Decimals(1000);
+  const PROPS_TOKEN_AMOUNT = expandTo18Decimals(100000000);
+  const RPROPS_TOKEN_AMOUNT = expandTo18Decimals(10000);
   const APP_POINTS_TOKEN_NAME = "AppPoints";
   const APP_POINTS_TOKEN_SYMBOL = "AppPoints";
   const APP_POINTS_TOKEN_AMOUNT = expandTo18Decimals(100000);
@@ -113,6 +114,7 @@ describe("GovernorAlpha", () => {
     const rPropsToken = await deployContractUpgradeable(
       "RPropsToken",
       deployer,
+      RPROPS_TOKEN_AMOUNT,
       propsProtocol.address,
       propsToken.address
     );

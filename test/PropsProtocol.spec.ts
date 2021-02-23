@@ -2,7 +2,6 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-wit
 import chai from "chai";
 import * as ethUtil from "ethereumjs-util";
 import { solidity } from "ethereum-waffle";
-import { BigNumber } from "ethers";
 import * as sigUtil from "eth-sig-util";
 import { ethers } from "hardhat";
 
@@ -49,7 +48,8 @@ describe("PropsProtocol", () => {
   let appProxyFactory: AppProxyFactoryL2;
   let propsProtocol: PropsProtocol;
 
-  const PROPS_TOKEN_AMOUNT = expandTo18Decimals(100000);
+  const PROPS_TOKEN_AMOUNT = expandTo18Decimals(100000000);
+  const RPROPS_TOKEN_AMOUNT = expandTo18Decimals(10000);
   const APP_POINTS_TOKEN_NAME = "AppPoints";
   const APP_POINTS_TOKEN_SYMBOL = "AppPoints";
   const APP_POINTS_TOKEN_AMOUNT = expandTo18Decimals(100000);
@@ -113,6 +113,7 @@ describe("PropsProtocol", () => {
     rPropsToken = await deployContractUpgradeable(
       "RPropsToken",
       deployer,
+      RPROPS_TOKEN_AMOUNT,
       propsProtocol.address,
       propsToken.address
     );
@@ -889,7 +890,7 @@ describe("PropsProtocol", () => {
     // Delegate staking rights
     await propsProtocol.connect(alice).delegate(bob.address);
 
-    const earned = await propsUserStaking.balanceOf(alice.address);
+    const earned = await propsUserStaking.earned(alice.address);
 
     // Claim Props rewards
     await propsProtocol.connect(alice).claimUserPropsRewards();

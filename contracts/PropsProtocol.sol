@@ -263,6 +263,23 @@ contract PropsProtocol is
         );
     }
 
+    /**
+     * @dev Withdraw rProps rewards from the app and user staking contracts.
+     * @param _appRewardsAmount The amount of rProps rewards to withdraw from the app Props staking contract
+     * @param _userRewardsAmount The amount of rProps rewards to withdraw from the user Props staking contract
+     */
+    function withdrawPropsRewards(uint256 _appRewardsAmount, uint256 _userRewardsAmount)
+        external
+        only(controller)
+    {
+        IRPropsToken(rPropsToken).withdrawRewards(
+            propsAppStaking,
+            _appRewardsAmount,
+            propsUserStaking,
+            _userRewardsAmount
+        );
+    }
+
     /***************************************
                APP FACTORY ACTIONS
     ****************************************/

@@ -1,11 +1,11 @@
 ## `PropsProtocol`
 
-The `PropsProtocol` is the single entry point for interacting with the Props protocol. All user actions should go through the `PropsProtocol` which will, in turn, perform corresponding actions on other involved contracts that users should not directly interact with. The `PropsProtocol` contract is the owner of the majority of the contracts involved in the Props protocol:
+The `PropsProtocol` is the single entry point for interacting with the Props protocol. All user actions must go through the `PropsProtocol` which will, in turn, perform corresponding actions on other involved contracts that users should not (and cannot) directly interact with. The `PropsProtocol` contract is the owner of the majority of the contracts involved in the Props protocol:
 
-- it owns the L2 rProps token contract, being responsible for initiating the rProps rewards distribution and for swapping rProps tokens for regular Props tokens
-- it owns all staking contracts, being responsible for performing staking-related operations on the individual staking contracts and for making sure the staked amounts are consistent across all staking contracts
+- it owns the rProps token contract, being responsible for initiating the rProps rewards distribution and for swapping rProps tokens for regular Props tokens
+- it owns all staking contracts, being responsible for performing staking-related operations on all individual staking contracts and for making sure the staked amounts are consistent across all staking contracts
 
-`PropsProtocol` also handles minting and burning of sProps, the ERC20 governance token in the Props protocol. sProps tokens are in a 1:1 mapping with staked Props tokens (that is, for each staked Props token a corresponding sProps token will get minted, while for each withdrawn Props token a corresponding sProps token will get burned). sProps are not transferrable between users and they represent voting power in Props' governance system.
+`PropsProtocol` also handles minting and burning of sProps, the ERC20 governance token in the Props protocol. sProps tokens are in a 1:1 mapping with staked Props tokens (that is, for each staked Props token a corresponding sProps token will get minted, while for each withdrawn Props token a corresponding sProps token will get burned). sProps are not transferrable between users and they represent voting power in Props' governance process.
 
 As an escape hatch for possible bugs, the `PropsProtocol` contract is pausable. Pausing it would simply forbid all user actions. The ability to pause and unpause the contract is given to a special address denoted as the Props guardian. Ideally, the Props guardian is a multi-sig of a few trusted addresses that, in case of bugs, can pause the contract until an upgrade that fixes the bug goes through the governance process.
 
@@ -106,7 +106,7 @@ function claimUserPropsRewardsAndStake(
 )
 ```
 
-##### Claim user Props rewards and stake
+##### Claim user Props rewards and stake as delegate
 
 Claim and directly stake the Props rewards on behalf of a delegator account.
 
@@ -126,6 +126,14 @@ Allow users to unlock their escrowed rewards, if the cooldown period passed. Thi
 function unlockUserPropsRewards()
 ```
 
+##### Delegate
+
+With delegation, accounts can outsource the following actions: adjust existing stake (without triggering any stake withdraws), stake rewards, claim and directly stake user Props rewards.
+
+```solidity
+function delegate(address _to)
+```
+
 ##### Pause
 
 Pause the contract.
@@ -140,14 +148,6 @@ Unpause the contract.
 
 ```solidity
 function unpause()
-```
-
-##### Set rewards escrow cooldown
-
-Change the cooldown period for users' escrowed rewards.
-
-```solidity
-function setRewardsEscrowCooldown(uint256 _rewardsEscrowCooldown)
 ```
 
 ##### Whitelist app
@@ -168,7 +168,7 @@ function whitelistApp(address _app)
 
 ##### Distribute Props rewards
 
-Distribute the Props rewards to the staking contracts for earning apps and users Props rewards. This action will trigger the distribution method of the rProps token, which `PropsProtocol` owns.
+Distribute the Props rewards to the staking contracts for earning apps and users Props rewards. This is a one-time only action that will trigger the distribution method of the rProps token, which `PropsProtocol` owns.
 
 ```solidity
 function distributePropsRewards(uint256 _appRewardsPercentage, uint256 _userRewardsPercentage)

@@ -24,7 +24,6 @@ contract AppProxyFactoryL1 is Initializable, MinimalProxyFactory {
     ***************************************/
 
     // The app proxy factory controller
-    // TODO: Take into consideration governance
     address public controller;
 
     // The Props protocol treasury address
@@ -133,7 +132,7 @@ contract AppProxyFactoryL1 is Initializable, MinimalProxyFactory {
         // Transfer ownership to the app owner
         OwnableUpgradeable(appPointsProxy).transferOwnership(_owner);
 
-        // Trigger a corresponding L2 app deployment
+        // Trigger a corresponding L2 deployment
         IAppProxyFactoryBridged(appProxyFactoryBridge).deployApp(
             appPointsProxy,
             _name,

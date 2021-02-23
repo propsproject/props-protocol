@@ -54,7 +54,7 @@ contract AppPointsL2 is Initializable, AppPointsCommon {
     }
 
     /**
-     * @dev Mint existing tokens of an account.
+     * @dev Burn existing tokens of an account.
      * @param _account The address to burn from
      * @param _amount The amount of tokens to burn
      */

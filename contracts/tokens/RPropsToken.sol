@@ -20,7 +20,6 @@ import "../interfaces/IStaking.sol";
  *         then swappable for regular Props tokens. This acts as a workaround
  *         for having to mint all left Props tokens beforehand.
  */
-// TODO: Have different L1 and L2 token versions
 contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
     using SafeMathUpgradeable for uint256;
 
@@ -33,6 +32,12 @@ contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
 
     // Props protocol related tokens
     address public propsToken;
+
+    // Keeps track of whether the rProps rewards have been distributed
+    bool public distributed;
+
+    // The amount of rProps initially minted and distributed
+    uint256 public distributedAmount;
 
     /**************************************
                     MODIFIERS
@@ -51,10 +56,16 @@ contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
      * @dev Initializer.
      * @param _controller The rProps token controller
      * @param _propsToken The address of the Props token contract
+     * @param _amount The amount of rProps to mint and distribute
      */
-    function initialize(address _controller, address _propsToken) public initializer {
+    function initialize(
+        uint256 _amount,
+        address _controller,
+        address _propsToken
+    ) public initializer {
         ERC20Upgradeable.__ERC20_init("rProps", "RPROPS");
 
+        distributedAmount = _amount;
         controller = _controller;
         propsToken = _propsToken;
     }
@@ -78,26 +89,45 @@ contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
         address _propsUserStaking,
         uint256 _userRewardsPercentage
     ) external override only(controller) {
+        // This is a one-time only action
+        require(!distributed, "Rewards already distributed");
+
         // The percentages must add up to 100%
         require(_appRewardsPercentage.add(_userRewardsPercentage) == 1e6, "Invalid percentages");
 
-        // Mint all available rProps
-        uint256 totalToMint =
-            IPropsToken(propsToken).maxTotalSupply().sub(
-                IERC20Upgradeable(propsToken).totalSupply()
-            );
-
-        require(totalToMint > 0, "No rewards left for distribution");
-
         // Distribute app rProps rewards
-        uint256 appRewards = totalToMint.mul(_appRewardsPercentage).div(1e6);
+        uint256 appRewards = distributedAmount.mul(_appRewardsPercentage).div(1e6);
         _mint(_propsAppStaking, appRewards);
         IStaking(_propsAppStaking).notifyRewardAmount(balanceOf(_propsAppStaking));
 
         // Distribute user rProps rewards
-        uint256 userRewards = totalToMint.sub(appRewards);
+        uint256 userRewards = distributedAmount.sub(appRewards);
         _mint(_propsUserStaking, userRewards);
         IStaking(_propsUserStaking).notifyRewardAmount(balanceOf(_propsUserStaking));
+
+        distributed = true;
+    }
+
+    /**
+     * @dev Withdraw rProps rewards from the app and user Props staking contracts.
+     * @param _propsAppStaking The app Props staking contract
+     * @param _appRewardsAmount The amount of rProps to get distributed to apps
+     * @param _propsUserStaking The user Props staking contract
+     * @param _userRewardsAmount The amount of rProps to get distributed to users
+     */
+    function withdrawRewards(
+        address _propsAppStaking,
+        uint256 _appRewardsAmount,
+        address _propsUserStaking,
+        uint256 _userRewardsAmount
+    ) external override only(controller) {
+        // Withdraw and burn app rProps rewards
+        IStaking(_propsAppStaking).withdrawReward(_appRewardsAmount);
+        _burn(address(this), _appRewardsAmount);
+
+        // Withdraw user rProps rewards
+        IStaking(_propsUserStaking).withdrawReward(_userRewardsAmount);
+        _burn(address(this), _userRewardsAmount);
     }
 
     /**
@@ -107,7 +137,7 @@ contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
     function swap(address _account) external override only(controller) {
         uint256 amount = balanceOf(_account);
         if (amount > 0) {
-            // Burn the rProps
+            // Burn rProps
             _burn(_account, amount);
 
             // Mint Props

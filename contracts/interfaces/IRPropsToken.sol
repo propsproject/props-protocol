@@ -10,5 +10,12 @@ interface IRPropsToken {
         uint256 _userRewardsPercentage
     ) external;
 
+    function withdrawRewards(
+        address _propsAppStaking,
+        uint256 _appRewardsAmount,
+        address _propsUserStaking,
+        uint256 _userRewardsAmount
+    ) external;
+
     function swap(address account) external;
 }

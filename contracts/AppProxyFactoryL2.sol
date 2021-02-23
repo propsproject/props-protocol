@@ -16,8 +16,8 @@ import "./interfaces/IStaking.sol";
  * @title  AppProxyFactoryL2
  * @author Props
  * @dev    The L2 factory responsible for deploying new apps. An L2 app
- *         deployment can only be triggered via the L2 bridge, as a result
- *         of a corresponding L1 deployment.
+ *         deployment can only be triggered via the L1 - L2 bridge, as a
+ *         result of a corresponding L1 deployment.
  */
 contract AppProxyFactoryL2 is Initializable, MinimalProxyFactory {
     /**************************************
@@ -100,15 +100,6 @@ contract AppProxyFactoryL2 is Initializable, MinimalProxyFactory {
     ****************************************/
 
     /**
-     * @dev Set the app proxy factory bridge contract.
-     * @param _appProxyFactoryBridge The address of the L2 bridge contract.
-     */
-    function setAppProxyFactoryBridge(address _appProxyFactoryBridge) external only(controller) {
-        require(appProxyFactoryBridge == address(0), "Already set");
-        appProxyFactoryBridge = _appProxyFactoryBridge;
-    }
-
-    /**
      * @dev Change the logic contract for app points contract proxies.
      * @param _appPointsLogic The address of the new logic contract
      */
@@ -122,6 +113,15 @@ contract AppProxyFactoryL2 is Initializable, MinimalProxyFactory {
      */
     function changeAppPointsStakingLogic(address _appPointsStakingLogic) external only(controller) {
         appPointsStakingLogic = _appPointsStakingLogic;
+    }
+
+    /**
+     * @dev Set the app proxy factory bridge contract.
+     * @param _appProxyFactoryBridge The address of the L2 bridge contract.
+     */
+    function setAppProxyFactoryBridge(address _appProxyFactoryBridge) external only(controller) {
+        require(appProxyFactoryBridge == address(0), "Already set");
+        appProxyFactoryBridge = _appProxyFactoryBridge;
     }
 
     /***************************************
@@ -152,6 +152,7 @@ contract AppProxyFactoryL2 is Initializable, MinimalProxyFactory {
                     _name,
                     _symbol,
                     // TODO: Replace with the bridge address
+                    // appProxyFactoryBridge,
                     _owner
                 )
             );
@@ -184,6 +185,7 @@ contract AppProxyFactoryL2 is Initializable, MinimalProxyFactory {
         // Transfer ownership to the app owner
         OwnableUpgradeable(appPointsProxy).transferOwnership(_owner);
 
+        // Integrate the app within the Props protocol
         IPropsProtocol(propsProtocol).saveApp(appPointsProxy, appPointsStakingProxy);
 
         emit AppDeployed(

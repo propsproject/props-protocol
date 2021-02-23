@@ -389,29 +389,27 @@ describe("Staking", () => {
     // Fast-forward until ~middle of the rewards period
     await mineBlock(distributionStartTime.add(rewardsDuration.div(2)));
 
-    const withdrawPeriodFinish = await staking.periodFinish();
-
-    // Withdraw any not yet distributed rewards
+    // Withdraw some amount of not yet distributed rewards
     const withdrawTime = await getTxTimestamp(
-      await staking.connect(rewardsDistribution).withdrawReward(daysToTimestamp(1))
+      await staking.connect(rewardsDistribution).withdrawReward(reward.div(10))
     );
 
     const secondRewardRate = await staking.rewardRate();
 
+    const periodFinish = await staking.periodFinish();
+
     // Fast-forward until after the end of the rewards period
-    await mineBlock(distributionStartTime.add(rewardsDuration).add(daysToTimestamp(1)));
+    await mineBlock(periodFinish.add(daysToTimestamp(1)));
 
     // Check that the only staker earned the correct amount (ensure results are within .01%)
     const earned = await staking.earned(alice.address);
     const localEarned = firstRewardRate
       .mul(withdrawTime.sub(distributionStartTime))
-      .add(secondRewardRate.mul(distributionStartTime.add(rewardsDuration).sub(withdrawTime)));
+      .add(secondRewardRate.mul(periodFinish.sub(withdrawTime)));
     expect(earned.sub(localEarned).abs().lte(earned.div(10000))).to.be.true;
     expect(earned.lte(await rewardsToken.balanceOf(staking.address)));
 
     // Check that the correct amount of rewards was withdrawn
-    expect(
-      firstRewardRate.mul(withdrawPeriodFinish.sub(withdrawTime.add(daysToTimestamp(1))))
-    ).to.eq(await rewardsToken.balanceOf(rewardsDistribution.address));
+    expect(reward.div(10)).to.eq(await rewardsToken.balanceOf(rewardsDistribution.address));
   });
 });

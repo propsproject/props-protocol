@@ -9,12 +9,11 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 import "../interfaces/IPropsToken.sol";
 
-contract TestPropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IPropsToken {
+contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IPropsToken {
     using SafeMathUpgradeable for uint256;
 
-    address private _minter;
+    mapping(address => bool) public minters;
 
-    address public childChainManager;
     uint256 public override maxTotalSupply;
 
     // solhint-disable-next-line var-name-mixedcase
@@ -24,12 +23,11 @@ contract TestPropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable
 
     mapping(address => uint256) public nonces;
 
-    function initialize(uint256 _maxTotalSupply, address _childChainManager) public initializer {
+    function initialize(uint256 _amount) public initializer {
         OwnableUpgradeable.__Ownable_init();
         ERC20Upgradeable.__ERC20_init("Test Props", "TPROPS");
 
-        childChainManager = _childChainManager;
-        maxTotalSupply = _maxTotalSupply;
+        maxTotalSupply = 1e9 * (10**uint256(decimals()));
 
         PERMIT_TYPEHASH = keccak256(
             "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
@@ -46,6 +44,7 @@ contract TestPropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable
             )
         );
 
+        _mint(msg.sender, _amount);
         // 1 million Props reserved for testing (redeemable from the faucet)
         _mint(address(this), 1000000 * 10**18);
     }
@@ -54,21 +53,16 @@ contract TestPropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable
         this.transfer(msg.sender, 1000 * 10**18);
     }
 
-    function deposit(address _account, bytes calldata _data) external {
-        require(msg.sender == childChainManager, "Unauthorized");
-        _mint(_account, abi.decode(_data, (uint256)));
+    function addMinter(address _minter) external onlyOwner {
+        minters[_minter] = true;
     }
 
-    function withdraw(uint256 amount) external {
-        _burn(msg.sender, amount);
-    }
-
-    function setMinter(address _newMinter) external onlyOwner {
-        _minter = _newMinter;
+    function removeMinter(address _minter) external onlyOwner {
+        minters[_minter] = false;
     }
 
     function mint(address _account, uint256 _amount) external override {
-        require(msg.sender == _minter, "Unauthorized");
+        require(minters[msg.sender], "Unauthorized");
         require(totalSupply().add(_amount) <= maxTotalSupply, "Amount exceeds max total supply");
         _mint(_account, _amount);
     }
