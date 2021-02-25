@@ -8,16 +8,18 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-import "../interfaces/IAppPoints.sol";
+import "./IAppPoints.sol";
+
+// TODO: Add full support for meta-transactions
 
 /**
  * @title  AppPointsCommon
  * @author Props
  * @dev    Includes common functionality that is shared by both the L1 and L2
- *         variants of the AppPoints tokens. The most important common
- *         characteristic is that AppPoints tokens are pausable (and thus transfers
- *         can be restricted) but this restriction can be overcame via whitelisting,
- *         which only the owner is allowed to perform.
+ *         variants of the AppPoints tokens. The most important common characteristic
+ *         is that AppPoints tokens are pausable (and thus transfers can be restricted)
+ *         but this restriction can be overcame via whitelisting, which only the owner
+ *         is allowed to perform.
  */
 abstract contract AppPointsCommon is
     Initializable,
@@ -40,6 +42,7 @@ abstract contract AppPointsCommon is
     // solhint-disable-next-line var-name-mixedcase
     bytes32 public PERMIT_TYPEHASH;
 
+    // Nonces for permit
     mapping(address => uint256) public nonces;
 
     /**************************************
@@ -85,14 +88,14 @@ abstract contract AppPointsCommon is
     ****************************************/
 
     /**
-     * @dev Pause AppPoints token transfers.
+     * @dev Pause token transfers.
      */
     function pause() public override onlyOwner {
         _pause();
     }
 
     /**
-     * @dev Unpause AppPoints token transfers.
+     * @dev Unpause token transfers.
      */
     function unpause() public override onlyOwner {
         _unpause();
@@ -123,14 +126,14 @@ abstract contract AppPointsCommon is
      * @param _amount The amount to recover
      */
     function recoverTokens(
-        IERC20Upgradeable _token,
+        address _token,
         address _to,
         uint256 _amount
     ) external onlyOwner {
         require(_to != address(0), "Cannot transfer to address zero");
-        uint256 balance = _token.balanceOf(address(this));
+        uint256 balance = IERC20Upgradeable(_token).balanceOf(address(this));
         require(_amount <= balance, "Cannot transfer more than balance");
-        _token.safeTransfer(_to, _amount);
+        IERC20Upgradeable(_token).safeTransfer(_to, _amount);
     }
 
     /***************************************
@@ -203,6 +206,11 @@ abstract contract AppPointsCommon is
         address,
         uint256
     ) internal view override {
+        // Only allow transfers if any of the following cases holds:
+        // - the token is not paused
+        // - the transfer represents a mint of new tokens
+        // - the address transferring from is whitelisted
+
         require(!paused() || _from == address(0) || transfersWhitelist[_from], "Unauthorized");
     }
 }

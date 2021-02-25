@@ -2,9 +2,12 @@
 
 pragma solidity 0.7.3;
 
-import "../interfaces/IAppProxyFactoryBridged.sol";
+import "../IAppProxyFactoryBridged.sol";
 
-contract TestAppProxyFactoryBridgeL1 is IAppProxyFactoryBridged {
+/**
+ * @dev Mock of the L1 side of the app deployment bridge used in tests.
+ */
+contract MockAppProxyFactoryBridgeL1 is IAppProxyFactoryBridged {
     address public appProxyFactory;
 
     event AppDeployed(

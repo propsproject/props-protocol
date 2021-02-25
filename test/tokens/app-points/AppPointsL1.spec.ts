@@ -5,7 +5,7 @@ import { solidity } from "ethereum-waffle";
 import * as sigUtil from "eth-sig-util";
 import { ethers } from "hardhat";
 
-import type { AppPointsL1, TestErc20 } from "../../typechain";
+import type { AppPointsL1, MockErc20 } from "../../../typechain";
 import {
   bn,
   daysToTimestamp,
@@ -15,7 +15,7 @@ import {
   getTxTimestamp,
   mineBlock,
   now,
-} from "../../utils";
+} from "../../../utils";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -117,8 +117,8 @@ describe("AppPointsL1", () => {
   });
 
   it("recover tokens accidentally sent to contract", async () => {
-    const erc20: TestErc20 = await deployContractUpgradeable(
-      "TestERC20",
+    const erc20: MockErc20 = await deployContractUpgradeable(
+      "MockERC20",
       alice,
       "Test",
       "Test",

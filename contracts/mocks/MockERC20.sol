@@ -5,7 +5,10 @@ pragma solidity 0.7.3;
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
-contract TestERC20 is Initializable, ERC20Upgradeable {
+/**
+ * @dev Mock ERC20 token used for testing.
+ */
+contract MockERC20 is Initializable, ERC20Upgradeable {
     function initialize(
         string memory _name,
         string memory _symbol,

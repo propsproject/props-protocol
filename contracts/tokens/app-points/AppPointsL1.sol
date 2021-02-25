@@ -7,10 +7,11 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
 import "./AppPointsCommon.sol";
 
+// TODO: Add full support for meta-transactions
+
 /**
  * @title  AppPointsL1
  * @author Props
- * @notice ERC20 token every app in the Props protocol gets associated with.
  * @dev    The L1 version of AppPoints tokens. Each app in the Props protocol will
  *         get an associated AppPoints contract. AppPoints are ERC20 compatible and
  *         mintable according to an inflation rate.
@@ -39,15 +40,11 @@ contract AppPointsL1 is Initializable, AppPointsCommon {
     // Time most recent inflation rate change occured at
     uint256 public lastInflationRateChange;
 
-    // IPFS hash pointing to app information
-    bytes public appInfo;
-
     /**************************************
                      EVENTS
     ***************************************/
 
-    event AppInfoChanged(bytes indexed newAppInfo);
-    event InflationRateChanged(uint256 oldInflationRate, uint256 newInflationRate);
+    event InflationRateChanged(uint256 inflationRate);
 
     /***************************************
                    INITIALIZER
@@ -89,15 +86,6 @@ contract AppPointsL1 is Initializable, AppPointsCommon {
     ****************************************/
 
     /**
-     * @dev Change the IPFS hash pointing to the app information.
-     * @param _appInfo The new IPFS app information hash
-     */
-    function changeAppInfo(bytes calldata _appInfo) external onlyOwner {
-        appInfo = _appInfo;
-        emit AppInfoChanged(_appInfo);
-    }
-
-    /**
      * @dev Mint additional tokens according to the current inflation rate.
      *      The amount of tokens to get minted is determined by both the last
      *      mint time and the inflation rate (given by the following formula:
@@ -131,6 +119,6 @@ contract AppPointsL1 is Initializable, AppPointsCommon {
         pendingInflationRate = _inflationRate;
         lastInflationRateChange = block.timestamp;
 
-        emit InflationRateChanged(inflationRate, pendingInflationRate);
+        emit InflationRateChanged(pendingInflationRate);
     }
 }

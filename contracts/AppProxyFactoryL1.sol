@@ -5,10 +5,9 @@ pragma solidity 0.7.3;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
+import "./IAppProxyFactoryBridged.sol";
+import "./tokens/app-points/IAppPoints.sol";
 import "./utils/MinimalProxyFactory.sol";
-
-import "./interfaces/IAppPoints.sol";
-import "./interfaces/IAppProxyFactoryBridged.sol";
 
 /**
  * @title  AppProxyFactoryL1
@@ -75,6 +74,14 @@ contract AppProxyFactoryL1 is Initializable, MinimalProxyFactory {
     ****************************************/
 
     /**
+     * @dev Transfer the control of the contract to a new address.
+     * @param _controller The new controller
+     */
+    function transferControl(address _controller) external only(controller) {
+        controller = _controller;
+    }
+
+    /**
      * @dev Change the logic contract for app points contract proxies.
      * @param _appPointsLogic The address of the new logic contract
      */
@@ -126,7 +133,7 @@ contract AppProxyFactoryL1 is Initializable, MinimalProxyFactory {
         // Pause app points transfers
         IAppPoints(appPointsProxy).pause();
 
-        // The app owner is whitelisted for app points transfers:
+        // The app owner is whitelisted for app points transfers
         IAppPoints(appPointsProxy).whitelistForTransfers(_owner);
 
         // Transfer ownership to the app owner

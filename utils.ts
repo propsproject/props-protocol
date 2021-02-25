@@ -21,7 +21,7 @@ export const getPrivateKey = (address: string): Buffer =>
     "hex"
   );
 
-// Encode a governance action's parameters
+// ABI-encode given parameters
 export const encodeParameters = (types: string[], values: any[]) => {
   const abi = new ethers.utils.AbiCoder();
   return abi.encode(types, values);

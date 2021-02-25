@@ -2,10 +2,10 @@
 
 pragma solidity 0.7.3;
 
-interface IPropsToken {
-    function maxTotalSupply() external view returns (uint256);
-
+interface IPropsTokenL2 {
     function mint(address _account, uint256 _amount) external;
+
+    function burn(address _account, uint256 _amount) external;
 
     function permit(
         address _owner,

@@ -8,7 +8,7 @@ import type {
   AppProxyFactoryL2,
   PropsProtocol,
   Staking,
-  TestPropsToken,
+  MockPropsToken,
 } from "../typechain";
 import {
   bn,
@@ -30,7 +30,7 @@ describe("AppProxyFactoryL2", () => {
   let appProxyFactoryBridge: SignerWithAddress;
   let mock: SignerWithAddress;
 
-  let propsToken: TestPropsToken;
+  let propsToken: MockPropsToken;
   let appProxyFactory: AppProxyFactoryL2;
   let propsProtocol: PropsProtocol;
 
@@ -76,7 +76,7 @@ describe("AppProxyFactoryL2", () => {
       mock,
     ] = await ethers.getSigners();
 
-    propsToken = await deployContractUpgradeable("TestPropsToken", deployer, PROPS_TOKEN_AMOUNT);
+    propsToken = await deployContractUpgradeable("MockPropsToken", deployer, PROPS_TOKEN_AMOUNT);
 
     propsProtocol = await deployContractUpgradeable(
       "PropsProtocol",
@@ -103,7 +103,7 @@ describe("AppProxyFactoryL2", () => {
     // Set needed parameters
     await appProxyFactory
       .connect(controller)
-      .setAppProxyFactoryBridge(appProxyFactoryBridge.address);
+      .changeAppProxyFactoryBridge(appProxyFactoryBridge.address);
     await propsProtocol.connect(controller).setAppProxyFactory(appProxyFactory.address);
   });
 

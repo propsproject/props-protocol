@@ -7,32 +7,31 @@ import type {
   AppProxyFactoryL2,
   AppProxyFactoryBridgeL2,
   Staking,
-  TestPropsTokenL2,
+  PropsTokenL2,
   PropsProtocol,
   RPropsToken,
   SPropsToken,
 } from "../typechain";
-import { bn, deployContract, deployContractUpgradeable } from "../utils";
+import { bn, deployContract, deployContractUpgradeable, expandTo18Decimals } from "../utils";
 
 // Constants
-const PROPS_TOKEN_AMOUNT = bn(0);
+// The amount of rProps (Props) rewards to get distributed on L2
+const PROPS_REWARDS_AMOUNT = expandTo18Decimals(process.env.PROPS_REWARDS_AMOUNT as string);
 const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
-// Taken from https://github.com/jdkanani/fx-portal
-// TODO: Support mainnet
-const FX_CHILD_ADDRESS = "0xCf73231F28B7331BBe3124B907840A94851f9f11";
-// Taken from https://github.com/maticnetwork/static/blob/master/network/testnet/mumbai/index.json
-// TODO: Support mainnet
-const CHILD_CHAIN_MANAGER_PROXY_ADDRESS = "0xb5505a6d998549090530911180f38aC5130101c6";
+
+// Matic contracts
+const MATIC_FX_CHILD_ADDRESS = process.env.TESTNET
+  ? "0xCf73231F28B7331BBe3124B907840A94851f9f11"
+  : ""; // TODO: Support mainnet
 
 // Accounts
 let deployer: SignerWithAddress;
 let controller: SignerWithAddress;
 let treasury: SignerWithAddress;
 let guardian: SignerWithAddress;
-let misc: SignerWithAddress;
 
 // Contracts
-let propsToken: TestPropsTokenL2;
+let propsToken: PropsTokenL2;
 let propsProtocol: PropsProtocol;
 let rPropsToken: RPropsToken;
 let sPropsToken: SPropsToken;
@@ -44,31 +43,33 @@ let appProxyFactory: AppProxyFactoryL2;
 let appProxyFactoryBridge: AppProxyFactoryBridgeL2;
 
 async function main() {
-  [deployer, controller, treasury, guardian, misc] = await ethers.getSigners();
-
-  const [l1Network, l2Network] = [process.env.L1_NETWORK, process.env.L2_NETWORK];
+  [deployer, controller, treasury, guardian] = await ethers.getSigners();
 
   console.log("Using the following addresses:");
   console.log(`Deployer - ${deployer.address}`);
   console.log(`Controller - ${controller.address}`);
   console.log(`Treasury - ${treasury.address}`);
   console.log(`Guardian - ${guardian.address}`);
-  console.log(`Misc - ${misc.address}`);
+
+  const [l1Network, l2Network] = [process.env.L1_NETWORK, process.env.L2_NETWORK];
 
   if (process.env.DEPLOY) {
-    if (!fs.existsSync(`${l2Network}.json`)) {
+    if (!fs.existsSync(`deployments/${l2Network}.json`)) {
+      console.log("Couldn't find any existing deployment, starting new deployment...");
+
       const addresses: any = {};
 
-      console.log("Starting deployment...");
-
-      console.log("Deploying `PropsToken`");
-      propsToken = await deployContractUpgradeable(
-        "TestPropsTokenL2",
-        deployer,
-        PROPS_TOKEN_AMOUNT,
-        CHILD_CHAIN_MANAGER_PROXY_ADDRESS
-      );
+      console.log("Deploying `PropsTokenL2`");
+      propsToken = await deployContractUpgradeable("PropsTokenL2", deployer);
       addresses["propsToken"] = propsToken.address;
+
+      if (process.env.DEV) {
+        console.log("[DEV only] Granting Props minting permissions to the deployer");
+        await propsToken
+          .connect(deployer)
+          .addMinter(deployer.address)
+          .then((tx: any) => tx.wait());
+      }
 
       console.log("Deploying `PropsProtocol`");
       propsProtocol = await deployContractUpgradeable(
@@ -80,16 +81,17 @@ async function main() {
       );
       addresses["propsProtocol"] = propsProtocol.address;
 
-      console.log("Deploying `rPropsToken`");
+      console.log("Deploying `RPropsToken`");
       rPropsToken = await deployContractUpgradeable(
         "RPropsToken",
         deployer,
+        PROPS_REWARDS_AMOUNT,
         propsProtocol.address,
         propsToken.address
       );
       addresses["rPropsToken"] = rPropsToken.address;
 
-      console.log("Deploying `sPropsToken`");
+      console.log("Deploying `SPropsToken`");
       sPropsToken = await deployContractUpgradeable("SPropsToken", deployer, propsProtocol.address);
       addresses["sPropsToken"] = sPropsToken.address;
 
@@ -115,7 +117,7 @@ async function main() {
       );
       addresses["propsUserStaking"] = propsUserStaking.address;
 
-      console.log("Deploying `AppPoints` logic");
+      console.log("Deploying `AppPointsL2` logic");
       appPointsLogic = await deployContract("AppPointsL2", deployer);
       addresses["appPointsLogic"] = appPointsLogic.address;
 
@@ -123,7 +125,7 @@ async function main() {
       appPointsStakingLogic = await deployContract("Staking", deployer);
       addresses["appPointsStakingLogic"] = appPointsStakingLogic.address;
 
-      console.log("Deploying `AppProxyFactory`");
+      console.log("Deploying `AppProxyFactoryL2`");
       appProxyFactory = await deployContractUpgradeable(
         "AppProxyFactoryL2",
         deployer,
@@ -136,44 +138,49 @@ async function main() {
       );
       addresses["appProxyFactory"] = appProxyFactory.address;
 
-      console.log("Deploying `AppProxyFactoryBridge`");
+      console.log("Deploying `AppProxyFactoryBridgeL2`");
       appProxyFactoryBridge = await deployContract(
         "AppProxyFactoryBridgeL2",
         deployer,
-        FX_CHILD_ADDRESS,
+        MATIC_FX_CHILD_ADDRESS,
         appProxyFactory.address
       );
       addresses["appProxyFactoryBridge"] = appProxyFactoryBridge.address;
 
-      console.log("Connecting `AppProxyFactory` to `AppProxyFactoryBridge`");
+      console.log("Connecting `AppProxyFactoryL2` to `AppProxyFactoryBridgeL2`");
       await appProxyFactory
         .connect(controller)
-        .setAppProxyFactoryBridge(appProxyFactoryBridge.address);
+        .changeAppProxyFactoryBridge(appProxyFactoryBridge.address)
+        .then((tx: any) => tx.wait());
 
       console.log("Setting required parameters");
-      await propsToken.connect(deployer).setMinter(rPropsToken.address);
+      await propsToken.connect(deployer).addMinter(rPropsToken.address);
       await propsProtocol.connect(controller).setAppProxyFactory(appProxyFactory.address);
       await propsProtocol.connect(controller).setRPropsToken(rPropsToken.address);
       await propsProtocol.connect(controller).setSPropsToken(sPropsToken.address);
       await propsProtocol.connect(controller).setPropsAppStaking(propsAppStaking.address);
       await propsProtocol.connect(controller).setPropsUserStaking(propsUserStaking.address);
 
-      fs.writeFileSync(`${l2Network}.json`, JSON.stringify(addresses, null, 2));
+      if (!fs.existsSync("deployments")) {
+        fs.mkdirSync("deployments");
+      }
+      fs.writeFileSync(`deployments/${l2Network}.json`, JSON.stringify(addresses, null, 2));
     } else {
       console.log("Contracts already deployed, skipping...");
     }
   } else {
-    const l1Addresses = JSON.parse(fs.readFileSync(`${l1Network}.json`).toString());
-    const l2Addresses = JSON.parse(fs.readFileSync(`${l2Network}.json`).toString());
+    const l1Addresses = JSON.parse(fs.readFileSync(`deployments/${l1Network}.json`).toString());
+    const l2Addresses = JSON.parse(fs.readFileSync(`deployments/${l2Network}.json`).toString());
 
     if (process.env.CONNECT) {
-      console.log("Connecting `AppProxyFactoryBridge` to L1");
+      console.log("Connecting `AppProxyFactoryBridgeL2` to `AppProxyFactoryBridgeL1`");
       appProxyFactoryBridge = (
         await ethers.getContractFactory("AppProxyFactoryBridgeL2", deployer)
-      ).attach(l2Addresses.appProxyFactoryBridge) as AppProxyFactoryBridgeL2;
+      ).attach(l2Addresses["appProxyFactoryBridge"]) as AppProxyFactoryBridgeL2;
       await appProxyFactoryBridge
         .connect(deployer)
-        .setFxRootTunnel(l1Addresses.appProxyFactoryBridge);
+        .setFxRootTunnel(l1Addresses["appProxyFactoryBridge"])
+        .then((tx: any) => tx.wait());
     }
   }
 }

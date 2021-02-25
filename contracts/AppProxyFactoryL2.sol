@@ -6,11 +6,10 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
+import "./IPropsProtocol.sol";
+import "./staking/IStaking.sol";
+import "./tokens/app-points/IAppPoints.sol";
 import "./utils/MinimalProxyFactory.sol";
-
-import "./interfaces/IAppPoints.sol";
-import "./interfaces/IPropsProtocol.sol";
-import "./interfaces/IStaking.sol";
 
 /**
  * @title  AppProxyFactoryL2
@@ -100,6 +99,14 @@ contract AppProxyFactoryL2 is Initializable, MinimalProxyFactory {
     ****************************************/
 
     /**
+     * @dev Transfer the control of the contract to a new address.
+     * @param _controller The new controller
+     */
+    function transferControl(address _controller) external only(controller) {
+        controller = _controller;
+    }
+
+    /**
      * @dev Change the logic contract for app points contract proxies.
      * @param _appPointsLogic The address of the new logic contract
      */
@@ -116,11 +123,10 @@ contract AppProxyFactoryL2 is Initializable, MinimalProxyFactory {
     }
 
     /**
-     * @dev Set the app proxy factory bridge contract.
-     * @param _appProxyFactoryBridge The address of the L2 bridge contract.
+     * @dev Change the app deployment bridge contract.
+     * @param _appProxyFactoryBridge The address of the new bridge contract
      */
-    function setAppProxyFactoryBridge(address _appProxyFactoryBridge) external only(controller) {
-        require(appProxyFactoryBridge == address(0), "Already set");
+    function changeAppProxyFactoryBridge(address _appProxyFactoryBridge) external only(controller) {
         appProxyFactoryBridge = _appProxyFactoryBridge;
     }
 
@@ -147,14 +153,7 @@ contract AppProxyFactoryL2 is Initializable, MinimalProxyFactory {
         address appPointsProxy =
             deployMinimal(
                 appPointsLogic,
-                abi.encodeWithSignature(
-                    "initialize(string,string,address)",
-                    _name,
-                    _symbol,
-                    // TODO: Replace with the bridge address
-                    // appProxyFactoryBridge,
-                    _owner
-                )
+                abi.encodeWithSignature("initialize(string,string)", _name, _symbol)
             );
 
         // Deploy the corresponding staking contract for the app points
@@ -177,7 +176,6 @@ contract AppProxyFactoryL2 is Initializable, MinimalProxyFactory {
         // - the app owner
         // - the PropsProtocol contract
         // - the app points staking contract
-
         IAppPoints(appPointsProxy).whitelistForTransfers(_owner);
         IAppPoints(appPointsProxy).whitelistForTransfers(propsProtocol);
         IAppPoints(appPointsProxy).whitelistForTransfers(appPointsStakingProxy);

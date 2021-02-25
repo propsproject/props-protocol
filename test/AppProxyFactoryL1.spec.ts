@@ -3,8 +3,7 @@ import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import { ethers } from "hardhat";
 
-import type { AppPointsL1, AppProxyFactoryL1 } from "../typechain";
-import { TestAppProxyFactoryBridgeL1 } from "../typechain/TestAppProxyFactoryBridgeL1";
+import type { AppPointsL1, AppProxyFactoryL1, MockAppProxyFactoryBridgeL1 } from "../typechain";
 import {
   bn,
   deployContract,
@@ -23,7 +22,7 @@ describe("AppProxyFactoryL1", () => {
   let appOwner: SignerWithAddress;
   let mock: SignerWithAddress;
 
-  let appProxyFactoryBridge: TestAppProxyFactoryBridgeL1;
+  let appProxyFactoryBridge: MockAppProxyFactoryBridgeL1;
   let appProxyFactory: AppProxyFactoryL1;
 
   const APP_POINTS_TOKEN_NAME = "AppPoints";
@@ -66,7 +65,7 @@ describe("AppProxyFactoryL1", () => {
     );
 
     appProxyFactoryBridge = await deployContract(
-      "TestAppProxyFactoryBridgeL1",
+      "MockAppProxyFactoryBridgeL1",
       deployer,
       appProxyFactory.address
     );

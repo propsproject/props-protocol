@@ -4,7 +4,7 @@ import { solidity } from "ethereum-waffle";
 import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 
-import type { Staking, TestErc20 } from "../../typechain";
+import type { Staking, MockErc20 } from "../../typechain";
 import {
   bn,
   daysToTimestamp,
@@ -24,8 +24,8 @@ describe("Staking", () => {
   let bob: SignerWithAddress;
   let carol: SignerWithAddress;
 
-  let stakingToken: TestErc20;
-  let rewardsToken: TestErc20;
+  let stakingToken: MockErc20;
+  let rewardsToken: MockErc20;
   let staking: Staking;
 
   const STAKING_TOKEN_NAME = "Staking";
@@ -44,7 +44,7 @@ describe("Staking", () => {
     [controller, rewardsDistribution, alice, bob, carol] = await ethers.getSigners();
 
     stakingToken = await deployContractUpgradeable(
-      "TestERC20",
+      "MockERC20",
       controller,
       STAKING_TOKEN_NAME,
       STAKING_TOKEN_SYMBOL,
@@ -52,7 +52,7 @@ describe("Staking", () => {
     );
 
     rewardsToken = await deployContractUpgradeable(
-      "TestERC20",
+      "MockERC20",
       rewardsDistribution,
       REWARDS_TOKEN_NAME,
       REWARDS_TOKEN_SYMBOL,

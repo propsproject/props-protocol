@@ -7,9 +7,9 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
-import "../interfaces/IPropsToken.sol";
-import "../interfaces/IRPropsToken.sol";
-import "../interfaces/IStaking.sol";
+import "../../staking/IStaking.sol";
+import "./IPropsTokenL2.sol";
+import "./IRPropsToken.sol";
 
 /**
  * @title  RPropsToken
@@ -54,9 +54,9 @@ contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
 
     /**
      * @dev Initializer.
+     * @param _amount The amount of rProps to mint and distribute
      * @param _controller The rProps token controller
      * @param _propsToken The address of the Props token contract
-     * @param _amount The amount of rProps to mint and distribute
      */
     function initialize(
         uint256 _amount,
@@ -141,7 +141,7 @@ contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
             _burn(_account, amount);
 
             // Mint Props
-            IPropsToken(propsToken).mint(_account, amount);
+            IPropsTokenL2(propsToken).mint(_account, amount);
         }
     }
 }

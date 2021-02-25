@@ -7,27 +7,30 @@ import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
-import "../interfaces/IPropsToken.sol";
+import "../tokens/props/IPropsTokenL1.sol";
 
-contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IPropsToken {
+/**
+ * @dev Mock of the Props token used in tests. It acts as a workaround
+ *      for having to bridge Props tokens from L1 to L2 by providing a
+ *      full-featured Props token directly on L2.
+ */
+contract MockPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, IPropsTokenL1 {
     using SafeMathUpgradeable for uint256;
 
-    mapping(address => bool) public minters;
-
-    uint256 public override maxTotalSupply;
+    // Set of addresses allowed to additional Props
+    mapping(address => bool) public isMinter;
 
     // solhint-disable-next-line var-name-mixedcase
     bytes32 public PERMIT_TYPEHASH;
     // solhint-disable-next-line var-name-mixedcase
     bytes32 public DOMAIN_SEPARATOR;
 
+    // Nonces for permit
     mapping(address => uint256) public nonces;
 
     function initialize(uint256 _amount) public initializer {
         OwnableUpgradeable.__Ownable_init();
-        ERC20Upgradeable.__ERC20_init("Test Props", "TPROPS");
-
-        maxTotalSupply = 1e9 * (10**uint256(decimals()));
+        ERC20Upgradeable.__ERC20_init("Mock Props", "MPROPS");
 
         PERMIT_TYPEHASH = keccak256(
             "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
@@ -45,25 +48,18 @@ contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, 
         );
 
         _mint(msg.sender, _amount);
-        // 1 million Props reserved for testing (redeemable from the faucet)
-        _mint(address(this), 1000000 * 10**18);
-    }
-
-    function redeem() external {
-        this.transfer(msg.sender, 1000 * 10**18);
     }
 
     function addMinter(address _minter) external onlyOwner {
-        minters[_minter] = true;
+        isMinter[_minter] = true;
     }
 
     function removeMinter(address _minter) external onlyOwner {
-        minters[_minter] = false;
+        isMinter[_minter] = false;
     }
 
     function mint(address _account, uint256 _amount) external override {
-        require(minters[msg.sender], "Unauthorized");
-        require(totalSupply().add(_amount) <= maxTotalSupply, "Amount exceeds max total supply");
+        require(isMinter[msg.sender], "Unauthorized");
         _mint(_account, _amount);
     }
 
@@ -77,6 +73,7 @@ contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, 
         bytes32 _s
     ) external override {
         require(_deadline >= block.timestamp, "Permit expired");
+
         bytes32 digest =
             keccak256(
                 abi.encodePacked(
@@ -94,8 +91,10 @@ contract TestPropsToken is Initializable, OwnableUpgradeable, ERC20Upgradeable, 
                     )
                 )
             );
+
         address recoveredAddress = ecrecover(digest, _v, _r, _s);
         require(recoveredAddress != address(0) && recoveredAddress == _owner, "Invalid signature");
+
         _approve(_owner, _spender, _amount);
     }
 

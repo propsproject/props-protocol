@@ -11,11 +11,11 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./utils/MetaTransactionProvider.sol";
 
-import "./interfaces/IPropsProtocol.sol";
-import "./interfaces/IPropsToken.sol";
-import "./interfaces/IRPropsToken.sol";
-import "./interfaces/ISPropsToken.sol";
-import "./interfaces/IStaking.sol";
+import "./IPropsProtocol.sol";
+import "./tokens/props/IPropsTokenL2.sol";
+import "./tokens/props/IRPropsToken.sol";
+import "./tokens/props/ISPropsToken.sol";
+import "./staking/IStaking.sol";
 
 /**
  * @title  PropsProtocol
@@ -142,6 +142,14 @@ contract PropsProtocol is
     ****************************************/
 
     /**
+     * @dev Transfer the guardian role to a new address.
+     * @param _guardian The new guardian
+     */
+    function transferGuardianship(address _guardian) external only(guardian) {
+        guardian = _guardian;
+    }
+
+    /**
      * @dev Pause the protocol.
      */
     function pause() external only(guardian) {
@@ -158,6 +166,14 @@ contract PropsProtocol is
     /***************************************
                 CONTROLLER ACTIONS
     ****************************************/
+
+    /**
+     * @dev Transfer the control of the contract to a new address.
+     * @param _controller The new controller
+     */
+    function transferControl(address _controller) external only(controller) {
+        controller = _controller;
+    }
 
     /*
      * The following set methods are required to be called before any contract interaction:
@@ -349,7 +365,7 @@ contract PropsProtocol is
         bytes32 _r,
         bytes32 _s
     ) external whenNotPaused {
-        IPropsToken(propsToken).permit(_owner, _spender, _amount, _deadline, _v, _r, _s);
+        IPropsTokenL2(propsToken).permit(_owner, _spender, _amount, _deadline, _v, _r, _s);
         stakeOnBehalf(_apps, _amounts, _account);
     }
 
@@ -379,7 +395,7 @@ contract PropsProtocol is
         bytes32 _r,
         bytes32 _s
     ) external whenNotPaused {
-        IPropsToken(propsToken).permit(_owner, _spender, _amount, _deadline, _v, _r, _s);
+        IPropsTokenL2(propsToken).permit(_owner, _spender, _amount, _deadline, _v, _r, _s);
         stake(_apps, _amounts);
     }
 

@@ -12,7 +12,7 @@ import type {
   RPropsToken,
   SPropsToken,
   Staking,
-  TestPropsToken,
+  MockPropsToken,
 } from "../typechain";
 import {
   bn,
@@ -40,7 +40,7 @@ describe("PropsProtocol", () => {
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
 
-  let propsToken: TestPropsToken;
+  let propsToken: MockPropsToken;
   let rPropsToken: RPropsToken;
   let sPropsToken: SPropsToken;
   let propsAppStaking: Staking;
@@ -77,7 +77,8 @@ describe("PropsProtocol", () => {
       appPointsAddress
     ) as AppPointsL2;
 
-    // Mint to the app owner (workaround for moving app points tokens across the bridge)
+    // Mint to the app owner (workaround for having to move app points tokens across the bridge)
+    await appPoints.connect(appOwner).addMinter(appOwner.address);
     await appPoints.connect(appOwner).mint(appOwner.address, APP_POINTS_TOKEN_AMOUNT);
 
     await propsProtocol.connect(controller).whitelistApp(appPointsAddress);
@@ -100,7 +101,7 @@ describe("PropsProtocol", () => {
       bob,
     ] = await ethers.getSigners();
 
-    propsToken = await deployContractUpgradeable("TestPropsToken", deployer, PROPS_TOKEN_AMOUNT);
+    propsToken = await deployContractUpgradeable("MockPropsToken", deployer, PROPS_TOKEN_AMOUNT);
 
     propsProtocol = await deployContractUpgradeable(
       "PropsProtocol",
@@ -156,7 +157,7 @@ describe("PropsProtocol", () => {
     await propsToken.connect(deployer).addMinter(rPropsToken.address);
     await appProxyFactory
       .connect(controller)
-      .setAppProxyFactoryBridge(appProxyFactoryBridge.address);
+      .changeAppProxyFactoryBridge(appProxyFactoryBridge.address);
     await propsProtocol.connect(controller).setAppProxyFactory(appProxyFactory.address);
     await propsProtocol.connect(controller).setRPropsToken(rPropsToken.address);
     await propsProtocol.connect(controller).setSPropsToken(sPropsToken.address);

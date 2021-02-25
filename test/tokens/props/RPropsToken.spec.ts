@@ -3,7 +3,7 @@ import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import { ethers } from "hardhat";
 
-import type { RPropsToken, Staking, TestPropsToken } from "../../typechain";
+import type { RPropsToken, Staking, MockPropsToken } from "../../../typechain";
 import {
   bn,
   daysToTimestamp,
@@ -11,7 +11,7 @@ import {
   expandTo18Decimals,
   mineBlock,
   now,
-} from "../../utils";
+} from "../../../utils";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -21,7 +21,7 @@ describe("RPropsToken", () => {
   let controller: SignerWithAddress;
   let alice: SignerWithAddress;
 
-  let propsToken: TestPropsToken;
+  let propsToken: MockPropsToken;
   let rPropsToken: RPropsToken;
   let propsAppStaking: Staking;
   let propsUserStaking: Staking;
@@ -35,7 +35,7 @@ describe("RPropsToken", () => {
   beforeEach(async () => {
     [deployer, controller, alice] = await ethers.getSigners();
 
-    propsToken = await deployContractUpgradeable("TestPropsToken", deployer, PROPS_TOKEN_AMOUNT);
+    propsToken = await deployContractUpgradeable("MockPropsToken", deployer, PROPS_TOKEN_AMOUNT);
 
     rPropsToken = await deployContractUpgradeable(
       "RPropsToken",

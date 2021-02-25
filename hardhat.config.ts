@@ -10,6 +10,7 @@ import "hardhat-gas-reporter";
 import "hardhat-typechain";
 import "solidity-coverage";
 
+// Use predefined accounts for testing
 import accounts from "./test-accounts";
 
 const config: HardhatUserConfig = {
@@ -29,12 +30,7 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: { accounts },
-    local: {
-      url: "http://localhost:8545",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
-    },
+    // Testnet configs
     goerli: {
       url: `https://goerli.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
       accounts: {
@@ -44,6 +40,21 @@ const config: HardhatUserConfig = {
     mumbai: {
       url: "https://rpc-mumbai.matic.today",
       accounts: {
+        mnemonic: process.env.MNEMONIC,
+      },
+    },
+    // Mainnet configs
+    mainnet: {
+      url: `https://mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
+      accounts: {
+        // TODO: We'll probably need to hardcode the individual private keys instead of using a mnemonic
+        mnemonic: process.env.MNEMONIC,
+      },
+    },
+    matic: {
+      url: "https://rpc-mainnet.matic.network",
+      accounts: {
+        // TODO: We'll probably need to hardcode the individual private keys instead of using a mnemonic
         mnemonic: process.env.MNEMONIC,
       },
     },
