@@ -12,4 +12,4 @@ In the Props protocol, app deployments can only be triggered on L1. An app deplo
 
 ##### Bridging governance actions
 
-Props governance fully resides on L2. This implies that in order for the governance to be able to take actions affecting L1 state (eg. state related to the Props token), there needs to be a way to bridge them from L2 to L1. This is to be done over a custom bridge. More details can be found at [Governance](./Governance.md).
+Props governance fully resides on L2. This implies that in order for the governance to be able to take actions affecting L1 state (eg. state related to the Props token), there needs to be a way to bridge them from L2 to L1. This is to be done over a custom bridge.
