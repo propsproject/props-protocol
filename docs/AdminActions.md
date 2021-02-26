@@ -1,4 +1,4 @@
-## Admin Actions
+## Admin actions
 
 In the Props protocol, several entities have special permissions on various aspects of the protocol. The following attempts to provide a description covering most of these special addresses and the impact they have over the protocol. Please note that the role of some of these special addresses will be played by protocol contracts (eg. `PropsProtocol` controls `RPropsToken` and `SPropsToken`).
 
