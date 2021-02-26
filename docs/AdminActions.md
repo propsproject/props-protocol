@@ -1,25 +1,63 @@
 ## Admin Actions
 
-WARNING: Some information might be out of date
+In the Props protocol, several entities have special permissions on various aspects of the protocol. The following attempts to provide a description covering most of these special addresses and the impact they have over the protocol. Please note that the role of some of these special addresses will be played by protocol contracts (eg. `PropsProtocol` controls `RPropsToken` and `SPropsToken`).
 
-All administrative actions related to Props-owned contracts are to be executed by four designated addresses: the upgradeability admin, the `PropsController` owner, the `AppTokenProxyFactory` owner and the Props guardian.
+Besides the permissions described below, the Props protocol deployer is granted permissions to upgrade any upgradeable contracts in the Props protocol. More details on how the upgrades are done and how the upgradeability owner is able to transfer its role to other designated addresses can be found at OpenZeppelin's [docs](https://docs.openzeppelin.com/cli/2.8/contracts-architecture#upgrades).
 
-As the name suggests, the upgradeability admin is responsible and allowed to upgrade any upgradeable contracts in the Props protocol. More details on how the upgrades are done and how the upgradeability owner is able to transfer its role to other designated addresses can be found in OpenZeppelin's [docs](https://docs.openzeppelin.com/cli/2.8/contracts-architecture#upgrades).
+##### `AppProxyFactoryL1` controller
 
-The `PropsController` owner has the ability to perform certain restricted actions on the `PropsController` contract:
+- change the logic contract for the L1 variant of AppPoints tokens
+- change the L1 app deployment bridge contract
 
-- set the sProps and rProps tokens contracts
-- set the app and user sProps staking contracts
-- set the rewards escrow cooldown period
-- whitelist an app
-- blacklist an app
-- distribute the Props rewards to apps and users (this is a one-time action)
+##### `AppProxyFactoryL2` controller
 
-The AppTokenProxyFactory owner is permissioned to take the following actions on the `AppTokenProxyFactory` contract:
+- change the logic contract for the L2 variant of AppPoints tokens
+- change the logic contract for AppPoints staking
+- change the L2 app deployment bridge contract
 
-- set the implementation contract for new app token contracts
-- set the implementation contract for new app token staking contracts
+##### `PropsProtocol` controller
 
-The Props guardian has the ability to pause/unpause the `PropsController` contract in case of bugs. More details can be found in the `PropsController` [docs](./PropsController.md).
+- whitelist apps
+- blacklist apps
+- change the cooldown period for the escrowed Props rewards
+- trigger the rProps rewards distribution
+- withdraw rProps rewards
 
-Besides this, the designated owners of individual apps can perform certain administrative actions on the corresponding AppToken contracts. More details on this can be found in the `AppToken` [docs](./AppToken.md).
+##### `PropsProtocol` guardian
+
+- pause the protocol
+- unpause the protocol
+
+##### `SPropsToken` controller (reserved for `PropsProtocol`)
+
+- mint sProps tokens
+- burn sProps tokens
+
+##### `RPropsToken` controller (reserved for `PropsProtocol`)
+
+- distribute rProps rewards
+- withdraw rProps rewards
+- swap rProps for regular Props
+
+##### `PropsTokenL2` owner
+
+- add new minter
+- remove existing minter
+
+##### `PropsTokenL2` minters (reserved for bridges)
+
+- mint L2 Props tokens
+- burn L2 Props tokens
+
+##### `AppPoints` owner
+
+- add new minter on L2
+- remove existing minter on L2
+- change app info on L2
+- mint L1 AppPoints tokens
+- change the inflation rate on L1
+
+##### `AppPoints` minters (reserved for bridges)
+
+- mint L2 AppPoints tokens
+- burn L2 AppPoints tokens
