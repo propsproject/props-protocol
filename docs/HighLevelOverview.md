@@ -1,3 +1,3 @@
 ## High-level overview over the protocol interactions
 
-![props protocol](./docs/diagrams/props-protocol.svg)
+![props protocol](./diagrams/props-protocol.svg)
