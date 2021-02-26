@@ -18,7 +18,7 @@ import "./IRPropsToken.sol";
  *         distributed to the app and user Props staking contracts and have the
  *         rewards in those contracts be earned in rProps. The rProps token is
  *         then swappable for regular Props tokens. This acts as a workaround
- *         for having to mint all left Props tokens beforehand.
+ *         for having to mint Props tokens before actual distribution to users.
  */
 contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
     using SafeMathUpgradeable for uint256;
@@ -33,11 +33,11 @@ contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
     // Props protocol related tokens
     address public propsToken;
 
-    // Keeps track of whether the rProps rewards have been distributed
+    // Keeps track of whether the rProps have been distributed as rewards
     bool public distributed;
 
-    // The amount of rProps initially minted and distributed
-    uint256 public distributedAmount;
+    // The amount of rProps to mint and distribute as rewards
+    uint256 public amountToDistribute;
 
     /**************************************
                     MODIFIERS
@@ -54,7 +54,7 @@ contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
 
     /**
      * @dev Initializer.
-     * @param _amount The amount of rProps to mint and distribute
+     * @param _amount The amount of rProps to mint and distribute as rewards
      * @param _controller The rProps token controller
      * @param _propsToken The address of the Props token contract
      */
@@ -65,7 +65,7 @@ contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
     ) public initializer {
         ERC20Upgradeable.__ERC20_init("rProps", "RPROPS");
 
-        distributedAmount = _amount;
+        amountToDistribute = _amount;
         controller = _controller;
         propsToken = _propsToken;
     }
@@ -76,7 +76,7 @@ contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
 
     /**
      * @dev Distribute rProps rewards to the app and user Props staking contracts.
-     *      This action mints the maximum possible amount of rProps and calls the
+     *      This action mints the initially set amount of rProps and calls the
      *      rewards distribution action on the staking contracts.
      * @param _propsAppStaking The app Props staking contract
      * @param _appRewardsPercentage The percentage of minted rProps to get distributed to apps
@@ -91,29 +91,28 @@ contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
     ) external override only(controller) {
         // This is a one-time only action
         require(!distributed, "Rewards already distributed");
+        distributed = true;
 
         // The percentages must add up to 100%
         require(_appRewardsPercentage.add(_userRewardsPercentage) == 1e6, "Invalid percentages");
 
         // Distribute app rProps rewards
-        uint256 appRewards = distributedAmount.mul(_appRewardsPercentage).div(1e6);
+        uint256 appRewards = amountToDistribute.mul(_appRewardsPercentage).div(1e6);
         _mint(_propsAppStaking, appRewards);
         IStaking(_propsAppStaking).notifyRewardAmount(balanceOf(_propsAppStaking));
 
         // Distribute user rProps rewards
-        uint256 userRewards = distributedAmount.sub(appRewards);
+        uint256 userRewards = amountToDistribute.sub(appRewards);
         _mint(_propsUserStaking, userRewards);
         IStaking(_propsUserStaking).notifyRewardAmount(balanceOf(_propsUserStaking));
-
-        distributed = true;
     }
 
     /**
      * @dev Withdraw rProps rewards from the app and user Props staking contracts.
      * @param _propsAppStaking The app Props staking contract
-     * @param _appRewardsAmount The amount of rProps to get distributed to apps
+     * @param _appRewardsAmount The amount of rProps to get withdrawn from the app Props staking contract
      * @param _propsUserStaking The user Props staking contract
-     * @param _userRewardsAmount The amount of rProps to get distributed to users
+     * @param _userRewardsAmount The amount of rProps to get withdrawn from the user Props staking contract
      */
     function withdrawRewards(
         address _propsAppStaking,
