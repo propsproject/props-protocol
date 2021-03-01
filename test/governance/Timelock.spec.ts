@@ -45,8 +45,6 @@ describe("Timelock", () => {
     timelock = await deployContract("Timelock", admin, admin.address, TIMELOCK_DELAY);
   });
 
-  // TODO: Add test for pausability
-
   it("queue transactions", async () => {
     const timelockTx: TimelockTx = {
       target: timelock.address,
@@ -149,5 +147,32 @@ describe("Timelock", () => {
     await expect(
       execute(timelock.connect(admin).executeTransaction, timelockTx)
     ).to.be.revertedWith("Transaction is stale");
+  });
+
+  it("pausability", async () => {
+    const timelockTx: TimelockTx = {
+      target: timelock.address,
+      value: 0,
+      signature: "pause()",
+      data: "0x",
+      eta: (await now()).add(TIMELOCK_DELAY).add(daysToTimestamp(1)),
+    };
+
+    // Queue transaction
+    await execute(timelock.connect(admin).queueTransaction, timelockTx);
+
+    // Fast forward until after the transaction's timelock
+    await mineBlock(timelockTx.eta.add(1));
+
+    // Execute transactions
+    await execute(timelock.connect(admin).executeTransaction, timelockTx);
+
+    // Check that the timelock contract got paused
+    expect(await timelock.paused()).to.be.true;
+
+    // Once paused, no transactions can get queued/cancelled/executed anymore
+    await expect(execute(timelock.connect(admin).queueTransaction, timelockTx)).to.be.revertedWith(
+      "Contract must not be paused"
+    );
   });
 });

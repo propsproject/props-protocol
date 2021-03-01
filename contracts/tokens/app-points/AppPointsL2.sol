@@ -69,7 +69,7 @@ contract AppPointsL2 is Initializable, AppPointsCommon {
      * @param _minter The address to remove minting permissions from
      */
     function removeMinter(address _minter) external onlyOwner {
-        isMinter[_minter] = true;
+        isMinter[_minter] = false;
     }
 
     /***************************************

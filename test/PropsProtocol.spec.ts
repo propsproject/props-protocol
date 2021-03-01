@@ -39,6 +39,7 @@ describe("PropsProtocol", () => {
   let appOwner: SignerWithAddress;
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
+  let mock: SignerWithAddress;
 
   let propsToken: MockPropsToken;
   let rPropsToken: RPropsToken;
@@ -99,6 +100,7 @@ describe("PropsProtocol", () => {
       appOwner,
       alice,
       bob,
+      mock,
     ] = await ethers.getSigners();
 
     propsToken = await deployContractUpgradeable("MockPropsToken", deployer, PROPS_TOKEN_AMOUNT);
@@ -987,23 +989,33 @@ describe("PropsProtocol", () => {
     ).to.be.revertedWith("Unauthorized");
     expect(await propsProtocol.connect(controller).changeRewardsEscrowCooldown(bn(10)));
 
-    const mockAddress = bob.address;
-
     // Only the controller can whitelist apps
-    await expect(propsProtocol.connect(alice).whitelistApp(mockAddress)).to.be.revertedWith(
+    await expect(propsProtocol.connect(alice).whitelistApp(mock.address)).to.be.revertedWith(
       "Unauthorized"
     );
-    expect(await propsProtocol.connect(controller).whitelistApp(mockAddress));
+    expect(await propsProtocol.connect(controller).whitelistApp(mock.address));
 
     // Only the controller can blacklist apps
-    await expect(propsProtocol.connect(alice).blacklistApp(mockAddress)).to.be.revertedWith(
+    await expect(propsProtocol.connect(alice).blacklistApp(mock.address)).to.be.revertedWith(
       "Unauthorized"
     );
-    expect(await propsProtocol.connect(controller).blacklistApp(mockAddress));
+    expect(await propsProtocol.connect(controller).blacklistApp(mock.address));
 
     // Only the guardian can pause the controller
     await expect(propsProtocol.connect(alice).pause()).to.be.revertedWith("Unauthorized");
     expect(await propsProtocol.connect(guardian).pause());
+
+    // Transfer control
+    await propsProtocol.connect(controller).transferControl(mock.address);
+    await expect(
+      propsProtocol.connect(controller).changeRewardsEscrowCooldown(bn(10))
+    ).to.be.revertedWith("Unauthorized");
+    expect(await propsProtocol.connect(mock).changeRewardsEscrowCooldown(bn(10)));
+
+    // Transfer guardianship
+    await propsProtocol.connect(guardian).transferGuardianship(mock.address);
+    await expect(propsProtocol.connect(guardian).unpause()).to.be.revertedWith("Unauthorized");
+    expect(await propsProtocol.connect(mock).unpause());
   });
 
   it("no user actions are available when paused", async () => {

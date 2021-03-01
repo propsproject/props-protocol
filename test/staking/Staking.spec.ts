@@ -24,13 +24,8 @@ describe("Staking", () => {
   let bob: SignerWithAddress;
   let carol: SignerWithAddress;
 
-  let stakingToken: MockErc20;
   let rewardsToken: MockErc20;
   let staking: Staking;
-
-  const STAKING_TOKEN_NAME = "Staking";
-  const STAKING_TOKEN_SYMBOL = "STK";
-  const STAKING_TOKEN_AMOUNT = expandTo18Decimals(1000);
 
   const REWARDS_TOKEN_NAME = "Rewards";
   const REWARDS_TOKEN_SYMBOL = "RWD";
@@ -42,14 +37,6 @@ describe("Staking", () => {
 
   beforeEach(async () => {
     [controller, rewardsDistribution, alice, bob, carol] = await ethers.getSigners();
-
-    stakingToken = await deployContractUpgradeable(
-      "MockERC20",
-      controller,
-      STAKING_TOKEN_NAME,
-      STAKING_TOKEN_SYMBOL,
-      STAKING_TOKEN_AMOUNT
-    );
 
     rewardsToken = await deployContractUpgradeable(
       "MockERC20",
@@ -411,5 +398,17 @@ describe("Staking", () => {
 
     // Check that the correct amount of rewards was withdrawn
     expect(reward.div(10)).to.eq(await rewardsToken.balanceOf(rewardsDistribution.address));
+  });
+
+  it("transfer rewards distribution role", async () => {
+    const reward = expandTo18Decimals(1000);
+    await rewardsToken.connect(rewardsDistribution).transfer(staking.address, reward);
+
+    // Update the rewards distribution address
+    await staking.connect(rewardsDistribution).changeRewardsDistribution(alice.address);
+    await expect(
+      staking.connect(rewardsDistribution).notifyRewardAmount(reward)
+    ).to.be.revertedWith("Unauthorized");
+    await staking.connect(alice).notifyRewardAmount(reward);
   });
 });

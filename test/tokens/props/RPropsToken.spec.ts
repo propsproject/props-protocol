@@ -1,5 +1,5 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
-import chai from "chai";
+import chai, { use } from "chai";
 import { solidity } from "ethereum-waffle";
 import { ethers } from "hardhat";
 
@@ -68,7 +68,7 @@ describe("RPropsToken", () => {
   });
 
   it("distribute rewards to the app and user Props staking contracts", async () => {
-    // Only the owner is permissioned to distribute the rewards
+    // Only the controller is permissioned to distribute the rewards
     await expect(
       rPropsToken
         .connect(alice)
@@ -107,6 +107,55 @@ describe("RPropsToken", () => {
     expect(await propsUserStaking.periodFinish()).to.not.eq(bn(0));
   });
 
+  it("withdraw rewards from the app and user Props staking contracts", async () => {
+    // First, distribute the rewards
+    await rPropsToken
+      .connect(controller)
+      .distributeRewards(propsAppStaking.address, bn(700000), propsUserStaking.address, bn(300000));
+
+    const appRewardsToWithdraw = RPROPS_TOKEN_AMOUNT.div(2).mul(7).div(10);
+    const userRewardsToWithdraw = RPROPS_TOKEN_AMOUNT.div(2).mul(3).div(10);
+
+    // Only the controller is permissioned to withdraw the rewards
+    await expect(
+      rPropsToken
+        .connect(alice)
+        .withdrawRewards(
+          propsAppStaking.address,
+          appRewardsToWithdraw,
+          propsUserStaking.address,
+          userRewardsToWithdraw
+        )
+    ).to.be.revertedWith("Unauthorized");
+
+    // Can only withdraw existing rewards that were not yet distributed
+    await expect(
+      rPropsToken
+        .connect(controller)
+        .withdrawRewards(
+          propsAppStaking.address,
+          RPROPS_TOKEN_AMOUNT,
+          propsUserStaking.address,
+          RPROPS_TOKEN_AMOUNT
+        )
+    ).to.be.revertedWith("Amount exceeds outstanding rewards");
+
+    // Withdraw rewards
+    await rPropsToken
+      .connect(controller)
+      .withdrawRewards(
+        propsAppStaking.address,
+        appRewardsToWithdraw,
+        propsUserStaking.address,
+        userRewardsToWithdraw
+      );
+
+    // The withdrawn rewards got burned
+    expect(await rPropsToken.totalSupply()).to.eq(
+      RPROPS_TOKEN_AMOUNT.sub(appRewardsToWithdraw.add(userRewardsToWithdraw))
+    );
+  });
+
   it("swap rProps to Props", async () => {
     // First, distribute the rewards in order to get some rProps minted
     await rPropsToken
@@ -127,7 +176,7 @@ describe("RPropsToken", () => {
     await propsUserStaking.connect(controller).claimReward(alice.address);
     await rPropsToken.connect(controller).transfer(alice.address, earned);
 
-    // Only the owner can swap rProps for Props
+    // Only the controller can swap rProps for Props
     await expect(rPropsToken.connect(alice).swap(alice.address)).to.be.revertedWith("Unauthorized");
 
     // Swap Alice's rProps for regular Props

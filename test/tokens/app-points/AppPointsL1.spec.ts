@@ -231,5 +231,11 @@ describe("AppPointsL1", () => {
     await expect(appPoints.connect(appOwner).transfer(alice.address, bn(100))).to.be.revertedWith(
       "Unauthorized"
     );
+
+    // Unpause
+    await appPoints.connect(appOwner).unpause();
+
+    // When unpaused, anyone should be free to transfer
+    await appPoints.connect(appOwner).transfer(alice.address, bn(100));
   });
 });

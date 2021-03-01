@@ -100,5 +100,12 @@ describe("AppProxyFactoryL1", () => {
 
     // Only the controller can change the logic contracts
     await appProxyFactory.connect(controller).changeAppPointsLogic(mock.address);
+
+    // Transfer control
+    await appProxyFactory.connect(controller).transferControl(mock.address);
+    await expect(
+      appProxyFactory.connect(controller).changeAppPointsLogic(mock.address)
+    ).to.be.revertedWith("Unauthorized");
+    await appProxyFactory.connect(mock).changeAppPointsLogic(mock.address);
   });
 });
