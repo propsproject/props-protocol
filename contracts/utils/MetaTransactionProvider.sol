@@ -5,7 +5,16 @@ pragma solidity 0.7.3;
 import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
-// TODO: Add docs
+/**
+ * @title  MetaTransactionProvider
+ * @author Forked from: Biconomy
+ *         Changes by: Props
+ * @dev    Provides native meta-transactions support to inheriting contracts.
+ *         It supports two different domain separators, one for the root chain
+ *         and the other for the child chain. The root chain domain separator
+ *         acts as a workaround for users having to switch networks when
+ *         interacting with an L2 instance of the contracts.
+ */
 abstract contract MetaTransactionProvider {
     using SafeMathUpgradeable for uint256;
 
@@ -19,7 +28,7 @@ abstract contract MetaTransactionProvider {
     struct MetaTransaction {
         uint256 nonce;
         address from;
-        bytes functionSignature;
+        bytes callData;
         uint256 deadline;
     }
 
@@ -28,7 +37,9 @@ abstract contract MetaTransactionProvider {
     ***************************************/
 
     // solhint-disable-next-line var-name-mixedcase
-    bytes32 public DOMAIN_SEPARATOR;
+    bytes32 public DOMAIN_SEPARATOR_L1;
+    // solhint-disable-next-line var-name-mixedcase
+    bytes32 public DOMAIN_SEPARATOR_L2;
 
     // solhint-disable-next-line var-name-mixedcase
     bytes32 public META_TRANSACTION_TYPEHASH;
@@ -39,7 +50,7 @@ abstract contract MetaTransactionProvider {
                      EVENTS
     ***************************************/
 
-    event MetaTransactionExecuted(address from, address relayer, bytes functionSignature);
+    event MetaTransactionExecuted(address from, address relayer, bytes callData);
 
     /***************************************
                    INITIALIZER
@@ -49,11 +60,11 @@ abstract contract MetaTransactionProvider {
     function __MetaTransactionProvider_init(
         string memory _name,
         string memory _version,
-        // The chain id must be correspond to the chain id of the underlying base Ethereum network
+        // The chain id must be correspond to the chain id of the underlying root network (Ethereum - goerli or mainnet in our case)
         // This way, users won't have to change networks in order to be able to sign transactions
-        uint256 _chainId
+        uint256 _l1ChainId
     ) public {
-        DOMAIN_SEPARATOR = keccak256(
+        DOMAIN_SEPARATOR_L1 = keccak256(
             abi.encode(
                 keccak256(
                     bytes(
@@ -62,21 +73,42 @@ abstract contract MetaTransactionProvider {
                 ),
                 keccak256(bytes(_name)),
                 keccak256(bytes(_version)),
-                _chainId,
+                _l1ChainId,
+                address(this)
+            )
+        );
+
+        DOMAIN_SEPARATOR_L2 = keccak256(
+            abi.encode(
+                keccak256(
+                    bytes(
+                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                    )
+                ),
+                keccak256(bytes(_name)),
+                keccak256(bytes(_version)),
+                _getChainId(),
                 address(this)
             )
         );
 
         META_TRANSACTION_TYPEHASH = keccak256(
-            bytes(
-                "MetaTransaction(uint256 nonce,address from,bytes functionSignature,uint256 deadline)"
-            )
+            bytes("MetaTransaction(uint256 nonce,address from,bytes callData,uint256 deadline)")
         );
     }
 
+    /**
+     * @dev Execute a meta-transaction.
+     * @param _from The actual transaction sender
+     * @param _callData The ABI-encoded calldata
+     * @param _deadline The deadline for the sender's signature
+     * @param _v Part of the signature
+     * @param _r Part of the signature
+     * @param _s Part of the signature
+     */
     function executeMetaTransaction(
         address _from,
-        bytes memory _functionSignature,
+        bytes memory _callData,
         uint256 _deadline,
         uint8 _v,
         bytes32 _r,
@@ -84,27 +116,32 @@ abstract contract MetaTransactionProvider {
     ) public payable returns (bytes memory) {
         require(_deadline >= block.timestamp, "Signature expired");
 
-        bytes4 destinationFunctionSignature = _convertBytesToBytes4(_functionSignature);
+        bytes4 destinationFunctionSignature = _convertBytesToBytes4(_callData);
         require(destinationFunctionSignature != msg.sig, "Invalid function signature");
 
         MetaTransaction memory metaTransaction =
             MetaTransaction({
                 nonce: nonces[_from],
                 from: _from,
-                functionSignature: _functionSignature,
+                callData: _callData,
                 deadline: _deadline
             });
 
-        require(_verify(_from, metaTransaction, _r, _s, _v), "Invalid signer");
+        // We allow either L1 or L2 signatures
+        require(
+            _verify(DOMAIN_SEPARATOR_L1, _from, metaTransaction, _r, _s, _v) ||
+                _verify(DOMAIN_SEPARATOR_L2, _from, metaTransaction, _r, _s, _v),
+            "Invalid signer"
+        );
         nonces[_from] = nonces[_from].add(1);
 
         // Append `_from` at the end to extract it from calling context
         (bool success, bytes memory returnData) =
             // solhint-disable-next-line avoid-low-level-calls
-            address(this).call(abi.encodePacked(_functionSignature, _from));
+            address(this).call(abi.encodePacked(_callData, _from));
         require(success, "Unsuccessfull call");
 
-        emit MetaTransactionExecuted(_from, msg.sender, _functionSignature);
+        emit MetaTransactionExecuted(_from, msg.sender, _callData);
         return returnData;
     }
 
@@ -112,8 +149,26 @@ abstract contract MetaTransactionProvider {
                      HELPERS
     ****************************************/
 
-    function _toEIP712Digest(bytes32 _messageDigest) internal view returns (bytes32) {
-        return keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, _messageDigest));
+    function _msgSender() internal view virtual returns (address payable sender) {
+        if (msg.sender == address(this)) {
+            bytes memory array = msg.data;
+            uint256 index = msg.data.length;
+
+            assembly {
+                // Load the 32 bytes word from memory with the address on the lower 20 bytes, and mask those
+                sender := and(mload(add(array, index)), 0xffffffffffffffffffffffffffffffffffffffff)
+            }
+        } else {
+            return msg.sender;
+        }
+    }
+
+    function _toEIP712Digest(bytes32 _domainSeparator, bytes32 _messageDigest)
+        internal
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encodePacked("\x19\x01", _domainSeparator, _messageDigest));
     }
 
     function _convertBytesToBytes4(bytes memory _inBytes) internal pure returns (bytes4) {
@@ -129,6 +184,7 @@ abstract contract MetaTransactionProvider {
     }
 
     function _verify(
+        bytes32 _domainSeparator,
         address _from,
         MetaTransaction memory _metaTransaction,
         bytes32 _r,
@@ -136,9 +192,13 @@ abstract contract MetaTransactionProvider {
         uint8 _v
     ) internal view returns (bool) {
         address signer =
-            ecrecover(_toEIP712Digest(_hashMetaTransaction(_metaTransaction)), _v, _r, _s);
-        require(signer != address(0), "Invalid signature");
-        return signer == _from;
+            ecrecover(
+                _toEIP712Digest(_domainSeparator, _hashMetaTransaction(_metaTransaction)),
+                _v,
+                _r,
+                _s
+            );
+        return signer != address(0) && signer == _from;
     }
 
     function _hashMetaTransaction(MetaTransaction memory _metaTransaction)
@@ -152,25 +212,15 @@ abstract contract MetaTransactionProvider {
                     META_TRANSACTION_TYPEHASH,
                     _metaTransaction.nonce,
                     _metaTransaction.from,
-                    keccak256(_metaTransaction.functionSignature),
+                    keccak256(_metaTransaction.callData),
                     _metaTransaction.deadline
                 )
             );
     }
 
-    function msgSender() internal view returns (address) {
-        if (msg.sender == address(this)) {
-            bytes memory array = msg.data;
-            uint256 index = msg.data.length;
-
-            address _sender;
-            assembly {
-                // Load the 32 bytes word from memory with the address on the lower 20 bytes, and mask those
-                _sender := and(mload(add(array, index)), 0xffffffffffffffffffffffffffffffffffffffff)
-            }
-            return _sender;
-        } else {
-            return msg.sender;
+    function _getChainId() internal pure returns (uint256 chainId) {
+        assembly {
+            chainId := chainid()
         }
     }
 }

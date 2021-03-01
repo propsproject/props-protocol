@@ -1052,7 +1052,7 @@ describe("PropsProtocol", () => {
     const message = {
       from: alice.address,
       nonce: (await propsProtocol.nonces(alice.address)).toNumber(),
-      functionSignature: propsProtocol.interface.encodeFunctionData("stake", [
+      callData: propsProtocol.interface.encodeFunctionData("stake", [
         [appPoints.address],
         [stakeAmount],
       ]),
@@ -1070,7 +1070,7 @@ describe("PropsProtocol", () => {
         MetaTransaction: [
           { name: "nonce", type: "uint256" },
           { name: "from", type: "address" },
-          { name: "functionSignature", type: "bytes" },
+          { name: "callData", type: "bytes" },
           { name: "deadline", type: "uint256" },
         ],
       },
@@ -1096,7 +1096,7 @@ describe("PropsProtocol", () => {
       .connect(bob)
       .executeMetaTransaction(
         message.from,
-        message.functionSignature,
+        message.callData,
         message.deadline,
         metaTransactionSig.v,
         metaTransactionSig.r,
