@@ -45,6 +45,8 @@ describe("Timelock", () => {
     timelock = await deployContract("Timelock", admin, admin.address, TIMELOCK_DELAY);
   });
 
+  // TODO: Add test for pausability
+
   it("queue transactions", async () => {
     const timelockTx: TimelockTx = {
       target: timelock.address,

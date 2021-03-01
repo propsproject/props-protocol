@@ -7,7 +7,10 @@ import "@openzeppelin/contracts-upgradeable/math/SafeMathUpgradeable.sol";
 /**
  * @title  Timelock
  * @author Forked from: Compound
+ *         Changes by: Props
  * @notice Timelock contract for Props governance.
+ * @dev    Changes to the original Compound contract:
+ *         - pausing capabilities
  */
 contract Timelock {
     using SafeMathUpgradeable for uint256;
@@ -15,6 +18,7 @@ contract Timelock {
     event NewAdmin(address indexed newAdmin);
     event NewPendingAdmin(address indexed newPendingAdmin);
     event NewDelay(uint256 indexed newDelay);
+    event Paused();
     event CancelTransaction(
         bytes32 indexed txHash,
         address indexed target,
@@ -47,6 +51,7 @@ contract Timelock {
     address public admin;
     address public pendingAdmin;
     uint256 public delay;
+    bool public paused;
 
     mapping(bytes32 => bool) public queuedTransactions;
 
@@ -84,6 +89,13 @@ contract Timelock {
         emit NewPendingAdmin(pendingAdmin);
     }
 
+    function pause() public {
+        require(msg.sender == address(this), "Call must come from Timelock");
+        paused = true;
+
+        emit Paused();
+    }
+
     function queueTransaction(
         address target,
         uint256 value,
@@ -92,6 +104,7 @@ contract Timelock {
         uint256 eta
     ) public returns (bytes32) {
         require(msg.sender == admin, "Call must come from admin");
+        require(!paused, "Contract must not be paused");
         require(
             eta >= getBlockTimestamp().add(delay),
             "Estimated execution block must satisfy delay"
@@ -112,6 +125,7 @@ contract Timelock {
         uint256 eta
     ) public {
         require(msg.sender == admin, "Call must come from admin");
+        require(!paused, "Contract must not be paused");
 
         bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
         queuedTransactions[txHash] = false;
@@ -127,6 +141,7 @@ contract Timelock {
         uint256 eta
     ) public payable returns (bytes memory) {
         require(msg.sender == admin, "Call must come from admin");
+        require(!paused, "Contract must not be paused");
 
         bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
         require(queuedTransactions[txHash], "Transaction hasn't been queued");

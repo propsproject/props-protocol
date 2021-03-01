@@ -14,8 +14,8 @@ import "../tokens/props/ISPropsToken.sol";
  *         Changes by: Props
  * @notice Governance contract in the Props protocol.
  * @dev    Changes to the original Compound contract:
- *         - the `votingDelay` and `votingPeriod` are passed in the
- *           constructor instead of being hardcoded in the contract
+ *         - the `votingDelay` and `votingPeriod` are passed in the constructor
+ *           instead of being hardcoded directly in the contract's code
  *         - minor changes for Solidity 0.7
  */
 contract GovernorAlpha {
