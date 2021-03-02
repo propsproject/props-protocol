@@ -37,6 +37,8 @@ abstract contract MetaTransactionProvider {
     ***************************************/
 
     // solhint-disable-next-line var-name-mixedcase
+    uint256 public ROOT_CHAIN_ID;
+    // solhint-disable-next-line var-name-mixedcase
     bytes32 public DOMAIN_SEPARATOR_L1;
     // solhint-disable-next-line var-name-mixedcase
     bytes32 public DOMAIN_SEPARATOR_L2;
@@ -57,13 +59,11 @@ abstract contract MetaTransactionProvider {
     ****************************************/
 
     // solhint-disable-next-line func-name-mixedcase
-    function __MetaTransactionProvider_init(
-        string memory _name,
-        string memory _version,
-        // The chain id must be correspond to the chain id of the underlying root network (Ethereum - goerli or mainnet in our case)
+    function __MetaTransactionProvider_init(string memory _name, string memory _version) public {
+        // The chain id must be correspond to the chain id of the underlying root network
         // This way, users won't have to change networks in order to be able to sign transactions
-        uint256 _l1ChainId
-    ) public {
+        ROOT_CHAIN_ID = 1;
+
         DOMAIN_SEPARATOR_L1 = keccak256(
             abi.encode(
                 keccak256(
@@ -73,7 +73,7 @@ abstract contract MetaTransactionProvider {
                 ),
                 keccak256(bytes(_name)),
                 keccak256(bytes(_version)),
-                _l1ChainId,
+                ROOT_CHAIN_ID,
                 address(this)
             )
         );
@@ -129,11 +129,11 @@ abstract contract MetaTransactionProvider {
 
         // We allow either L1 or L2 signatures
         require(
-            _verify(DOMAIN_SEPARATOR_L1, _from, metaTransaction, _r, _s, _v) ||
-                _verify(DOMAIN_SEPARATOR_L2, _from, metaTransaction, _r, _s, _v),
-            "Invalid signer"
+            _verify(DOMAIN_SEPARATOR_L1, _from, metaTransaction, _v, _r, _s) ||
+                _verify(DOMAIN_SEPARATOR_L2, _from, metaTransaction, _v, _r, _s),
+            "Invalid signature"
         );
-        nonces[_from] = nonces[_from].add(1);
+        nonces[_from]++;
 
         // Append `_from` at the end to extract it from calling context
         (bool success, bytes memory returnData) =
@@ -187,9 +187,9 @@ abstract contract MetaTransactionProvider {
         bytes32 _domainSeparator,
         address _from,
         MetaTransaction memory _metaTransaction,
+        uint8 _v,
         bytes32 _r,
-        bytes32 _s,
-        uint8 _v
+        bytes32 _s
     ) internal view returns (bool) {
         address signer =
             ecrecover(

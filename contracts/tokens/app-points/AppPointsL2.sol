@@ -6,8 +6,6 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
 import "./AppPointsCommon.sol";
 
-// TODO: Add full support for meta-transactions
-
 /**
  * @title  AppPointsL2
  * @author Props
@@ -23,6 +21,13 @@ contract AppPointsL2 is Initializable, AppPointsCommon {
 
     // IPFS hash pointing to app information
     bytes public appInfo;
+
+    // solhint-disable-next-line var-name-mixedcase
+    uint256 public ROOT_CHAIN_ID;
+    // solhint-disable-next-line var-name-mixedcase
+    bytes32 public DOMAIN_SEPARATOR_L1;
+    // solhint-disable-next-line var-name-mixedcase
+    bytes32 public DOMAIN_SEPARATOR_L2;
 
     /**************************************
                      EVENTS
@@ -41,6 +46,38 @@ contract AppPointsL2 is Initializable, AppPointsCommon {
      */
     function initialize(string memory _name, string memory _symbol) public initializer {
         AppPointsCommon.__AppPointsCommon_init(_name, _symbol);
+
+        // The chain id must be correspond to the chain id of the underlying root network
+        // This way, users won't have to change networks in order to be able to sign transactions
+        ROOT_CHAIN_ID = 1;
+
+        DOMAIN_SEPARATOR_L1 = keccak256(
+            abi.encode(
+                keccak256(
+                    bytes(
+                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                    )
+                ),
+                keccak256(bytes(name())),
+                keccak256(bytes("1")),
+                ROOT_CHAIN_ID,
+                address(this)
+            )
+        );
+
+        DOMAIN_SEPARATOR_L2 = keccak256(
+            abi.encode(
+                keccak256(
+                    bytes(
+                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                    )
+                ),
+                keccak256(bytes(name())),
+                keccak256(bytes("1")),
+                _getChainId(),
+                address(this)
+            )
+        );
     }
 
     /***************************************
@@ -94,5 +131,24 @@ contract AppPointsL2 is Initializable, AppPointsCommon {
     function burn(address _account, uint256 _amount) external {
         require(isMinter[msg.sender], "Unauthorized");
         _burn(_account, _amount);
+    }
+
+    /***************************************
+               PERMIT VERIFICATION
+    ****************************************/
+
+    function verifyPermitSignature(
+        address _owner,
+        address _spender,
+        uint256 _amount,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) internal view override returns (bool) {
+        // On L2, we allow both L1 and L2 signatures
+        return
+            _verify(DOMAIN_SEPARATOR_L1, _owner, _spender, _amount, _deadline, _v, _r, _s) ||
+            _verify(DOMAIN_SEPARATOR_L2, _owner, _spender, _amount, _deadline, _v, _r, _s);
     }
 }

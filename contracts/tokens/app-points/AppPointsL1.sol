@@ -7,8 +7,6 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
 import "./AppPointsCommon.sol";
 
-// TODO: Add full support for meta-transactions
-
 /**
  * @title  AppPointsL1
  * @author Props
@@ -40,6 +38,9 @@ contract AppPointsL1 is Initializable, AppPointsCommon {
     // Time most recent inflation rate change occured at
     uint256 public lastInflationRateChange;
 
+    // solhint-disable-next-line var-name-mixedcase
+    bytes32 public DOMAIN_SEPARATOR_L1;
+
     /**************************************
                      EVENTS
     ***************************************/
@@ -66,6 +67,18 @@ contract AppPointsL1 is Initializable, AppPointsCommon {
         address _propsTreasury
     ) public initializer {
         AppPointsCommon.__AppPointsCommon_init(_name, _symbol);
+
+        DOMAIN_SEPARATOR_L1 = keccak256(
+            abi.encode(
+                keccak256(
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                ),
+                keccak256(bytes(name())),
+                keccak256(bytes("1")),
+                _getChainId(),
+                address(this)
+            )
+        );
 
         propsTreasury = _propsTreasury;
         propsTreasuryMintPercentage = 50000; // 5%
@@ -120,5 +133,21 @@ contract AppPointsL1 is Initializable, AppPointsCommon {
         lastInflationRateChange = block.timestamp;
 
         emit InflationRateChanged(pendingInflationRate);
+    }
+
+    /***************************************
+               PERMIT VERIFICATION
+    ****************************************/
+
+    function verifyPermitSignature(
+        address _owner,
+        address _spender,
+        uint256 _amount,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) internal view override returns (bool) {
+        return _verify(DOMAIN_SEPARATOR_L1, _owner, _spender, _amount, _deadline, _v, _r, _s);
     }
 }

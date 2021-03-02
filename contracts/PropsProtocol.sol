@@ -9,13 +9,12 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
-import "./utils/MetaTransactionProvider.sol";
-
 import "./IPropsProtocol.sol";
 import "./tokens/props/IPropsTokenL2.sol";
 import "./tokens/props/IRPropsToken.sol";
 import "./tokens/props/ISPropsToken.sol";
 import "./staking/IStaking.sol";
+import "./utils/MetaTransactionProvider.sol";
 
 /**
  * @title  PropsProtocol
@@ -129,7 +128,7 @@ contract PropsProtocol is
         address _propsToken
     ) public initializer {
         PausableUpgradeable.__Pausable_init();
-        MetaTransactionProvider.__MetaTransactionProvider_init("PropsProtocol", "1", 1);
+        MetaTransactionProvider.__MetaTransactionProvider_init("PropsProtocol", "1");
 
         controller = _controller;
         guardian = _guardian;

@@ -1,10 +1,12 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import chai from "chai";
+import * as ethUtil from "ethereumjs-util";
 import { solidity } from "ethereum-waffle";
+import * as sigUtil from "eth-sig-util";
 import { ethers } from "hardhat";
 
 import type { AppPointsL2 } from "../../../typechain";
-import { bn, deployContractUpgradeable } from "../../../utils";
+import { bn, daysToTimestamp, deployContractUpgradeable, getPrivateKey, now } from "../../../utils";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -28,6 +30,78 @@ describe("AppPointsL2", () => {
       APP_POINTS_TOKEN_NAME,
       APP_POINTS_TOKEN_SYMBOL
     );
+  });
+
+  it("approve via off-chain signature (permit) from root chain", async () => {
+    // Sign the permit
+    const permitMessage = {
+      owner: appOwner.address,
+      spender: alice.address,
+      value: bn(100).toString(),
+      nonce: (await appPoints.nonces(appOwner.address)).toString(),
+      deadline: (await now()).add(daysToTimestamp(1)).toString(),
+    };
+
+    const permitData = {
+      domain: {
+        chainId: (await appPoints.ROOT_CHAIN_ID()).toNumber(),
+        name: await appPoints.name(),
+        verifyingContract: appPoints.address,
+        version: "1",
+      },
+      message: permitMessage,
+      primaryType: "Permit" as const,
+      types: {
+        EIP712Domain: [
+          { name: "name", type: "string" },
+          { name: "version", type: "string" },
+          { name: "chainId", type: "uint256" },
+          { name: "verifyingContract", type: "address" },
+        ],
+        Permit: [
+          { name: "owner", type: "address" },
+          { name: "spender", type: "address" },
+          { name: "value", type: "uint256" },
+          { name: "nonce", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+        ],
+      },
+    };
+
+    const permitSig = ethUtil.fromRpcSig(
+      sigUtil.signTypedData_v4(getPrivateKey(appOwner.address), { data: permitData })
+    );
+
+    // Permit
+    await appPoints
+      .connect(alice)
+      .permit(
+        permitMessage.owner,
+        permitMessage.spender,
+        permitMessage.value,
+        permitMessage.deadline,
+        permitSig.v,
+        permitSig.r,
+        permitSig.s
+      );
+
+    // The approval indeed took place
+    expect(await appPoints.allowance(appOwner.address, alice.address)).to.eq(permitMessage.value);
+
+    // Replay attack fails
+    await expect(
+      appPoints
+        .connect(alice)
+        .permit(
+          permitMessage.owner,
+          permitMessage.spender,
+          permitMessage.value,
+          permitMessage.deadline,
+          permitSig.v,
+          permitSig.r,
+          permitSig.s
+        )
+    ).to.be.revertedWith("Invalid signature");
   });
 
   it("update app info", async () => {

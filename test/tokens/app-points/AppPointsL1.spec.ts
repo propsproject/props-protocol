@@ -191,7 +191,7 @@ describe("AppPointsL1", () => {
     expect(await appPoints.allowance(appOwner.address, alice.address)).to.eq(permitMessage.value);
 
     // Replay attack fails
-    expect(
+    await expect(
       appPoints
         .connect(alice)
         .permit(

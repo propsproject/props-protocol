@@ -10,8 +10,6 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./IAppPoints.sol";
 
-// TODO: Add full support for meta-transactions
-
 /**
  * @title  AppPointsCommon
  * @author Props
@@ -67,17 +65,6 @@ abstract contract AppPointsCommon is
         PausableUpgradeable.__Pausable_init();
         ERC20Upgradeable.__ERC20_init(_name, _symbol);
 
-        DOMAIN_SEPARATOR = keccak256(
-            abi.encode(
-                keccak256(
-                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                ),
-                keccak256(bytes(name())),
-                keccak256(bytes("1")),
-                _getChainId(),
-                address(this)
-            )
-        );
         PERMIT_TYPEHASH = keccak256(
             "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
         );
@@ -160,41 +147,66 @@ abstract contract AppPointsCommon is
         bytes32 _s
     ) external {
         require(_deadline >= block.timestamp, "Permit expired");
-
-        bytes32 digest =
-            keccak256(
-                abi.encodePacked(
-                    "\x19\x01",
-                    DOMAIN_SEPARATOR,
-                    keccak256(
-                        abi.encode(
-                            PERMIT_TYPEHASH,
-                            _owner,
-                            _spender,
-                            _amount,
-                            nonces[_owner]++,
-                            _deadline
-                        )
-                    )
-                )
-            );
-
-        address recoveredAddress = ecrecover(digest, _v, _r, _s);
-        require(recoveredAddress != address(0) && recoveredAddress == _owner, "Invalid signature");
+        require(
+            verifyPermitSignature(_owner, _spender, _amount, _deadline, _v, _r, _s),
+            "Invalid signature"
+        );
+        nonces[_owner]++;
 
         _approve(_owner, _spender, _amount);
     }
+
+    /**
+     * @dev Each subclass is responsible for providing the logic of verifying permit
+     *      signatures. This allows custom behavior (eg. on L2 we might allow both
+     *      L1 and L2 signatures so that users don't have to change network when
+     *      signing - and even if they do the signature would still be valid).
+     */
+    function verifyPermitSignature(
+        address _owner,
+        address _spender,
+        uint256 _amount,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) internal view virtual returns (bool);
 
     /***************************************
                      HELPERS
     ****************************************/
 
-    function _getChainId() internal pure returns (uint256) {
-        uint256 chainId;
+    function _toEIP712Digest(bytes32 _domainSeparator, bytes32 _messageDigest)
+        internal
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encodePacked("\x19\x01", _domainSeparator, _messageDigest));
+    }
+
+    function _verify(
+        bytes32 _domainSeparator,
+        address _owner,
+        address _spender,
+        uint256 _amount,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) internal view returns (bool) {
+        bytes32 digest =
+            keccak256(
+                abi.encode(PERMIT_TYPEHASH, _owner, _spender, _amount, nonces[_owner], _deadline)
+            );
+
+        address signer = ecrecover(_toEIP712Digest(_domainSeparator, digest), _v, _r, _s);
+        return signer != address(0) && signer == _owner;
+    }
+
+    function _getChainId() internal pure returns (uint256 chainId) {
         assembly {
             chainId := chainid()
         }
-        return chainId;
     }
 
     /***************************************

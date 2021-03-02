@@ -27,9 +27,13 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
     mapping(address => bool) public isMinter;
 
     // solhint-disable-next-line var-name-mixedcase
-    bytes32 public PERMIT_TYPEHASH;
+    uint256 public ROOT_CHAIN_ID;
     // solhint-disable-next-line var-name-mixedcase
-    bytes32 public DOMAIN_SEPARATOR;
+    bytes32 public DOMAIN_SEPARATOR_L1;
+    // solhint-disable-next-line var-name-mixedcase
+    bytes32 public DOMAIN_SEPARATOR_L2;
+    // solhint-disable-next-line var-name-mixedcase
+    bytes32 public PERMIT_TYPEHASH;
 
     // Nonces for permit
     mapping(address => uint256) public nonces;
@@ -42,19 +46,40 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
         OwnableUpgradeable.__Ownable_init();
         ERC20Upgradeable.__ERC20_init("Props", "PROPS");
 
-        PERMIT_TYPEHASH = keccak256(
-            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-        );
-        DOMAIN_SEPARATOR = keccak256(
+        // The chain id must be correspond to the chain id of the underlying root network
+        // This way, users won't have to change networks in order to be able to sign transactions
+        ROOT_CHAIN_ID = 1;
+
+        DOMAIN_SEPARATOR_L1 = keccak256(
             abi.encode(
                 keccak256(
-                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                    bytes(
+                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                    )
+                ),
+                keccak256(bytes(name())),
+                keccak256(bytes("1")),
+                ROOT_CHAIN_ID,
+                address(this)
+            )
+        );
+
+        DOMAIN_SEPARATOR_L2 = keccak256(
+            abi.encode(
+                keccak256(
+                    bytes(
+                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                    )
                 ),
                 keccak256(bytes(name())),
                 keccak256(bytes("1")),
                 _getChainId(),
                 address(this)
             )
+        );
+
+        PERMIT_TYPEHASH = keccak256(
+            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
         );
     }
 
@@ -127,26 +152,13 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
     ) external override {
         require(_deadline >= block.timestamp, "Permit expired");
 
-        bytes32 digest =
-            keccak256(
-                abi.encodePacked(
-                    "\x19\x01",
-                    DOMAIN_SEPARATOR,
-                    keccak256(
-                        abi.encode(
-                            PERMIT_TYPEHASH,
-                            _owner,
-                            _spender,
-                            _amount,
-                            nonces[_owner]++,
-                            _deadline
-                        )
-                    )
-                )
-            );
-
-        address recoveredAddress = ecrecover(digest, _v, _r, _s);
-        require(recoveredAddress != address(0) && recoveredAddress == _owner, "Invalid signature");
+        // We allow either L1 or L2 signatures
+        require(
+            _verify(DOMAIN_SEPARATOR_L1, _owner, _spender, _amount, _deadline, _v, _r, _s) ||
+                _verify(DOMAIN_SEPARATOR_L2, _owner, _spender, _amount, _deadline, _v, _r, _s),
+            "Invalid signature"
+        );
+        nonces[_owner]++;
 
         _approve(_owner, _spender, _amount);
     }
@@ -155,12 +167,36 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
                     HELPERS
     ****************************************/
 
-    // TODO: Replace with root chain's id
-    function _getChainId() internal pure returns (uint256) {
-        uint256 chainId;
+    function _toEIP712Digest(bytes32 _domainSeparator, bytes32 _messageDigest)
+        internal
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encodePacked("\x19\x01", _domainSeparator, _messageDigest));
+    }
+
+    function _verify(
+        bytes32 _domainSeparator,
+        address _owner,
+        address _spender,
+        uint256 _amount,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) internal view returns (bool) {
+        bytes32 digest =
+            keccak256(
+                abi.encode(PERMIT_TYPEHASH, _owner, _spender, _amount, nonces[_owner], _deadline)
+            );
+
+        address signer = ecrecover(_toEIP712Digest(_domainSeparator, digest), _v, _r, _s);
+        return signer != address(0) && signer == _owner;
+    }
+
+    function _getChainId() internal pure returns (uint256 chainId) {
         assembly {
             chainId := chainid()
         }
-        return chainId;
     }
 }
