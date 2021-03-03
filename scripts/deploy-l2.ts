@@ -16,7 +16,9 @@ import { bn, deployContract, deployContractUpgradeable, expandTo18Decimals } fro
 
 // Constants
 // The amount of rProps (Props) rewards to get distributed on L2
-const PROPS_REWARDS_AMOUNT = expandTo18Decimals(process.env.PROPS_REWARDS_AMOUNT as string);
+const PROPS_REWARDS_AMOUNT = expandTo18Decimals(
+  (process.env.PROPS_REWARDS_AMOUNT || "0") as string
+);
 const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
 
 // Matic contracts
@@ -182,6 +184,27 @@ async function main() {
         .setFxRootTunnel(l1Addresses["appProxyFactoryBridge"])
         .then((tx: any) => tx.wait());
     }
+
+    // else if (process.env.TEST) {
+    //   console.log("Granting Props minting permissions to deployer");
+    //   propsToken = (await ethers.getContractFactory("PropsTokenL2", deployer)).attach(
+    //     l2Addresses["propsToken"]
+    //   ) as PropsTokenL2;
+    //   await propsToken
+    //     .connect(deployer)
+    //     .addMinter(deployer.address)
+    //     .then((tx: any) => tx.wait());
+    //   await propsToken.connect(deployer).mint(deployer.address, expandTo18Decimals(1000));
+
+    //   console.log("Whitelisting app");
+    //   propsProtocol = (await ethers.getContractFactory("PropsProtocol", deployer)).attach(
+    //     l2Addresses["propsProtocol"]
+    //   ) as PropsProtocol;
+    //   await propsProtocol
+    //     .connect(controller)
+    //     .whitelistApp("0x55Beb8c7cd8e549aB4AEbC8b86C3C8f64110B7C7")
+    //     .then((tx: any) => tx.wait());
+    // }
   }
 }
 

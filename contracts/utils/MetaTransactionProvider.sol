@@ -15,7 +15,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
  *         acts as a workaround for users having to switch networks when
  *         interacting with an L2 instance of the contracts.
  */
-abstract contract MetaTransactionProvider {
+abstract contract MetaTransactionProvider is Initializable {
     using SafeMathUpgradeable for uint256;
 
     struct EIP712Domain {
@@ -59,7 +59,10 @@ abstract contract MetaTransactionProvider {
     ****************************************/
 
     // solhint-disable-next-line func-name-mixedcase
-    function __MetaTransactionProvider_init(string memory _name, string memory _version) public {
+    function __MetaTransactionProvider_init(string memory _name, string memory _version)
+        internal
+        initializer
+    {
         // The chain id must be correspond to the chain id of the underlying root network
         // This way, users won't have to change networks in order to be able to sign transactions
         ROOT_CHAIN_ID = 1;

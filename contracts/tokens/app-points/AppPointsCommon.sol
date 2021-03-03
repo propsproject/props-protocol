@@ -60,7 +60,10 @@ abstract contract AppPointsCommon is
      * @param _symbol The symbol of the app points token
      */
     // solhint-disable-next-line func-name-mixedcase
-    function __AppPointsCommon_init(string memory _name, string memory _symbol) public initializer {
+    function __AppPointsCommon_init(string memory _name, string memory _symbol)
+        internal
+        initializer
+    {
         OwnableUpgradeable.__Ownable_init();
         PausableUpgradeable.__Pausable_init();
         ERC20Upgradeable.__ERC20_init(_name, _symbol);

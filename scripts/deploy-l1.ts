@@ -3,7 +3,7 @@ import * as fs from "fs";
 import { ethers } from "hardhat";
 
 import type { AppPointsL1, AppProxyFactoryL1, AppProxyFactoryBridgeL1 } from "../typechain";
-import { deployContract, deployContractUpgradeable } from "../utils";
+import { bn, deployContract, deployContractUpgradeable, expandTo18Decimals } from "../utils";
 
 // Matic contracts
 const MATIC_CHECKPOINT_MANAGER_ADDRESS = process.env.TESTNET
@@ -91,14 +91,14 @@ async function main() {
         .then((tx: any) => tx.wait());
     }
 
-    // if (process.env.TEST) {
+    // else if (process.env.TEST) {
     //   console.log("Deploying test app");
     //   appProxyFactory = (await ethers.getContractFactory("AppProxyFactoryL1", deployer)).attach(
     //     l1Addresses.appProxyFactory
     //   ) as AppProxyFactoryL1;
     //   await appProxyFactory
     //     .connect(controller)
-    //     .deployApp("Test", "TST", expandTo18Decimals(10000), misc.address, bn(3658).mul(1e11));
+    //     .deployApp("Test", "TST", expandTo18Decimals(10000), deployer.address, bn(3658).mul(1e11));
     // }
   }
 }
