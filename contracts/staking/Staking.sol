@@ -125,8 +125,7 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
             uint256 remaining = periodFinish.sub(block.timestamp);
             uint256 leftover = remaining.mul(rewardRate);
             rewardRate = leftover.div(rewardsDuration);
-            periodFinish = block.timestamp.add(rewardsDuration);
-            lastRewardRateUpdate = block.timestamp;
+            _updateParameters();
         }
     }
 
@@ -242,6 +241,7 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
         only(controller)
         nonReentrant
         updateReward(_account)
+        updateRewardRate
     {
         require(_amount > 0, "Cannot withdraw 0");
         _totalSupply = _totalSupply.sub(_amount);
@@ -293,15 +293,7 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
             rewardRate = _reward.add(leftover).div(rewardsDuration);
         }
 
-        // Ensure the provided reward amount is not more than the balance in the contract.
-        // This keeps the reward rate in the right range, preventing overflows due to
-        // very high values of rewardRate in the earned and rewardsPerToken functions;
-        // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
-        uint256 balance = IERC20Upgradeable(rewardsToken).balanceOf(address(this));
-        require(rewardRate <= balance.div(rewardsDuration), "Reward too high");
-
-        lastUpdateTime = block.timestamp;
-        periodFinish = block.timestamp.add(rewardsDuration);
+        _updateParameters();
         emit RewardAdded(_reward);
     }
 
@@ -326,16 +318,20 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
         uint256 leftover = remaining.mul(rewardRate).sub(_amount);
         rewardRate = leftover.div(rewardsDuration);
 
-        // Ensure the provided reward amount is not more than the balance in the contract.
-        // This keeps the reward rate in the right range, preventing overflows due to
-        // very high values of rewardRate in the earned and rewardsPerToken functions;
-        // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
-        uint256 balance = IERC20Upgradeable(rewardsToken).balanceOf(address(this));
-        require(rewardRate <= balance.div(rewardsDuration), "Reward too high");
-
-        lastUpdateTime = block.timestamp;
-        periodFinish = block.timestamp.add(rewardsDuration);
+        _updateParameters();
         emit RewardWithdrawn(_amount);
+    }
+
+    /**
+     * @dev Change the daily reward emission rate.
+     * @param _dailyRewardEmission The new daily emission rate
+     */
+    function changeDailyRewardEmission(uint256 _dailyRewardEmission)
+        external
+        override
+        only(rewardsDistribution)
+    {
+        rewardsDuration = uint256(1e18).div(_dailyRewardEmission).mul(1 days);
     }
 
     /**
@@ -348,5 +344,22 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
         only(rewardsDistribution)
     {
         rewardsDistribution = _account;
+    }
+
+    /***************************************
+                    HELPERS
+    ****************************************/
+
+    function _updateParameters() internal {
+        // Ensure the provided reward amount is not more than the balance in the contract.
+        // This keeps the reward rate in the right range, preventing overflows due to
+        // very high values of rewardRate in the earned and rewardsPerToken functions;
+        // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
+        uint256 balance = IERC20Upgradeable(rewardsToken).balanceOf(address(this));
+        require(rewardRate <= balance.div(rewardsDuration), "Reward too high");
+
+        lastUpdateTime = block.timestamp;
+        periodFinish = block.timestamp.add(rewardsDuration);
+        lastRewardRateUpdate = block.timestamp;
     }
 }

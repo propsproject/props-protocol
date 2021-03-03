@@ -82,7 +82,7 @@ describe("GovernorAlpha", () => {
     await appPoints.connect(appOwner).addMinter(appOwner.address);
     await appPoints.connect(appOwner).mint(appOwner.address, APP_POINTS_TOKEN_AMOUNT);
 
-    await propsProtocol.connect(controller).whitelistApp(appPointsAddress);
+    await propsProtocol.connect(controller).updateAppWhitelist(appPointsAddress, true);
 
     return [
       appPoints,
@@ -115,7 +115,6 @@ describe("GovernorAlpha", () => {
     const rPropsToken = await deployContractUpgradeable(
       "RPropsToken",
       deployer,
-      RPROPS_TOKEN_AMOUNT,
       propsProtocol.address,
       propsToken.address
     );
@@ -166,7 +165,9 @@ describe("GovernorAlpha", () => {
     await propsProtocol.connect(controller).setPropsUserStaking(propsUserStaking.address);
 
     // Distribute the rProps rewards to the sProps staking contracts
-    await propsProtocol.connect(controller).distributePropsRewards(bn(800000), bn(200000));
+    await propsProtocol
+      .connect(controller)
+      .distributePropsRewards(RPROPS_TOKEN_AMOUNT, bn(800000), bn(200000));
 
     const governorAlphaAddress = ethers.utils.getContractAddress({
       from: deployer.address,

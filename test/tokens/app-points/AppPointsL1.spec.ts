@@ -216,7 +216,7 @@ describe("AppPointsL1", () => {
     );
 
     // Whitelist the app token owner
-    await appPoints.connect(appOwner).whitelistForTransfers(appOwner.address);
+    await appPoints.connect(appOwner).updateTransferWhitelist(appOwner.address, true);
 
     // Only whitelisted addresses are able to transfer
     await appPoints.connect(appOwner).transfer(alice.address, bn(100));
@@ -225,7 +225,7 @@ describe("AppPointsL1", () => {
     );
 
     // Blacklist the app token owner
-    await appPoints.connect(appOwner).blacklistForTransfers(appOwner.address);
+    await appPoints.connect(appOwner).updateTransferWhitelist(appOwner.address, false);
 
     // After blacklist, transfers will fail once again
     await expect(appPoints.connect(appOwner).transfer(alice.address, bn(100))).to.be.revertedWith(

@@ -47,7 +47,7 @@ contract AppPointsL2 is Initializable, AppPointsCommon {
     function initialize(string memory _name, string memory _symbol) public initializer {
         AppPointsCommon.__AppPointsCommon_init(_name, _symbol);
 
-        // The chain id must be correspond to the chain id of the underlying root network
+        // The root chain id must correspond to the chain id of the underlying root Ethereum network (either mainnet or testnet)
         // This way, users won't have to change networks in order to be able to sign transactions
         ROOT_CHAIN_ID = 1;
 

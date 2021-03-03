@@ -46,7 +46,7 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
         OwnableUpgradeable.__Ownable_init();
         ERC20Upgradeable.__ERC20_init("Props", "PROPS");
 
-        // The chain id must be correspond to the chain id of the underlying root network
+        // The root chain id must correspond to the chain id of the underlying root Ethereum network (either mainnet or testnet)
         // This way, users won't have to change networks in order to be able to sign transactions
         ROOT_CHAIN_ID = 1;
 

@@ -85,13 +85,7 @@ contract AppPointsL1 is Initializable, AppPointsCommon {
         inflationRateChangeDelay = 7 days;
 
         // Initial mint
-        uint256 propsTreasuryAmount = _amount.mul(propsTreasuryMintPercentage).div(1e6);
-        uint256 appOwnerAmount = _amount.sub(propsTreasuryAmount);
-
-        _mint(_propsTreasury, propsTreasuryAmount);
-        _mint(_owner, appOwnerAmount);
-
-        lastMint = block.timestamp;
+        _mintAppPoints(_owner, _amount);
     }
 
     /***************************************
@@ -112,13 +106,7 @@ contract AppPointsL1 is Initializable, AppPointsCommon {
 
         uint256 amount = inflationRate.mul(block.timestamp.sub(lastMint));
         if (amount != 0) {
-            uint256 propsTreasuryAmount = amount.mul(propsTreasuryMintPercentage).div(1e6);
-            uint256 ownerAmount = amount.sub(propsTreasuryAmount);
-
-            _mint(propsTreasury, propsTreasuryAmount);
-            _mint(owner(), ownerAmount);
-
-            lastMint = block.timestamp;
+            _mintAppPoints(owner(), amount);
         }
     }
 
@@ -149,5 +137,19 @@ contract AppPointsL1 is Initializable, AppPointsCommon {
         bytes32 _s
     ) internal view override returns (bool) {
         return _verify(DOMAIN_SEPARATOR_L1, _owner, _spender, _amount, _deadline, _v, _r, _s);
+    }
+
+    /***************************************
+                     HELPERS
+    ****************************************/
+
+    function _mintAppPoints(address _owner, uint256 _amount) internal {
+        uint256 propsTreasuryAmount = _amount.mul(propsTreasuryMintPercentage).div(1e6);
+        uint256 ownerAmount = _amount.sub(propsTreasuryAmount);
+
+        _mint(propsTreasury, propsTreasuryAmount);
+        _mint(_owner, ownerAmount);
+
+        lastMint = block.timestamp;
     }
 }

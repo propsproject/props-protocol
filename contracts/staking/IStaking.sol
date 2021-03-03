@@ -19,5 +19,7 @@ interface IStaking {
 
     function withdrawReward(uint256 _amount) external;
 
+    function changeDailyRewardEmission(uint256 _dailyRewardEmission) external;
+
     function changeRewardsDistribution(address _account) external;
 }

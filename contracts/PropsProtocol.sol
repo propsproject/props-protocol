@@ -76,11 +76,11 @@ contract PropsProtocol is
     // Mapping of the unlock time for the escrowed rewards of each user
     mapping(address => uint256) public rewardsEscrowUnlock;
 
-    // The cooldown period for the rewards escrow
+    // The cooldown period for the rewards escrow (in seconds)
     uint256 public rewardsEscrowCooldown;
 
     // Keeps track of the protocol-whitelisted apps
-    mapping(address => uint8) private whitelist;
+    mapping(address => bool) private appWhitelist;
 
     /**************************************
                      EVENTS
@@ -89,8 +89,7 @@ contract PropsProtocol is
     event Stake(address indexed app, address indexed account, int256 amount);
     event RewardsStake(address indexed app, address indexed account, int256 amount);
     event RewardsEscrowUpdated(address indexed account, uint256 lockedAmount, uint256 unlockTime);
-    event AppWhitelisted(address indexed app);
-    event AppBlacklisted(address indexed app);
+    event AppWhitelistUpdated(address indexed app, bool status);
     event DelegateChanged(address indexed delegator, address indexed delegatee);
 
     /**************************************
@@ -181,6 +180,8 @@ contract PropsProtocol is
      * - setSPropsToken
      * - setPropsAppStaking
      * - setPropsUserStaking
+     *
+     * ! `setRPropsToken` must be called before `setPropsAppStaking` and `setPropsUserStaking` !
      */
 
     /**
@@ -221,6 +222,7 @@ contract PropsProtocol is
         notSet(propsAppStaking)
     {
         propsAppStaking = _propsAppStaking;
+        IRPropsToken(rPropsToken).setPropsAppStaking(_propsAppStaking);
     }
 
     /**
@@ -233,6 +235,7 @@ contract PropsProtocol is
         notSet(propsUserStaking)
     {
         propsUserStaking = _propsUserStaking;
+        IRPropsToken(rPropsToken).setPropsUserStaking(_propsUserStaking);
     }
 
     /**
@@ -244,36 +247,29 @@ contract PropsProtocol is
     }
 
     /**
-     * @dev Whitelist an app.
-     * @param _app The address of the app to be whitelisted
+     * @dev Update the app whitelist.
+     * @param _app The address of the app to update the whitelist status of
+     * @param _status The whitelist status of the app
      */
-    function whitelistApp(address _app) external only(controller) {
-        whitelist[_app] = 1;
-        emit AppWhitelisted(_app);
-    }
-
-    /**
-     * @dev Blacklist an app.
-     * @param _app The address of the app to be blacklisted
-     */
-    function blacklistApp(address _app) external only(controller) {
-        whitelist[_app] = 0;
-        emit AppBlacklisted(_app);
+    function updateAppWhitelist(address _app, bool _status) external only(controller) {
+        appWhitelist[_app] = _status;
+        emit AppWhitelistUpdated(_app, _status);
     }
 
     /**
      * @dev Distribute the rProps rewards to the app and user Props staking contracts.
+     * @param _amount The amount of rProps to mint and get distributed as staking rewards
      * @param _appRewardsPercentage The percentage of minted rProps to go to the app Props staking contract
      * @param _userRewardsPercentage The percentage of minted rProps to go to the user Props staking contract
      */
-    function distributePropsRewards(uint256 _appRewardsPercentage, uint256 _userRewardsPercentage)
-        external
-        only(controller)
-    {
+    function distributePropsRewards(
+        uint256 _amount,
+        uint256 _appRewardsPercentage,
+        uint256 _userRewardsPercentage
+    ) external only(controller) {
         IRPropsToken(rPropsToken).distributeRewards(
-            propsAppStaking,
+            _amount,
             _appRewardsPercentage,
-            propsUserStaking,
             _userRewardsPercentage
         );
     }
@@ -287,12 +283,29 @@ contract PropsProtocol is
         external
         only(controller)
     {
-        IRPropsToken(rPropsToken).withdrawRewards(
-            propsAppStaking,
-            _appRewardsAmount,
-            propsUserStaking,
-            _userRewardsAmount
-        );
+        IRPropsToken(rPropsToken).withdrawRewards(_appRewardsAmount, _userRewardsAmount);
+    }
+
+    /**
+     * @dev Change the daily reward emission parameter on the app Props staking contract.
+     * @param _appDailyRewardEmission The new daily reward emission rate
+     */
+    function changeDailyAppRewardEmission(uint256 _appDailyRewardEmission)
+        external
+        only(controller)
+    {
+        IRPropsToken(rPropsToken).changeDailyAppRewardEmission(_appDailyRewardEmission);
+    }
+
+    /**
+     * @dev Change the daily reward emission parameter on the user Props staking contract.
+     * @param _userDailyRewardEmission The new daily reward emission rate
+     */
+    function changeDailyUserRewardEmission(uint256 _userDailyRewardEmission)
+        external
+        only(controller)
+    {
+        IRPropsToken(rPropsToken).changeDailyUserRewardEmission(_userDailyRewardEmission);
     }
 
     /***************************************
@@ -453,20 +466,23 @@ contract PropsProtocol is
     /**
      * @dev Allow app owners to claim their app's Props rewards.
      * @param _app The app to claim the Props rewards of
+     * @param _wallet The address claimed Props rewards are to be withdrawn to
      */
-    function claimAppPropsRewards(address _app)
+    function claimAppPropsRewards(address _app, address _wallet)
         external
         validApp(_app)
         only(OwnableUpgradeable(_app).owner())
         whenNotPaused
     {
+        require(appWhitelist[_app], "App not whitelisted");
+
         // Claim the rewards and transfer them to the user's wallet
         uint256 reward = IStaking(propsAppStaking).earned(_app);
         if (reward > 0) {
             IStaking(propsAppStaking).claimReward(_app);
-            IERC20Upgradeable(rPropsToken).safeTransfer(_msgSender(), reward);
+            IERC20Upgradeable(rPropsToken).safeTransfer(_wallet, reward);
             // Since the rewards are in rProps, swap it for regular Props
-            IRPropsToken(rPropsToken).swap(_msgSender());
+            IRPropsToken(rPropsToken).swap(_wallet);
         }
     }
 
@@ -523,7 +539,7 @@ contract PropsProtocol is
      *      having the rewards go through the escrow (and thus having the unlock
      *      time of the escrow extended).
      * @param _apps Array of apps to stake to
-     * @param _percentages Array of percentages of the claimed rewards to stake to each app
+     * @param _percentages Array of percentages of the claimed rewards to stake to each app (in ppm)
      */
     function claimUserPropsRewardsAndStake(
         address[] calldata _apps,
@@ -535,7 +551,7 @@ contract PropsProtocol is
     /**
      * @dev Claim and stake user Props rewards on behalf of a delegator.
      * @param _apps Array of apps to stake to
-     * @param _percentages Array of percentages of the claimed rewards to stake to each app
+     * @param _percentages Array of percentages of the claimed rewards to stake to each app (in ppm)
      * @param _account Delegator account to claim and stake on behalf of
      */
     function claimUserPropsRewardsAndStakeAsDelegate(
@@ -627,7 +643,7 @@ contract PropsProtocol is
         // Handle all stakes (positive amounts)
         for (uint256 i = 0; i < _apps.length; i++) {
             if (_amounts[i] > 0) {
-                require(whitelist[_apps[i]] != 0, "App blacklisted");
+                require(appWhitelist[_apps[i]], "App not whitelisted");
 
                 uint256 amountToStake = uint256(_amounts[i]);
 

@@ -172,12 +172,26 @@ describe("Staking", () => {
     );
     await staking.connect(controller).claimReward(alice.address);
 
-    // Only the rewards distribution can distribute new rewards (not even the owner can do it)
-    await expect(staking.connect(controller).notifyRewardAmount(bn(100))).to.be.revertedWith(
-      "Unauthorized"
-    );
+    // Only the rewards distribution can distribute new rewards
+    await expect(
+      staking.connect(controller).notifyRewardAmount(expandTo18Decimals(100))
+    ).to.be.revertedWith("Unauthorized");
     await rewardsToken.connect(rewardsDistribution).transfer(staking.address, stakeAmount);
-    await staking.connect(rewardsDistribution).notifyRewardAmount(bn(100));
+    await staking.connect(rewardsDistribution).notifyRewardAmount(expandTo18Decimals(100));
+
+    // Only the rewards distribution can withdraw outstanding rewards
+    await expect(
+      staking.connect(controller).withdrawReward(expandTo18Decimals(10))
+    ).to.be.revertedWith("Unauthorized");
+    await staking.connect(rewardsDistribution).withdrawReward(expandTo18Decimals(10));
+
+    // Only the rewards distribution can change the daily emission rate
+    await expect(
+      staking.connect(controller).changeDailyRewardEmission(DAILY_REWARDS_EMISSION.add(1))
+    ).to.be.revertedWith("Unauthorized");
+    await staking
+      .connect(rewardsDistribution)
+      .changeDailyRewardEmission(DAILY_REWARDS_EMISSION.add(1));
   });
 
   it("distribute new rewards during on-going reward period", async () => {
@@ -398,6 +412,27 @@ describe("Staking", () => {
 
     // Check that the correct amount of rewards was withdrawn
     expect(reward.div(10)).to.eq(await rewardsToken.balanceOf(rewardsDistribution.address));
+  });
+
+  it("update the daily reward emission rate", async () => {
+    const reward = expandTo18Decimals(1000);
+
+    const initialRewardsDuration = await staking.rewardsDuration();
+
+    // Distribute reward
+    await rewardsToken.connect(rewardsDistribution).transfer(staking.address, reward);
+    await staking.connect(rewardsDistribution).notifyRewardAmount(reward);
+
+    const initialRewardRate = await staking.rewardRate();
+
+    // Change the daily reward emission rate
+    await staking
+      .connect(rewardsDistribution)
+      .changeDailyRewardEmission(DAILY_REWARDS_EMISSION.div(2));
+
+    // Check that the new emission rate only changed the rewards duration
+    expect((await staking.rewardsDuration()).gt(initialRewardsDuration)).to.be.true;
+    expect(await staking.rewardRate()).to.eq(initialRewardRate);
   });
 
   it("transfer rewards distribution role", async () => {

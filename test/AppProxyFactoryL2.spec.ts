@@ -57,7 +57,7 @@ describe("AppProxyFactoryL2", () => {
       "AppProxyFactoryL2"
     );
 
-    await propsProtocol.connect(controller).whitelistApp(appPointsAddress);
+    await propsProtocol.connect(controller).updateAppWhitelist(appPointsAddress, true);
 
     return [
       (await ethers.getContractFactory("AppPointsL2")).attach(appPointsAddress) as AppPointsL2,

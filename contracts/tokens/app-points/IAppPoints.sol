@@ -7,7 +7,5 @@ interface IAppPoints {
 
     function unpause() external;
 
-    function whitelistForTransfers(address _account) external;
-
-    function blacklistForTransfers(address _account) external;
+    function updateTransferWhitelist(address _account, bool _status) external;
 }

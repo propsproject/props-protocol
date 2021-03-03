@@ -33,11 +33,10 @@ contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
     // Props protocol related tokens
     address public propsToken;
 
-    // Keeps track of whether the rProps have been distributed as rewards
-    bool public distributed;
-
-    // The amount of rProps to mint and distribute as rewards
-    uint256 public amountToDistribute;
+    // The staking contract for earning apps Props rewards
+    address public propsAppStaking;
+    // The staking contract for earning users Props rewards
+    address public propsUserStaking;
 
     /**************************************
                     MODIFIERS
@@ -48,24 +47,23 @@ contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
         _;
     }
 
+    modifier notSet(address _field) {
+        require(_field == address(0), "Already set");
+        _;
+    }
+
     /***************************************
                    INITIALIZER
     ****************************************/
 
     /**
      * @dev Initializer.
-     * @param _amount The amount of rProps to mint and distribute as rewards
      * @param _controller The rProps token controller
      * @param _propsToken The address of the Props token contract
      */
-    function initialize(
-        uint256 _amount,
-        address _controller,
-        address _propsToken
-    ) public initializer {
+    function initialize(address _controller, address _propsToken) public initializer {
         ERC20Upgradeable.__ERC20_init("rProps", "RPROPS");
 
-        amountToDistribute = _amount;
         controller = _controller;
         propsToken = _propsToken;
     }
@@ -75,58 +73,99 @@ contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
     ****************************************/
 
     /**
+     * @dev Set the staking contract for earning apps Props rewards.
+     * @param _propsAppStaking The address of the staking contract for earning apps Props rewards
+     */
+    function setPropsAppStaking(address _propsAppStaking)
+        external
+        override
+        only(controller)
+        notSet(propsAppStaking)
+    {
+        propsAppStaking = _propsAppStaking;
+    }
+
+    /**
+     * @dev Set the staking contract for earning users Props rewards.
+     * @param _propsUserStaking The address of the staking contract for earning users Props rewards.
+     */
+    function setPropsUserStaking(address _propsUserStaking)
+        external
+        override
+        only(controller)
+        notSet(propsUserStaking)
+    {
+        propsUserStaking = _propsUserStaking;
+    }
+
+    /**
      * @dev Distribute rProps rewards to the app and user Props staking contracts.
-     *      This action mints the initially set amount of rProps and calls the
-     *      rewards distribution action on the staking contracts.
-     * @param _propsAppStaking The app Props staking contract
-     * @param _appRewardsPercentage The percentage of minted rProps to get distributed to apps
-     * @param _propsUserStaking The user Props staking contract
-     * @param _userRewardsPercentage The percentage of minted rProps to get distributed to users
+     *      This action mints the given amount of rProps and calls the rewards
+     *      distribution action on the staking contracts.
+     * @param _amount The amount of rProps to mint and distribute
+     * @param _appRewardsPercentage The percentage of minted rProps to get distributed to apps (in ppm)
+     * @param _userRewardsPercentage The percentage of minted rProps to get distributed to users (in ppm)
      */
     function distributeRewards(
-        address _propsAppStaking,
+        uint256 _amount,
         uint256 _appRewardsPercentage,
-        address _propsUserStaking,
         uint256 _userRewardsPercentage
     ) external override only(controller) {
-        // This is a one-time only action
-        require(!distributed, "Rewards already distributed");
-        distributed = true;
-
         // The percentages must add up to 100%
         require(_appRewardsPercentage.add(_userRewardsPercentage) == 1e6, "Invalid percentages");
 
         // Distribute app rProps rewards
-        uint256 appRewards = amountToDistribute.mul(_appRewardsPercentage).div(1e6);
-        _mint(_propsAppStaking, appRewards);
-        IStaking(_propsAppStaking).notifyRewardAmount(balanceOf(_propsAppStaking));
+        uint256 appRewards = _amount.mul(_appRewardsPercentage).div(1e6);
+        _mint(propsAppStaking, appRewards);
+        IStaking(propsAppStaking).notifyRewardAmount(balanceOf(propsAppStaking));
 
         // Distribute user rProps rewards
-        uint256 userRewards = amountToDistribute.sub(appRewards);
-        _mint(_propsUserStaking, userRewards);
-        IStaking(_propsUserStaking).notifyRewardAmount(balanceOf(_propsUserStaking));
+        uint256 userRewards = _amount.sub(appRewards);
+        _mint(propsUserStaking, userRewards);
+        IStaking(propsUserStaking).notifyRewardAmount(balanceOf(propsUserStaking));
     }
 
     /**
      * @dev Withdraw rProps rewards from the app and user Props staking contracts.
-     * @param _propsAppStaking The app Props staking contract
      * @param _appRewardsAmount The amount of rProps to get withdrawn from the app Props staking contract
-     * @param _propsUserStaking The user Props staking contract
      * @param _userRewardsAmount The amount of rProps to get withdrawn from the user Props staking contract
      */
-    function withdrawRewards(
-        address _propsAppStaking,
-        uint256 _appRewardsAmount,
-        address _propsUserStaking,
-        uint256 _userRewardsAmount
-    ) external override only(controller) {
+    function withdrawRewards(uint256 _appRewardsAmount, uint256 _userRewardsAmount)
+        external
+        override
+        only(controller)
+    {
         // Withdraw and burn app rProps rewards
-        IStaking(_propsAppStaking).withdrawReward(_appRewardsAmount);
+        IStaking(propsAppStaking).withdrawReward(_appRewardsAmount);
         _burn(address(this), _appRewardsAmount);
 
         // Withdraw user rProps rewards
-        IStaking(_propsUserStaking).withdrawReward(_userRewardsAmount);
+        IStaking(propsUserStaking).withdrawReward(_userRewardsAmount);
         _burn(address(this), _userRewardsAmount);
+    }
+
+    /**
+     * @dev Change the daily reward emission parameter on the app Props staking contract.
+     * @param _appDailyRewardEmission The new daily reward emission rate
+     */
+    function changeDailyAppRewardEmission(uint256 _appDailyRewardEmission)
+        external
+        override
+        only(controller)
+    {
+        IStaking(propsAppStaking).changeDailyRewardEmission(_appDailyRewardEmission);
+    }
+
+    /**
+     * @dev Change the daily reward emission parameter on the user Props staking contract.
+     * @param _userDailyRewardEmission The new daily reward emission rate
+     */
+    function changeDailyUserRewardEmission(uint256 _userDailyRewardEmission)
+        external
+        override
+        only(controller)
+    {
+        IStaking(propsUserStaking).changeDailyRewardEmission(_userDailyRewardEmission);
     }
 
     /**

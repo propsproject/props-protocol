@@ -176,9 +176,9 @@ contract AppProxyFactoryL2 is Initializable, MinimalProxyFactory {
         // - the app owner
         // - the PropsProtocol contract
         // - the app points staking contract
-        IAppPoints(appPointsProxy).whitelistForTransfers(_owner);
-        IAppPoints(appPointsProxy).whitelistForTransfers(propsProtocol);
-        IAppPoints(appPointsProxy).whitelistForTransfers(appPointsStakingProxy);
+        IAppPoints(appPointsProxy).updateTransferWhitelist(_owner, true);
+        IAppPoints(appPointsProxy).updateTransferWhitelist(propsProtocol, true);
+        IAppPoints(appPointsProxy).updateTransferWhitelist(appPointsStakingProxy, true);
 
         // Transfer ownership to the app owner
         OwnableUpgradeable(appPointsProxy).transferOwnership(_owner);

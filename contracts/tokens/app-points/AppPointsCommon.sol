@@ -33,7 +33,7 @@ abstract contract AppPointsCommon is
     ***************************************/
 
     // Whitelist of addresses allowed to transfer when paused
-    mapping(address => bool) public transfersWhitelist;
+    mapping(address => bool) public transferWhitelist;
 
     // solhint-disable-next-line var-name-mixedcase
     bytes32 public DOMAIN_SEPARATOR;
@@ -47,8 +47,7 @@ abstract contract AppPointsCommon is
                      EVENTS
     ***************************************/
 
-    event AddressWhitelisted(address indexed account);
-    event AddressBlacklisted(address indexed account);
+    event TransferWhitelistUpdated(address indexed account, bool status);
 
     /***************************************
                    INITIALIZER
@@ -92,21 +91,13 @@ abstract contract AppPointsCommon is
     }
 
     /**
-     * @dev Whitelist an address for transfers when paused.
-     * @param _account The address of the account to whitelist
+     * @dev Update the transfer whitelist.
+     * @param _account The account to update the whitelist status of
+     * @param _status The whitelist status of the account
      */
-    function whitelistForTransfers(address _account) external override onlyOwner {
-        transfersWhitelist[_account] = true;
-        emit AddressWhitelisted(_account);
-    }
-
-    /**
-     * @dev Blacklist an address for transfers when paused.
-     * @param _account The address of the account to blacklist
-     */
-    function blacklistForTransfers(address _account) external override onlyOwner {
-        transfersWhitelist[_account] = false;
-        emit AddressBlacklisted(_account);
+    function updateTransferWhitelist(address _account, bool _status) external override onlyOwner {
+        transferWhitelist[_account] = _status;
+        emit TransferWhitelistUpdated(_account, _status);
     }
 
     /**
@@ -226,6 +217,6 @@ abstract contract AppPointsCommon is
         // - the transfer represents a mint of new tokens
         // - the address transferring from is whitelisted
 
-        require(!paused() || _from == address(0) || transfersWhitelist[_from], "Unauthorized");
+        require(!paused() || _from == address(0) || transferWhitelist[_from], "Unauthorized");
     }
 }

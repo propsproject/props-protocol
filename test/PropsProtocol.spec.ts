@@ -82,7 +82,7 @@ describe("PropsProtocol", () => {
     await appPoints.connect(appOwner).addMinter(appOwner.address);
     await appPoints.connect(appOwner).mint(appOwner.address, APP_POINTS_TOKEN_AMOUNT);
 
-    await propsProtocol.connect(controller).whitelistApp(appPointsAddress);
+    await propsProtocol.connect(controller).updateAppWhitelist(appPointsAddress, true);
 
     return [
       appPoints,
@@ -116,7 +116,6 @@ describe("PropsProtocol", () => {
     rPropsToken = await deployContractUpgradeable(
       "RPropsToken",
       deployer,
-      RPROPS_TOKEN_AMOUNT,
       propsProtocol.address,
       propsToken.address
     );
@@ -167,7 +166,9 @@ describe("PropsProtocol", () => {
     await propsProtocol.connect(controller).setPropsUserStaking(propsUserStaking.address);
 
     // Distribute the rProps rewards to the sProps staking contracts
-    await propsProtocol.connect(controller).distributePropsRewards(bn(800000), bn(200000));
+    await propsProtocol
+      .connect(controller)
+      .distributePropsRewards(RPROPS_TOKEN_AMOUNT, bn(800000), bn(200000));
   });
 
   it("sProps are not transferrable", async () => {
@@ -666,13 +667,13 @@ describe("PropsProtocol", () => {
 
     // Only the app owner can claim app Props rewards
     await expect(
-      propsProtocol.connect(alice).claimAppPropsRewards(appPoints.address)
+      propsProtocol.connect(alice).claimAppPropsRewards(appPoints.address, alice.address)
     ).to.be.revertedWith("Unauthorized");
 
     const earned = await propsAppStaking.earned(appPoints.address);
 
     // Claim app Props rewards
-    await propsProtocol.connect(appOwner).claimAppPropsRewards(appPoints.address);
+    await propsProtocol.connect(appOwner).claimAppPropsRewards(appPoints.address, appOwner.address);
 
     // Make sure the app owner has no rProps in their wallet
     expect(await rPropsToken.balanceOf(appOwner.address)).to.eq(bn(0));
@@ -989,17 +990,11 @@ describe("PropsProtocol", () => {
     ).to.be.revertedWith("Unauthorized");
     expect(await propsProtocol.connect(controller).changeRewardsEscrowCooldown(bn(10)));
 
-    // Only the controller can whitelist apps
-    await expect(propsProtocol.connect(alice).whitelistApp(mock.address)).to.be.revertedWith(
-      "Unauthorized"
-    );
-    expect(await propsProtocol.connect(controller).whitelistApp(mock.address));
-
-    // Only the controller can blacklist apps
-    await expect(propsProtocol.connect(alice).blacklistApp(mock.address)).to.be.revertedWith(
-      "Unauthorized"
-    );
-    expect(await propsProtocol.connect(controller).blacklistApp(mock.address));
+    // Only the controller can update the app whitelist
+    await expect(
+      propsProtocol.connect(alice).updateAppWhitelist(mock.address, true)
+    ).to.be.revertedWith("Unauthorized");
+    expect(await propsProtocol.connect(controller).updateAppWhitelist(mock.address, true));
 
     // Only the guardian can pause the controller
     await expect(propsProtocol.connect(alice).pause()).to.be.revertedWith("Unauthorized");
