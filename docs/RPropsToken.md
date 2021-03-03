@@ -1,6 +1,6 @@
 ## `RPropsToken`
 
-rProps tokens represent future Props rewards. They were introduced as a workaround to having to mint Props tokens (and thus increasing the total supply) in order to get them distributed to the app and user Props rewards pools. The initial total supply of rProps is configurable and represents the amount of Props tokens that are to be distributed as staking rewards. When staking, apps and users earn their Props rewards in rProps, but when claimed, these rProps get burned and an equivalent amount of regular Props tokens will get minted to replace them.
+rProps tokens represent future Props rewards. They were introduced as a workaround to having to mint Props tokens (and thus increasing the total supply) in order to get them distributed to the app and user Props rewards pools. When staking, apps and users earn their Props rewards in rProps, but when claimed, these rProps get burned and an equivalent amount of regular Props tokens will get minted to replace them.
 
 The following setup is required:
 
@@ -8,19 +8,18 @@ The following setup is required:
 - the `RPropsToken` contract must have minting permissions on the `PropsTokenL2` contract
 - the `RPropsToken` contract must be the designated rewards distribution address in the app and user Props staking contracts
 
-Since the controller of `RPropsToken` must be the `PropsProtocol` contract, any calls to it (`distributeRewards`, `withdrawRewards` and `swap`) must be initiated by `PropsProtocol`.
+Since the controller of `RPropsToken` must be the `PropsProtocol` contract, any calls to it (eg. `distributeRewards`, `withdrawRewards`, `swap`) must be initiated by `PropsProtocol`.
 
 ## Architecture
 
 ##### Distribute rewards
 
-Mint the initially set amount of rProps tokens and distribute them to the staking contracts for earning apps and users Props rewards. The distribution will also trigger the start of the rewards distribution period on those two staking contracts. The amount of rProps distributed to each rewards pool is determined by the given percentages. This is a one-time action: once distributed, all initially configured rProps tokens will get minted and further attempts to rProps rewards distributions will fail.
+Mint the given amount of rProps tokens and distribute them to the staking contracts for earning apps and users Props rewards. The distribution will also trigger the start of the rewards distribution period on those two staking contracts. The amount of rProps distributed to each rewards pool is determined by the given percentages.
 
 ```solidity
 function distributeRewards(
-    address _propsAppStaking,
+    uint256 _amount,
     uint256 _appRewardsPercentage,
-    address _propsUserStaking,
     uint256 _userRewardsPercentage
 )
 ```
@@ -31,11 +30,25 @@ Withdraw and burn the given amounts of rProps tokens from the app and user Props
 
 ```solidity
 function withdrawRewards(
-    address _propsAppStaking,
     uint256 _appRewardsAmount,
-    address _propsUserStaking,
     uint256 _userRewardsAmount
 )
+```
+
+##### Change daily app reward emission
+
+Change the daily reward emission rate on the app Props staking contract.
+
+```solidity
+function changeDailyAppRewardEmission(uint256 _appDailyRewardEmission)
+```
+
+##### Change daily user reward emission
+
+Change the daily reward emission rate on the user Props staking contract.
+
+```solidity
+function changeDailyUserRewardEmission(uint256 _userDailyRewardEmission)
 ```
 
 ##### Swap

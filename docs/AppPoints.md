@@ -76,18 +76,10 @@ Unpause the contract. This will re-enable transfers.
 function unpause()
 ```
 
-##### Whitelist for transfers
+##### Update transfer whitelist
 
-Whitelist an address for performing transfers. The whitelist is only relevant when transfers are paused.
-
-```solidity
-function whitelistForTransfers(address _account)
-```
-
-##### Blacklist for transfers
-
-Blacklist an from performing transfers. The blacklist is only active when the transfers are paused.
+Update the set of whitelisted addresses allowed to transfer when the transfers are paused. The whitelist is only relevant when transfers are paused.
 
 ```solidity
-function blacklistForTransfers(address _account)
+function updateTransferWhitelist(address _account, bool _status)
 ```

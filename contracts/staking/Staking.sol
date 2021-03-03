@@ -14,7 +14,7 @@ import "./IStaking.sol";
  * @title  Staking
  * @author Forked from: Synthetix
  *         Changes by: Props
- * @notice Reward stakers of staking tokens with reward tokens, on a pro-rata basis.
+ * @notice Reward stakers with reward tokens, on a pro-rata basis.
  * @dev    In order to allow for passive reward accrual, it uses an ever-increasing
  *         `rewardsPerTokenStored` variable that gets updated on every write action
  *         to the contract.
@@ -28,9 +28,9 @@ import "./IStaking.sol";
  *           and `periodFinish` variables get updated via the `updateRewardRate` modifier)
  *         - any outstanding rewards (not yet earned by any staker) can be withdrawn by the
  *           designated rewards distribution account
- *         - the `rewardsDuration` variable gets calculated from the `dailyRewardsEmission`
- *           parameter on initialization, which specifies the percentage of the remaining
- *           rewards pool that should get distributed each day
+ *         - the `rewardsDuration` variable gets calculated from the `dailyRewardsEmission`,
+ *           which specifies the percentage of the remaining rewards pool that should get
+ *           distributed each day
  *         - the staked and withdrawn amounts are implicit (the contract trusts its controller
  *           to provide correct values), no staking tokens are transferred to or from this
  *           contract
@@ -55,17 +55,17 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
     // Token to be used for rewards
     address public rewardsToken;
 
-    // The finish time of the current rewards period
+    // The finish time of the current rewards period (timestamp in seconds)
     uint256 public periodFinish;
     // The currently active reward rate
     uint256 public rewardRate;
-    // The duration of the rewards period
+    // The duration of the rewards period (in seconds)
     uint256 public rewardsDuration;
-    // Last time any user took any action (stake / unstake / claim / distribute)
+    // Last time any user took any action (stake / unstake / claim / distribute) (timestamp in seconds)
     uint256 public lastUpdateTime;
     // Ever-increasing reward per token rate that allows for passive reward accrual
     uint256 public rewardPerTokenStored;
-    // Last time the reward rate got updated
+    // Last time the reward rate got updated (timestamp in seconds)
     uint256 public lastRewardRateUpdate;
 
     // Mapping of the last `rewardPerTokenStored` rate of each user

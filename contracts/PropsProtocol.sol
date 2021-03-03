@@ -86,8 +86,7 @@ contract PropsProtocol is
                      EVENTS
     ***************************************/
 
-    event Stake(address indexed app, address indexed account, int256 amount);
-    event RewardsStake(address indexed app, address indexed account, int256 amount);
+    event Staked(address indexed app, address indexed account, int256 amount, bool rewards);
     event RewardsEscrowUpdated(address indexed account, uint256 lockedAmount, uint256 unlockTime);
     event AppWhitelistUpdated(address indexed app, bool status);
     event DelegateChanged(address indexed delegator, address indexed delegatee);
@@ -632,11 +631,7 @@ contract PropsProtocol is
                 // Update the total unstaked amount
                 totalUnstakedAmount = totalUnstakedAmount.add(amountToUnstake);
 
-                if (_rewards) {
-                    emit RewardsStake(_apps[i], _to, _amounts[i]);
-                } else {
-                    emit Stake(_apps[i], _to, _amounts[i]);
-                }
+                emit Staked(_apps[i], _to, _amounts[i], _rewards);
             }
         }
 
@@ -692,11 +687,7 @@ contract PropsProtocol is
                 // Stake the sProps in the app Props staking contract
                 IStaking(propsAppStaking).stake(_apps[i], amountToStake);
 
-                if (_rewards) {
-                    emit RewardsStake(_apps[i], _to, _amounts[i]);
-                } else {
-                    emit Stake(_apps[i], _to, _amounts[i]);
-                }
+                emit Staked(_apps[i], _to, _amounts[i], _rewards);
             }
         }
 

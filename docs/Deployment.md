@@ -4,5 +4,3 @@ Deploying all contracts related to the Props protocol is as simple as running a 
 
 - request a token mapping from the Matic team (via https://mapper.matic.today/map) - their current interface only allows mapping tokens based on default predicates (`ERC20Predicate` in our case), however, we need the bridge to be able to mint Props tokens on demand (this allows the protocol to mint additional Props tokens on L2 and have the users be able to withdraw these L2-minted Props back to L1), so for this to happen we need to further request the Matic team to bridge the Props token based on their `MintableERC20Predicate`
 - give the `MintableERC20PredicateProxy` contract (the contract address can be found at https://github.com/maticnetwork/static) minting permissions on the Props token so that it can mint additional Props token as needed
-
-One configurable option when deploying is the amount of Props (rProps) that is to get distributed as rewards on the L2 where the protocol will reside. This option is configurable via the `PROPS_REWARDS_AMOUNT` environment variable which can be tweaked as needed directly in the deployment scripts.

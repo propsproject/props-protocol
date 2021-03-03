@@ -76,10 +76,10 @@ function claimAppPointsRewards(address _app)
 
 ##### Claim app Props rewards
 
-Allow app owners to claim the Props rewards of their apps. The claimed Props rewards will get transferred from the app Props staking contract to the app owner's wallet.
+Allow app owners to claim the Props rewards of their apps. The claimed Props rewards will get transferred from the app Props staking contract to the specified wallet address.
 
 ```solidity
-function claimAppPropsRewards(address _app)
+function claimAppPropsRewards(address _app, address _wallet)
 ```
 
 ##### Claim app Props rewards and stake
@@ -153,28 +153,24 @@ Unpause the contract.
 function unpause()
 ```
 
-##### Whitelist app
+##### Update app whitelist
 
-Whitelist an app. Users can only stake to whitelisted apps.
-
-```solidity
-function whitelistApp(address _app)
-```
-
-##### Blacklist app
-
-Blacklist an app. By default, any newly deployed app is blacklisted. Although staking to blacklisted apps is forbidden, withdrawing and claiming are still available.
+Update the set of whitelisted apps. Users can only stake to whitelisted apps. By default, any newly deployed app is blacklisted. Although staking to blacklisted apps is forbidden, withdrawing and claiming are still available.
 
 ```solidity
-function whitelistApp(address _app)
+function updateAppWhitelist(address _app, bool _status)
 ```
 
 ##### Distribute Props rewards
 
-Distribute the Props rewards to the app and user Props staking contracts. This is a one-time only action that will trigger the distribution method of the rProps token, which `PropsProtocol` owns.
+Distribute the Props rewards to the app and user Props staking contracts. This will trigger the distribution method of the rProps token, which `PropsProtocol` owns.
 
 ```solidity
-function distributePropsRewards(uint256 _appRewardsPercentage, uint256 _userRewardsPercentage)
+function distributePropsRewards(
+    uint256 _amount,
+    uint256 _appRewardsPercentage,
+    uint256 _userRewardsPercentage
+)
 ```
 
 ##### Withdraw Props rewards
