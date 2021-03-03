@@ -15,10 +15,6 @@ import type {
 import { bn, deployContract, deployContractUpgradeable, expandTo18Decimals } from "../utils";
 
 // Constants
-// The amount of rProps (Props) rewards to get distributed on L2
-const PROPS_REWARDS_AMOUNT = expandTo18Decimals(
-  (process.env.PROPS_REWARDS_AMOUNT || "0") as string
-);
 const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
 
 // Matic contracts
@@ -65,14 +61,6 @@ async function main() {
       propsToken = await deployContractUpgradeable("PropsTokenL2", deployer);
       addresses["propsToken"] = propsToken.address;
 
-      if (process.env.DEV) {
-        console.log("[DEV only] Granting Props minting permissions to the deployer");
-        await propsToken
-          .connect(deployer)
-          .addMinter(deployer.address)
-          .then((tx: any) => tx.wait());
-      }
-
       console.log("Deploying `PropsProtocol`");
       propsProtocol = await deployContractUpgradeable(
         "PropsProtocol",
@@ -87,7 +75,6 @@ async function main() {
       rPropsToken = await deployContractUpgradeable(
         "RPropsToken",
         deployer,
-        PROPS_REWARDS_AMOUNT,
         propsProtocol.address,
         propsToken.address
       );
