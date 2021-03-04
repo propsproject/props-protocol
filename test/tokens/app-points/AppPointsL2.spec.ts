@@ -12,6 +12,7 @@ chai.use(solidity);
 const { expect } = chai;
 
 describe("AppPointsL2", () => {
+  let deployer: SignerWithAddress;
   let appOwner: SignerWithAddress;
   let alice: SignerWithAddress;
   let minter: SignerWithAddress;
@@ -22,14 +23,24 @@ describe("AppPointsL2", () => {
   const APP_POINTS_TOKEN_SYMBOL = "AppPoints";
 
   beforeEach(async () => {
-    [appOwner, alice, minter] = await ethers.getSigners();
+    [deployer, appOwner, alice, minter] = await ethers.getSigners();
 
     appPoints = await deployContractUpgradeable(
       "AppPointsL2",
-      appOwner,
+      deployer,
       APP_POINTS_TOKEN_NAME,
       APP_POINTS_TOKEN_SYMBOL
     );
+
+    // Mimick the AppProxyFactory by transferring ownership to the app owner
+    await appPoints.connect(deployer).transferOwnership(appOwner.address);
+  });
+
+  it("correctly initialized", async () => {
+    expect(await appPoints.owner()).to.eq(appOwner.address);
+    expect(await appPoints.name()).to.eq(APP_POINTS_TOKEN_NAME);
+    expect(await appPoints.symbol()).to.eq(APP_POINTS_TOKEN_SYMBOL);
+    expect(await appPoints.totalSupply()).to.eq(bn(0));
   });
 
   it("approve via off-chain signature (permit) from root chain", async () => {

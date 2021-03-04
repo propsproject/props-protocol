@@ -9,7 +9,7 @@ import {
   deployContract,
   deployContractUpgradeable,
   expandTo18Decimals,
-  getEvent,
+  getEvents,
 } from "../utils";
 
 chai.use(solidity);
@@ -42,7 +42,7 @@ describe("AppProxyFactoryL1", () => {
         appOwner.address,
         DAILY_REWARDS_EMISSION
       );
-    const [appPointsAddress] = await getEvent(
+    const [[appPointsAddress]] = await getEvents(
       await tx.wait(),
       "AppDeployed(address,string,string,address)",
       "AppProxyFactoryL1"
@@ -92,17 +92,40 @@ describe("AppProxyFactoryL1", () => {
     );
   });
 
+  it("change AppPoints logic contract", async () => {
+    // Change the logic contract for AppPoints
+    const newAppPointsLogic = await deployContract("AppPointsL1", deployer);
+    await appProxyFactory.connect(controller).changeAppPointsLogic(newAppPointsLogic.address);
+    expect(await appProxyFactory.appPointsLogic()).to.eq(newAppPointsLogic.address);
+
+    const appPoints = await deployApp();
+
+    // Check the deployment with the new logic contract is correct
+    expect(await appPoints.name()).to.eq(APP_POINTS_TOKEN_NAME);
+    expect(await appPoints.symbol()).to.eq(APP_POINTS_TOKEN_SYMBOL);
+    expect(await appPoints.totalSupply()).to.eq(APP_POINTS_TOKEN_AMOUNT);
+  });
+
   it("proper permissioning", async () => {
-    // A random address cannot change the logic contracts
+    // Only the controller can change the logic contracts
     await expect(
       appProxyFactory.connect(mock).changeAppPointsLogic(mock.address)
     ).to.be.revertedWith("Unauthorized");
-
-    // Only the controller can change the logic contracts
     await appProxyFactory.connect(controller).changeAppPointsLogic(mock.address);
+    expect(await appProxyFactory.appPointsLogic()).to.eq(mock.address);
+
+    // Only the controller can change the bridge address
+    await expect(
+      appProxyFactory.connect(mock).changeAppProxyFactoryBridge(mock.address)
+    ).to.be.revertedWith("Unauthorized");
+    await appProxyFactory.connect(controller).changeAppProxyFactoryBridge(mock.address);
+    expect(await appProxyFactory.appProxyFactoryBridge()).to.eq(mock.address);
 
     // Transfer control
     await appProxyFactory.connect(controller).transferControl(mock.address);
+    expect(await appProxyFactory.controller()).to.eq(mock.address);
+
+    // Check the control was properly transferred
     await expect(
       appProxyFactory.connect(controller).changeAppPointsLogic(mock.address)
     ).to.be.revertedWith("Unauthorized");

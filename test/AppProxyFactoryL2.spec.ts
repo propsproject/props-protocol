@@ -15,7 +15,7 @@ import {
   deployContract,
   deployContractUpgradeable,
   expandTo18Decimals,
-  getEvent,
+  getEvents,
 } from "../utils";
 
 chai.use(solidity);
@@ -51,7 +51,7 @@ describe("AppProxyFactoryL2", () => {
         appOwner.address,
         DAILY_REWARDS_EMISSION
       );
-    const [, appPointsAddress, appPointsStakingAddress] = await getEvent(
+    const [[, appPointsAddress, appPointsStakingAddress]] = await getEvents(
       await tx.wait(),
       "AppDeployed(address,address,address,string,string,address)",
       "AppProxyFactoryL2"
@@ -122,21 +122,55 @@ describe("AppProxyFactoryL2", () => {
     expect(await appPointsStaking.rewardsToken()).to.eq(appPoints.address);
   });
 
+  it("change AppPoints logic contract", async () => {
+    // Change the logic contract for AppPoints
+    const newAppPointsLogic = await deployContract("AppPointsL2", deployer);
+    await appProxyFactory.connect(controller).changeAppPointsLogic(newAppPointsLogic.address);
+    expect(await appProxyFactory.appPointsLogic()).to.eq(newAppPointsLogic.address);
+
+    // Change the logic contract for Staking
+    const newAppPointsStakingLogic = await deployContract("Staking", deployer);
+    await appProxyFactory
+      .connect(controller)
+      .changeAppPointsStakingLogic(newAppPointsStakingLogic.address);
+    expect(await appProxyFactory.appPointsStakingLogic()).to.eq(newAppPointsStakingLogic.address);
+
+    const [appPoints, appPointsStaking] = await deployApp();
+
+    // Check the deployment with the new logic contracts is correct
+    expect(await appPoints.name()).to.eq(APP_POINTS_TOKEN_NAME);
+    expect(await appPoints.symbol()).to.eq(APP_POINTS_TOKEN_SYMBOL);
+    expect(await appPoints.totalSupply()).to.eq(bn(0));
+    expect(await appPointsStaking.rewardsToken()).to.eq(appPoints.address);
+    expect(await appPointsStaking.rewardsDistribution()).to.eq(appOwner.address);
+  });
+
   it("proper permissioning", async () => {
-    // A random address cannot change the logic contracts
+    // Only the controller can change the logic contracts
     await expect(
       appProxyFactory.connect(mock).changeAppPointsLogic(mock.address)
     ).to.be.revertedWith("Unauthorized");
+    await appProxyFactory.connect(controller).changeAppPointsLogic(mock.address);
+    expect(await appProxyFactory.appPointsLogic()).to.eq(mock.address);
+
     await expect(
       appProxyFactory.connect(mock).changeAppPointsStakingLogic(mock.address)
     ).to.be.revertedWith("Unauthorized");
-
-    // Only the controller can change the logic contracts
-    await appProxyFactory.connect(controller).changeAppPointsLogic(mock.address);
     await appProxyFactory.connect(controller).changeAppPointsStakingLogic(mock.address);
+    expect(await appProxyFactory.appPointsStakingLogic()).to.eq(mock.address);
+
+    // Only the controller can change the bridge address
+    await expect(
+      appProxyFactory.connect(mock).changeAppProxyFactoryBridge(mock.address)
+    ).to.be.revertedWith("Unauthorized");
+    await appProxyFactory.connect(controller).changeAppProxyFactoryBridge(mock.address);
+    expect(await appProxyFactory.appProxyFactoryBridge()).to.eq(mock.address);
 
     // Transfer control
     await appProxyFactory.connect(controller).transferControl(mock.address);
+    expect(await appProxyFactory.controller()).to.eq(mock.address);
+
+    // Check the control was properly transferred
     await expect(
       appProxyFactory.connect(controller).changeAppPointsLogic(mock.address)
     ).to.be.revertedWith("Unauthorized");

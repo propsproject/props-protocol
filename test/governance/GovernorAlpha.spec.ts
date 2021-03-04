@@ -21,7 +21,7 @@ import {
   deployContractUpgradeable,
   encodeParameters,
   expandTo18Decimals,
-  getEvent,
+  getEvents,
   mineBlock,
   mineBlocks,
 } from "../../utils";
@@ -68,7 +68,7 @@ describe("GovernorAlpha", () => {
         appOwner.address,
         DAILY_REWARDS_EMISSION
       );
-    const [, appPointsAddress, appPointsStakingAddress] = await getEvent(
+    const [[, appPointsAddress, appPointsStakingAddress]] = await getEvents(
       await tx.wait(),
       "AppDeployed(address,address,address,string,string,address)",
       "AppProxyFactoryL2"
@@ -215,7 +215,7 @@ describe("GovernorAlpha", () => {
       // description: description of the proposal
       "Change Timelock's admin"
     );
-    const [proposalId, proposer, , , , , proposalStartBlock, proposalEndBlock] = await getEvent(
+    const [[proposalId, proposer, , , , , proposalStartBlock, proposalEndBlock]] = await getEvents(
       await tx.wait(),
       "ProposalCreated(uint256,address,address[],uint256[],string[],bytes[],uint256,uint256,string)",
       "GovernorAlpha"
@@ -231,7 +231,7 @@ describe("GovernorAlpha", () => {
 
     // Vote on proposal, from an account that has no voting power
     tx = await governorAlpha.connect(alice).castVote(proposalId, true);
-    [voter, , support, votes] = await getEvent(
+    [[voter, , support, votes]] = await getEvents(
       await tx.wait(),
       "VoteCast(address,uint256,bool,uint256)",
       "GovernorAlpha"
@@ -242,7 +242,7 @@ describe("GovernorAlpha", () => {
 
     // Vote once again on proposal, this time from an account that has voting power
     tx = await governorAlpha.connect(bob).castVote(proposalId, true);
-    [voter, , support, votes] = await getEvent(
+    [[voter, , support, votes]] = await getEvents(
       await tx.wait(),
       "VoteCast(address,uint256,bool,uint256)",
       "GovernorAlpha"
@@ -259,7 +259,7 @@ describe("GovernorAlpha", () => {
 
     // Queue proposal for execution
     tx = await governorAlpha.queue(proposalId);
-    const [, eta] = await getEvent(
+    const [[, eta]] = await getEvents(
       await tx.wait(),
       "ProposalQueued(uint256,uint256)",
       "GovernorAlpha"

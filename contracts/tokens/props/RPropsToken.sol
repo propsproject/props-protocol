@@ -117,12 +117,12 @@ contract RPropsToken is Initializable, ERC20Upgradeable, IRPropsToken {
         // Distribute app rProps rewards
         uint256 appRewards = _amount.mul(_appRewardsPercentage).div(1e6);
         _mint(propsAppStaking, appRewards);
-        IStaking(propsAppStaking).notifyRewardAmount(balanceOf(propsAppStaking));
+        IStaking(propsAppStaking).notifyRewardAmount(appRewards);
 
         // Distribute user rProps rewards
         uint256 userRewards = _amount.sub(appRewards);
         _mint(propsUserStaking, userRewards);
-        IStaking(propsUserStaking).notifyRewardAmount(balanceOf(propsUserStaking));
+        IStaking(propsUserStaking).notifyRewardAmount(userRewards);
     }
 
     /**

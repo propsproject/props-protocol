@@ -104,6 +104,7 @@ contract AppPointsL1 is Initializable, AppPointsCommon {
             inflationRate = pendingInflationRate;
         }
 
+        // Should we revert on attempts to mint 0 additional AppPoints tokens?
         uint256 amount = inflationRate.mul(block.timestamp.sub(lastMint));
         if (amount != 0) {
             _mintAppPoints(owner(), amount);

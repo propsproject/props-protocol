@@ -20,6 +20,7 @@ describe("RPropsToken", () => {
   let deployer: SignerWithAddress;
   let controller: SignerWithAddress;
   let alice: SignerWithAddress;
+  let mock: SignerWithAddress;
 
   let propsToken: MockPropsToken;
   let rPropsToken: RPropsToken;
@@ -33,7 +34,7 @@ describe("RPropsToken", () => {
   const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
 
   beforeEach(async () => {
-    [deployer, controller, alice] = await ethers.getSigners();
+    [deployer, controller, alice, mock] = await ethers.getSigners();
 
     propsToken = await deployContractUpgradeable("MockPropsToken", deployer, PROPS_TOKEN_AMOUNT);
 
@@ -91,6 +92,46 @@ describe("RPropsToken", () => {
     expect(rPropsForAppRewards).to.eq(RPROPS_TOKEN_AMOUNT.mul(70).div(100));
     expect(await propsAppStaking.periodFinish()).to.not.eq(bn(0));
     expect(rPropsForUserRewards).to.eq(RPROPS_TOKEN_AMOUNT.sub(rPropsForAppRewards));
+    expect(await propsUserStaking.periodFinish()).to.not.eq(bn(0));
+  });
+
+  it("multiple reward distributions", async () => {
+    // First distribution
+    await rPropsToken
+      .connect(controller)
+      .distributeRewards(RPROPS_TOKEN_AMOUNT, bn(700000), bn(300000));
+
+    // Check the correct amount of rProps got minted
+    expect(await rPropsToken.totalSupply()).to.eq(RPROPS_TOKEN_AMOUNT);
+
+    const rPropsForAppRewards1 = await rPropsToken.balanceOf(propsAppStaking.address);
+    const rPropsForUserRewards1 = await rPropsToken.balanceOf(propsUserStaking.address);
+
+    // Check the rewards were indeed deposited in the staking contracts
+    expect(rPropsForAppRewards1).to.eq(RPROPS_TOKEN_AMOUNT.mul(70).div(100));
+    expect(await propsAppStaking.periodFinish()).to.not.eq(bn(0));
+    expect(rPropsForUserRewards1).to.eq(RPROPS_TOKEN_AMOUNT.sub(rPropsForAppRewards1));
+    expect(await propsUserStaking.periodFinish()).to.not.eq(bn(0));
+
+    // Second distribution
+    await rPropsToken
+      .connect(controller)
+      .distributeRewards(RPROPS_TOKEN_AMOUNT, bn(700000), bn(300000));
+
+    // Check the correct amount of rProps got minted
+    expect(await rPropsToken.totalSupply()).to.eq(RPROPS_TOKEN_AMOUNT.mul(2));
+
+    const rPropsForAppRewards2 = await rPropsToken.balanceOf(propsAppStaking.address);
+    const rPropsForUserRewards2 = await rPropsToken.balanceOf(propsUserStaking.address);
+
+    // Check the rewards were indeed deposited in the staking contracts
+    expect(rPropsForAppRewards2).to.eq(
+      rPropsForAppRewards1.add(RPROPS_TOKEN_AMOUNT.mul(70).div(100))
+    );
+    expect(await propsAppStaking.periodFinish()).to.not.eq(bn(0));
+    expect(rPropsForUserRewards2).to.eq(
+      rPropsForUserRewards1.add(RPROPS_TOKEN_AMOUNT.sub(rPropsForAppRewards1))
+    );
     expect(await propsUserStaking.periodFinish()).to.not.eq(bn(0));
   });
 
@@ -176,5 +217,14 @@ describe("RPropsToken", () => {
 
     // Check that the earned reward is now in Alice's Props wallet
     expect(await propsToken.balanceOf(alice.address)).to.eq(earned);
+  });
+
+  it("cannot re-set initialization parameters", async () => {
+    await expect(
+      rPropsToken.connect(controller).setPropsAppStaking(mock.address)
+    ).to.be.revertedWith("Already set");
+    await expect(
+      rPropsToken.connect(controller).setPropsUserStaking(mock.address)
+    ).to.be.revertedWith("Already set");
   });
 });

@@ -49,11 +49,11 @@ export const deployContractUpgradeable = async <T extends Contract>(
 };
 
 // Retrieves an on-chain event"s parameters
-export const getEvent = async (
+export const getEvents = async (
   txReceipt: ContractReceipt,
   eventSignature: string,
   originatingContractName: string
-): Promise<Result> => {
+): Promise<Result[]> => {
   const contractAbi = (await ethers.getContractFactory(originatingContractName)).interface;
 
   let parsedLogs: utils.LogDescription[] = [];
@@ -66,9 +66,8 @@ export const getEvent = async (
     }
   });
 
-  // Assume the event is present
-  const log = parsedLogs.find(({ signature }) => signature === eventSignature);
-  return log?.args as Result;
+  // Return all matching events
+  return parsedLogs.filter(({ signature }) => signature === eventSignature).map((log) => log.args);
 };
 
 export const getTxTimestamp = async (tx: ContractTransaction): Promise<BigNumber> =>

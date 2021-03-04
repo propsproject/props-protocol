@@ -21,6 +21,7 @@ chai.use(solidity);
 const { expect } = chai;
 
 describe("AppPointsL1", () => {
+  let deployer: SignerWithAddress;
   let appOwner: SignerWithAddress;
   let treasury: SignerWithAddress;
   let alice: SignerWithAddress;
@@ -32,17 +33,30 @@ describe("AppPointsL1", () => {
   const APP_POINTS_TOKEN_AMOUNT = expandTo18Decimals(100000);
 
   beforeEach(async () => {
-    [appOwner, treasury, alice] = await ethers.getSigners();
+    [deployer, appOwner, treasury, alice] = await ethers.getSigners();
 
     appPoints = await deployContractUpgradeable(
       "AppPointsL1",
-      appOwner,
+      deployer,
       APP_POINTS_TOKEN_NAME,
       APP_POINTS_TOKEN_SYMBOL,
       APP_POINTS_TOKEN_AMOUNT,
       appOwner.address,
       treasury.address
     );
+
+    // Mimick the AppProxyFactory by transferring ownership to the app owner
+    await appPoints.connect(deployer).transferOwnership(appOwner.address);
+  });
+
+  it("correctly initialized", async () => {
+    expect(await appPoints.owner()).to.eq(appOwner.address);
+    expect(await appPoints.name()).to.eq(APP_POINTS_TOKEN_NAME);
+    expect(await appPoints.symbol()).to.eq(APP_POINTS_TOKEN_SYMBOL);
+    expect(await appPoints.totalSupply()).to.eq(APP_POINTS_TOKEN_AMOUNT);
+    expect(await appPoints.propsTreasury()).to.eq(treasury.address);
+    expect(await appPoints.propsTreasuryMintPercentage()).to.eq(bn(50000));
+    expect(await appPoints.inflationRateChangeDelay()).to.eq(daysToTimestamp(7));
   });
 
   it("correctly mints and distributes initial token amounts on initialization", async () => {
@@ -100,20 +114,6 @@ describe("AppPointsL1", () => {
     expect(await appPoints.totalSupply()).to.eq(
       APP_POINTS_TOKEN_AMOUNT.add(newInflationRate.mul(newMintTime.sub(initialMintTime)))
     );
-  });
-
-  it("totalSupply takes into account the inflation rate", async () => {
-    const newInflationRate = bn(100);
-
-    // There is a delay before a change in the inflation rate goes into effect
-    await appPoints.connect(appOwner).changeInflationRate(newInflationRate);
-    expect(await appPoints.totalSupply()).to.eq(APP_POINTS_TOKEN_AMOUNT);
-
-    // Fast-forward until after the inflation rate delay
-    await mineBlock((await now()).add(await appPoints.inflationRateChangeDelay()).add(1));
-
-    // Calling totalSupply should take into account the new inflation rate
-    expect(await appPoints.totalSupply()).to.be.gte(APP_POINTS_TOKEN_AMOUNT);
   });
 
   it("recover tokens accidentally sent to contract", async () => {

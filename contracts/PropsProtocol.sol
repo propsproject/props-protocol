@@ -495,6 +495,8 @@ contract PropsProtocol is
         only(OwnableUpgradeable(_app).owner())
         whenNotPaused
     {
+        require(appWhitelist[_app], "App not whitelisted");
+
         uint256 reward = IStaking(propsAppStaking).earned(_app);
         if (reward > 0) {
             IStaking(propsAppStaking).claimReward(_app);
@@ -719,6 +721,8 @@ contract PropsProtocol is
         uint256[] memory _percentages,
         address _account
     ) internal {
+        require(_apps.length == _percentages.length, "Invalid input");
+
         uint256 reward = IStaking(propsUserStaking).earned(_account);
         if (reward > 0) {
             // Claim the rewards but don't transfer them to the user's wallet

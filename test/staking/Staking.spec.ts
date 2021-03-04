@@ -18,6 +18,7 @@ chai.use(solidity);
 const { expect } = chai;
 
 describe("Staking", () => {
+  let deployer: SignerWithAddress;
   let controller: SignerWithAddress;
   let rewardsDistribution: SignerWithAddress;
   let alice: SignerWithAddress;
@@ -36,7 +37,7 @@ describe("Staking", () => {
   const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
 
   beforeEach(async () => {
-    [controller, rewardsDistribution, alice, bob, carol] = await ethers.getSigners();
+    [deployer, controller, rewardsDistribution, alice, bob, carol] = await ethers.getSigners();
 
     rewardsToken = await deployContractUpgradeable(
       "MockERC20",
@@ -48,7 +49,7 @@ describe("Staking", () => {
 
     staking = await deployContractUpgradeable(
       "Staking",
-      controller,
+      deployer,
       controller.address,
       rewardsDistribution.address,
       rewardsToken.address,
@@ -143,6 +144,7 @@ describe("Staking", () => {
       await staking.connect(controller).stake(carol.address, stakeAmount)
     );
 
+    // Check the total staked amount
     expect(await staking.totalSupply()).to.eq(stakeAmount.mul(4));
 
     // Once one day since the last reward rate update passed, the parameters get readjusted
@@ -209,6 +211,7 @@ describe("Staking", () => {
     const firstRewardRate = await staking.rewardRate();
     const firstPeriodFinish = await staking.periodFinish();
 
+    // Check the reward parameters were properly set
     expect(firstRewardRate).to.eq(firstReward.div(rewardsDuration));
     expect(firstPeriodFinish).to.eq(firstDistributionStartTime.add(rewardsDuration));
 
@@ -221,6 +224,9 @@ describe("Staking", () => {
       await staking.connect(rewardsDistribution).notifyRewardAmount(secondReward)
     );
 
+    // Check the new rewards were properly accounted for
+    // remainingRewardsToDistribute = (firstPeriodFinish - secondDistributionTime) * oldRewardRate
+    // (remainingRewardsToDistribute + secondReward) / rewardsDuration
     expect(await staking.rewardRate()).to.eq(
       firstPeriodFinish
         .sub(secondDistributionStartTime)
@@ -248,6 +254,12 @@ describe("Staking", () => {
     // Check that the only staker got all rewards (ensure results are within .01%)
     const earned = await staking.earned(alice.address);
     expect(reward.sub(earned).abs().lte(reward.div(10000))).to.be.true;
+
+    // Claim rewards and check that the rewards are transferred to the controller (ensure results are within .01%)
+    await staking.connect(controller).claimReward(alice.address);
+    expect(
+      (await rewardsToken.balanceOf(controller.address)).sub(earned).abs().lte(earned.div(10000))
+    ).to.be.true;
   });
 
   it("rewards are properly distributed to stakers (two stakers)", async () => {
@@ -280,21 +292,23 @@ describe("Staking", () => {
     await mineBlock((await staking.periodFinish()).add(1));
 
     // Check Alice's rewards (ensure results are within .01%)
+    // firstPeriodEarned = (secondStakeTime - distributionStartTime) * firstRewardRate
+    // secondPeriodEarned = ((periodFinish - secondStakeTime) * secondRewardRate) * aliceStakedAmount / totalStakedAmount
+    // firstPeriodEarned + secondPeriodEarned
     const aliceEarned = await staking.earned(alice.address);
     const localAliceEarned = secondStakeTime
       .sub(distributionStartTime)
       .mul(firstRewardRate)
       .add((await staking.periodFinish()).sub(secondStakeTime).mul(secondRewardRate).div(2));
-
     expect(aliceEarned.sub(localAliceEarned).abs().lte(aliceEarned.div(10000))).to.be.true;
 
     // Check Bob's rewards (ensure results are within .01%)
+    // ((periodFinish - secondStakeTime) * secondRewardRate) * bobStakedAmount / totalStakedAmount
     const bobEarned = await staking.earned(bob.address);
     const localBobEarned = (await staking.periodFinish())
       .sub(secondStakeTime)
       .mul(secondRewardRate)
       .div(2);
-
     expect(bobEarned.sub(localBobEarned).abs().lte(bobEarned.div(10000))).to.be.true;
   });
 
@@ -343,31 +357,35 @@ describe("Staking", () => {
     await mineBlock((await staking.periodFinish()).add(1));
 
     // Check Alice's rewards (ensure results are within .01%)
+    // firstPeriodEarned = (secondStakeTime - distributionStartTime) * firstRewardRate
+    // secondPeriodEarned = ((unstakeTime - secondStakeTime) * secondRewardRate) * aliceStakedAmount / totalStakedAmount
+    // firstPeriodEarned + secondPeriodEarned
     const aliceEarned = await staking.earned(alice.address);
     const localAliceEarned = secondStakeTime
       .sub(distributionStartTime)
       .mul(firstRewardRate)
       .add(unstakeTime.sub(secondStakeTime).mul(secondRewardRate).mul(2).div(3));
-
     expect(aliceEarned.sub(localAliceEarned).abs().lte(aliceEarned.div(10000))).to.be.true;
 
     // Check Bob's rewards (ensure results are within .01%)
+    // secondPeriodEarned = ((thirdStakeTime - secondStakeTime) * secondRewardRate) * bobStakedAmount / totalStakedAmount
+    // thirdPeriodEarned = ((periodFinish - thirdStakeTime) * thirdRewardRate) * bobStakedAmount / totalStakedAmount
+    // secondPeriodEarned + thirdPeriodEarned
     const bobEarned = await staking.earned(bob.address);
     const localBobEarned = thirdStakeTime
       .sub(secondStakeTime)
       .mul(secondRewardRate)
       .div(3)
       .add((await staking.periodFinish()).sub(thirdStakeTime).mul(thirdRewardRate).div(2));
-
     expect(bobEarned.sub(localBobEarned).abs().lte(bobEarned.div(10000))).to.be.true;
 
     // Check Carol's rewards (ensure results are within .01%)
+    // ((periodFinish - thirdStakeTime) * thirdRewardRate) * carolStakedAmount / totalStakedAmount
     const carolEarned = await staking.earned(carol.address);
     const localCarolEarned = (await staking.periodFinish())
       .sub(thirdStakeTime)
       .mul(thirdRewardRate)
       .div(2);
-
     expect(carolEarned.sub(localCarolEarned).abs().lte(carolEarned.div(10000))).to.be.true;
   });
 
@@ -390,19 +408,26 @@ describe("Staking", () => {
     // Fast-forward until ~middle of the rewards period
     await mineBlock(distributionStartTime.add(rewardsDuration.div(2)));
 
+    // Cannot withdraw rewards that were distributed or doesn't exist
+    await expect(staking.connect(rewardsDistribution).withdrawReward(reward)).to.be.revertedWith(
+      "Amount exceeds outstanding rewards"
+    );
+
     // Withdraw some amount of not yet distributed rewards
     const withdrawTime = await getTxTimestamp(
       await staking.connect(rewardsDistribution).withdrawReward(reward.div(10))
     );
 
     const secondRewardRate = await staking.rewardRate();
-
     const periodFinish = await staking.periodFinish();
 
     // Fast-forward until after the end of the rewards period
     await mineBlock(periodFinish.add(daysToTimestamp(1)));
 
     // Check that the only staker earned the correct amount (ensure results are within .01%)
+    // firstPeriodEarned = (withdrawTime - distributionStartTime) * firstRewardRate
+    // secondPeriodEarned = (periodFinish - withdrawTime) * secondRewardRate
+    // firstPeriodEarned + secondPeriodEarned
     const earned = await staking.earned(alice.address);
     const localEarned = firstRewardRate
       .mul(withdrawTime.sub(distributionStartTime))
