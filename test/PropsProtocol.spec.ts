@@ -33,7 +33,6 @@ const { expect } = chai;
 describe("PropsProtocol", () => {
   let deployer: SignerWithAddress;
   let controller: SignerWithAddress;
-  let treasury: SignerWithAddress;
   let guardian: SignerWithAddress;
   let appProxyFactoryBridge: SignerWithAddress;
   let appOwner: SignerWithAddress;
@@ -93,7 +92,6 @@ describe("PropsProtocol", () => {
     [
       deployer,
       controller,
-      treasury,
       guardian,
       appProxyFactoryBridge,
       appOwner,
@@ -147,7 +145,6 @@ describe("PropsProtocol", () => {
       deployer,
       controller.address,
       propsProtocol.address,
-      treasury.address,
       propsToken.address,
       appPointsLogic.address,
       appPointsStakingLogic.address

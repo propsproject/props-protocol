@@ -33,7 +33,6 @@ describe("GovernorAlpha", () => {
   let deployer: SignerWithAddress;
   let controller: SignerWithAddress;
   let guardian: SignerWithAddress;
-  let treasury: SignerWithAddress;
   let appProxyFactoryBridge: SignerWithAddress;
   let appOwner: SignerWithAddress;
   let alice: SignerWithAddress;
@@ -95,7 +94,6 @@ describe("GovernorAlpha", () => {
       deployer,
       controller,
       guardian,
-      treasury,
       appProxyFactoryBridge,
       appOwner,
       alice,
@@ -147,7 +145,6 @@ describe("GovernorAlpha", () => {
       deployer,
       controller.address,
       propsProtocol.address,
-      treasury.address,
       propsToken.address,
       appPointsLogic.address,
       appPointsStakingLogic.address

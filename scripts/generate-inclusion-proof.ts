@@ -10,9 +10,9 @@ const l2Provider = new ethers.providers.JsonRpcProvider(
   process.env.TESTNET ? "https://rpc-mumbai.matic.today" : "https://rpc-mainnet.matic.network"
 );
 
-const MATIC_ROOT_CHAIN_ADDRESS = process.env.TESTNET
+const MATIC_ROOT_CHAIN_MANAGER_ADDRESS = process.env.TESTNET
   ? "0xBbD7cBFA79faee899Eaf900F13C9065bF03B1A74"
-  : ""; // TODO: Support mainnet
+  : "0xA0c68C638235ee32657e8f720a23ceC1bFc77C77";
 
 async function main() {
   if (!process.env.L2_TX_HASH) {
@@ -23,7 +23,7 @@ async function main() {
 
   const maticRootChain = await ethers.getContractAt(
     ["function checkpointManagerAddress() returns (address)"],
-    MATIC_ROOT_CHAIN_ADDRESS
+    MATIC_ROOT_CHAIN_MANAGER_ADDRESS
   );
   const checkpointManagerAddress = await maticRootChain
     .connect(l1Provider)
@@ -49,7 +49,7 @@ async function main() {
       await buildPayloadForExit(
         l1Provider,
         l2Provider,
-        MATIC_ROOT_CHAIN_ADDRESS,
+        MATIC_ROOT_CHAIN_MANAGER_ADDRESS,
         process.env.L2_TX_HASH as string,
         EventSignature.SendMessage
       )

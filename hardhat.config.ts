@@ -1,6 +1,7 @@
 import { config as dotEnvConfig } from "dotenv";
 dotEnvConfig();
 
+import { assert } from "console";
 import { HardhatUserConfig } from "hardhat/types";
 
 import "@nomiclabs/hardhat-waffle";
@@ -11,7 +12,23 @@ import "hardhat-typechain";
 import "solidity-coverage";
 
 // Use predefined accounts for testing
-import accounts from "./test-accounts";
+import testAccounts from "./test-accounts";
+
+assert(
+  process.env.INFURA_PROJECT_ID &&
+    process.env.DEPLOYER_PRIVATE_KEY &&
+    process.env.CONTROLLER_PRIVATE_KEY &&
+    process.env.CONTROLLER_ADDRESS &&
+    process.env.TREASURY_ADDRESS &&
+    process.env.GUARDIAN_ADDRESS,
+  "Invalid `.env` file"
+);
+
+// Accounts for production deployments
+const prodAccounts = [
+  `${process.env.DEPLOYER_PRIVATE_KEY}`,
+  `${process.env.CONTROLLER_PRIVATE_KEY}`,
+];
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
@@ -29,34 +46,24 @@ const config: HardhatUserConfig = {
     ],
   },
   networks: {
-    hardhat: { accounts },
+    hardhat: { accounts: testAccounts },
     // Testnet configs
     goerli: {
       url: `https://goerli.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
+      accounts: prodAccounts,
     },
     mumbai: {
       url: "https://rpc-mumbai.matic.today",
-      accounts: {
-        mnemonic: process.env.MNEMONIC,
-      },
+      accounts: prodAccounts,
     },
     // Mainnet configs
     mainnet: {
       url: `https://mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
-      accounts: {
-        // TODO: We'll probably need to hardcode the individual private keys instead of using a mnemonic
-        mnemonic: process.env.MNEMONIC,
-      },
+      accounts: prodAccounts,
     },
     matic: {
       url: "https://rpc-mainnet.matic.network",
-      accounts: {
-        // TODO: We'll probably need to hardcode the individual private keys instead of using a mnemonic
-        mnemonic: process.env.MNEMONIC,
-      },
+      accounts: prodAccounts,
     },
   },
   gasReporter: {

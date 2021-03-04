@@ -29,9 +29,6 @@ contract AppProxyFactoryL2 is Initializable, MinimalProxyFactory {
     // The PropsProtocol contract
     address public propsProtocol;
 
-    // The Props protocol treasury address
-    address public propsTreasury;
-
     // Props protocol related tokens
     address public propsToken;
 
@@ -73,7 +70,6 @@ contract AppProxyFactoryL2 is Initializable, MinimalProxyFactory {
      * @dev Initializer.
      * @param _controller The app proxy factory controller
      * @param _propsProtocol The PropsProtocol contract
-     * @param _propsTreasury The Props protocol treasury that a percentage of all minted app points will go to
      * @param _propsToken The Props token contract
      * @param _appPointsLogic The logic contract for app points contract proxies
      * @param _appPointsStakingLogic The logic contract for app points staking contract proxies
@@ -81,14 +77,12 @@ contract AppProxyFactoryL2 is Initializable, MinimalProxyFactory {
     function initialize(
         address _controller,
         address _propsProtocol,
-        address _propsTreasury,
         address _propsToken,
         address _appPointsLogic,
         address _appPointsStakingLogic
     ) public initializer {
         controller = _controller;
         propsProtocol = _propsProtocol;
-        propsTreasury = _propsTreasury;
         propsToken = _propsToken;
         appPointsLogic = _appPointsLogic;
         appPointsStakingLogic = _appPointsStakingLogic;
