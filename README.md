@@ -25,3 +25,19 @@ When it comes to implementation, an important detail is that the Props Token ori
 - [Deployment](./docs/Deployment.md)
 - [L2 migration](./docs/L2Migration.md)
 - [Protocol actions](./docs/ProtocolActions.md)
+
+## Local setup instructions
+
+```bash
+# Install dependencies
+npm install
+
+# Pull needed submodules
+git submodule update --init --recursive
+
+# Build
+npm run build
+
+# Run tests
+npm test
+```
