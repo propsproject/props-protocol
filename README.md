@@ -4,7 +4,7 @@
 
 For a high-level overview of Props, and what these contracts are aiming to acheive, we recommend starting with the [whitepaper](https://www.propsproject.com/hubfs/Props_December_2020/Docs/PropsWhitepaper.pdf), which is only 9 pages long.
 
-In addition, the documentation below gives a more technical overview of the various components and processes encompassing the Props Protocol:
+When it comes to implementation, an important detail is that the Props Token originates on Ethereum (L1), while the Props Protocol is primarily implemented on a Layer 2 (Matic / Polygon). The documentation below goes into more technical detail about the various components, and how they function across L1 and L2. 
 
 ## Core Components
 
