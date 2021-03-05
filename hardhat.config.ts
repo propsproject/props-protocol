@@ -15,8 +15,8 @@ import testAccounts from "./test-accounts";
 
 // Accounts for production deployments
 const prodAccounts = [
-  `${process.env.DEPLOYER_PRIVATE_KEY}`,
-  `${process.env.CONTROLLER_PRIVATE_KEY}`,
+  `${process.env.DEPLOYER_PRIVATE_KEY || "0x00"}`, // Avoid irrelevant errors by defaulting to "0x00"
+  `${process.env.CONTROLLER_PRIVATE_KEY || "0x00"}`, // Avoid irrelevant errors by defaulting to "0x00"
 ];
 
 const config: HardhatUserConfig = {

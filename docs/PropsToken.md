@@ -4,4 +4,6 @@ The Props protocol is fully powered by the Props token, which is used by users t
 
 Due to the way the protocol works, new Props tokens will get minted on L2 (because of users earning and claiming rProps rewards), tokens that are not backed by any L1 Props tokens residing in the L1 bridge contract. So, in order to allow users to withdraw these L2-minted Props tokens to L1, we need a custom bridge that can mint L1 Props tokens on demand if a user tries to withdraw tokens that were not deposited in the L1 bridge contract.
 
+Moreover, the control of the Props token needs to be passed to the Props protocol controller (same goes with the proxy administration role - it needs to be passed to the `ProxyAdmin` contract in charge of the L1 protocol contracts).
+
 The configuration required to allow for this setup is described in [Deployment](./Deployment.md).

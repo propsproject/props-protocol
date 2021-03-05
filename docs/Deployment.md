@@ -34,5 +34,5 @@ Once deployed, it is advisable to go through the post-deployment phase in order 
 Additional notes:
 
 - although we could have a single protocol controller multi-sig on L2 and have all actions relayed through the governance bridge (this would imply setting the L1 part of the governance bridge as the controller of all protocol contracts residing on L1), we decided that (for security and ease-of-use purposes) it's better to initially have different protocol controllers on the two layers
-- the original Props token contract on L1 should go through the same steps of transferring any control to `CONTROLLER_MULTISIG_L1`
+- the original Props token contract on L1 should go through the same steps of transferring any point of control to `CONTROLLER_MULTISIG_L1`
 - since the Props treasury will be receiving AppPoints tokens on every mint, it is advisable to have `TREASURY_ADDRESS` setup as a 1-of-1 multi-sig controlled by the protocol controller (`CONTROLLER_MULTISIG_L1`)
