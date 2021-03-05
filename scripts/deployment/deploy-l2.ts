@@ -12,8 +12,8 @@ import type {
   PropsProtocol,
   RPropsToken,
   SPropsToken,
-} from "../typechain";
-import { bn, deployContract, deployContractUpgradeable } from "../utils";
+} from "../../typechain";
+import { bn, deployContract, deployContractUpgradeable } from "../../utils";
 
 // Constants
 const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
@@ -42,7 +42,7 @@ let appProxyFactoryBridge: AppProxyFactoryBridgeL2;
 async function main() {
   [deployer, controller] = await ethers.getSigners();
 
-  const [l1Network, l2Network] = [process.env.L1_NETWORK, process.env.L2_NETWORK];
+  const [l1Network, l2Network] = [`${process.env.L1_NETWORK}`, `${process.env.L2_NETWORK}`];
   if (process.env.DEPLOY) {
     console.log("Starting deployment...");
 

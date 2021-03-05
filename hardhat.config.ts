@@ -1,7 +1,6 @@
 import { config as dotEnvConfig } from "dotenv";
 dotEnvConfig();
 
-import { assert } from "console";
 import { HardhatUserConfig } from "hardhat/types";
 
 import "@nomiclabs/hardhat-waffle";
@@ -13,16 +12,6 @@ import "solidity-coverage";
 
 // Use predefined accounts for testing
 import testAccounts from "./test-accounts";
-
-assert(
-  process.env.INFURA_PROJECT_ID &&
-    process.env.DEPLOYER_PRIVATE_KEY &&
-    process.env.CONTROLLER_PRIVATE_KEY &&
-    process.env.CONTROLLER_ADDRESS &&
-    process.env.TREASURY_ADDRESS &&
-    process.env.GUARDIAN_ADDRESS,
-  "Invalid `.env` file"
-);
 
 // Accounts for production deployments
 const prodAccounts = [

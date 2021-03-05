@@ -1,17 +1,7 @@
 [
   {
-    "appPointsLogic": "0x455b1c4b8825FD0298dd94B60467c629E14B7556",
-    "appProxyFactory": "0xE85481DfffA7a44A2aA05eD4AbE5b542D80e8303",
-    "appProxyFactoryBridge": "0xe43ceDD555C2759C023281383C4e8Be73936b417"
-  },
-  {
-    "appPointsLogic": "0xE1384A02C4df705bE01eca86E749ff93b32E77de",
-    "appProxyFactory": "0x29d9c19f5B33C25D2EE025397DdF6F0B34fb3b66",
-    "appProxyFactoryBridge": "0xC95b490d565623fd698F8417Cc893c9A56C4E5Eb"
-  },
-  {
-    "appPointsLogic": "0xcc973ffE8c710a632bEbB24A43c39B76fd71D31E",
-    "appProxyFactory": "0x8997504690Fab47f887B4f1e4D209232A7159f0F",
-    "appProxyFactoryBridge": "0x2C8a21a253a3849deEd10f79cAd5204d8a1afF2d"
+    "appPointsLogic": "0xec7F456498c33d1D195D58c2dceC89d99dc5cDf1",
+    "appProxyFactory": "0x11a525a1e3d322843733276DC18Ad2cb812d2f2d",
+    "appProxyFactoryBridge": "0x4AaFBa96bda5374632063453f771700E131EBE3B"
   }
 ]

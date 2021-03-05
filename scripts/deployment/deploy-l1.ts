@@ -3,8 +3,8 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-wit
 import * as fs from "fs";
 import { ethers } from "hardhat";
 
-import type { AppPointsL1, AppProxyFactoryL1, AppProxyFactoryBridgeL1 } from "../typechain";
-import { deployContract, deployContractUpgradeable } from "../utils";
+import type { AppPointsL1, AppProxyFactoryL1, AppProxyFactoryBridgeL1 } from "../../typechain";
+import { deployContract, deployContractUpgradeable } from "../../utils";
 
 // Matic contracts
 const MATIC_ROOT_CHAIN_ADDRESS = process.env.TESTNET
@@ -26,7 +26,7 @@ let appProxyFactoryBridge: AppProxyFactoryBridgeL1;
 async function main() {
   [deployer, controller] = await ethers.getSigners();
 
-  const [l1Network, l2Network] = [process.env.L1_NETWORK, process.env.L2_NETWORK];
+  const [l1Network, l2Network] = [`${process.env.L1_NETWORK}`, `${process.env.L2_NETWORK}`];
   if (process.env.DEPLOY) {
     console.log("Starting deployment...");
 

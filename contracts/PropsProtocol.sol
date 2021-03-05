@@ -139,24 +139,18 @@ contract PropsProtocol is
     ****************************************/
 
     /**
-     * @dev Transfer the guardian role to a new address.
-     * @param _guardian The new guardian
-     */
-    function transferGuardianship(address _guardian) external only(guardian) {
-        guardian = _guardian;
-    }
-
-    /**
      * @dev Pause the protocol.
      */
-    function pause() external only(guardian) {
+    function pause() external {
+        require(_msgSender() == controller || _msgSender() == guardian, "Unauthorized");
         _pause();
     }
 
     /**
      * @dev Unpause the protocol.
      */
-    function unpause() external only(guardian) {
+    function unpause() external {
+        require(_msgSender() == controller || _msgSender() == guardian, "Unauthorized");
         _unpause();
     }
 
@@ -170,6 +164,14 @@ contract PropsProtocol is
      */
     function transferControl(address _controller) external only(controller) {
         controller = _controller;
+    }
+
+    /**
+     * @dev Transfer the guardian role to a new address.
+     * @param _guardian The new guardian
+     */
+    function transferGuardianship(address _guardian) external only(controller) {
+        guardian = _guardian;
     }
 
     /*
