@@ -24,3 +24,4 @@ When it comes to implementation, an important detail is that the Props Token ori
 - [Bridging](./docs/Bridging.md)
 - [Deployment](./docs/Deployment.md)
 - [L2 migration](./docs/L2Migration.md)
+- [Protocol actions](./docs/ProtocolActions.md)
