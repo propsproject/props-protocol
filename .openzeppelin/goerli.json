@@ -1,0 +1,61 @@
+{
+  "manifestVersion": "3.1",
+  "impls": {
+    "009c5b045ce7fa8a4e10bceedc3b178b1db55d4b1f9032247c9bdcda7e861962": {
+      "address": "0xA442dBF4CAF3054d4612eBEEB9f249dB680FB7ac",
+      "txHash": "0x55bbd2cbe1cea982da173ccb6691cf6db59291e0d1d4433a4bb50b463191b906",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:25"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:30"
+          },
+          {
+            "contract": "AppProxyFactoryL1",
+            "label": "controller",
+            "type": "t_address",
+            "src": "contracts/AppProxyFactoryL1.sol:26"
+          },
+          {
+            "contract": "AppProxyFactoryL1",
+            "label": "propsTreasury",
+            "type": "t_address",
+            "src": "contracts/AppProxyFactoryL1.sol:29"
+          },
+          {
+            "contract": "AppProxyFactoryL1",
+            "label": "appPointsLogic",
+            "type": "t_address",
+            "src": "contracts/AppProxyFactoryL1.sol:32"
+          },
+          {
+            "contract": "AppProxyFactoryL1",
+            "label": "appProxyFactoryBridge",
+            "type": "t_address",
+            "src": "contracts/AppProxyFactoryL1.sol:35"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address"
+          },
+          "t_bool": {
+            "label": "bool"
+          }
+        }
+      }
+    }
+  },
+  "admin": {
+    "address": "0x382C1117d73d028870A8F9926cf308d3FAdF6Fb7",
+    "txHash": "0xacd3a94d30f393d2349789ef4b5c798c77b662a253b2c354c06de159c9a57d8b"
+  }
+}

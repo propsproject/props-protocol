@@ -5,4 +5,3 @@ typechain/
 artifacts/
 coverage*
 .env
-.openzeppelin/

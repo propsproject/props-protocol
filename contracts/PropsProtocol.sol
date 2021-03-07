@@ -337,7 +337,6 @@ contract PropsProtocol is
         external
         override
         only(appProxyFactory)
-        whenNotPaused
     {
         appPointsStaking[_appPoints] = _appPointsStaking;
     }
