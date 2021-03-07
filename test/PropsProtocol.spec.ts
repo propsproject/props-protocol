@@ -817,13 +817,6 @@ describe("PropsProtocol", () => {
       propsProtocol.connect(alice).claimAppPropsRewards(appPoints.address, alice.address)
     ).to.be.revertedWith("Unauthorized");
 
-    // Claiming is possible only for whitelisted apps
-    await propsProtocol.connect(controller).updateAppWhitelist(appPoints.address, false);
-    await expect(
-      propsProtocol.connect(appOwner).claimAppPropsRewards(appPoints.address, alice.address)
-    ).to.be.revertedWith("App not whitelisted");
-    await propsProtocol.connect(controller).updateAppWhitelist(appPoints.address, true);
-
     const earned = await propsAppStaking.earned(appPoints.address);
 
     // Claim app Props rewards
@@ -1392,5 +1385,40 @@ describe("PropsProtocol", () => {
     await expect(
       propsProtocol.connect(controller).saveApp(mock.address, mock.address)
     ).to.be.revertedWith("Unauthorized");
+  });
+
+  it("whitelist updates", async () => {
+    const [appPoints] = await deployApp();
+
+    // Stake
+    const stakeAmount = expandTo18Decimals(100);
+    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
+    await propsToken.connect(alice).approve(propsProtocol.address, stakeAmount);
+    await propsProtocol.connect(alice).stake([appPoints.address], [stakeAmount]);
+
+    // Fast-forward a few days to allow accruing rewards
+    await mineBlock((await now()).add(daysToTimestamp(10)));
+
+    // Check the sProps were staked on behalf of the app
+    expect(await propsAppStaking.balanceOf(appPoints.address)).to.eq(stakeAmount);
+
+    // Blacklist app
+    await propsProtocol.connect(controller).updateAppWhitelist(appPoints.address, false);
+
+    // Check that the sProps previously staked on behalf of the app were withdrawn
+    expect(await propsAppStaking.balanceOf(appPoints.address)).to.eq(bn(0));
+
+    // However, previously earned app Props rewards can still be claimed
+    await propsProtocol.connect(appOwner).claimAppPropsRewards(appPoints.address, appOwner.address);
+    expect((await propsToken.balanceOf(appOwner.address)).gt(0)).to.be.true;
+
+    // Unstake half of the initially staked amount to app
+    await propsProtocol.connect(alice).stake([appPoints.address], [stakeAmount.div(2).mul(-1)]);
+
+    // Whitelist app
+    await propsProtocol.connect(controller).updateAppWhitelist(appPoints.address, true);
+
+    // Check that the sProps previously staked on behalf of the app were re-staked
+    expect(await propsAppStaking.balanceOf(appPoints.address)).to.eq(stakeAmount.div(2));
   });
 });

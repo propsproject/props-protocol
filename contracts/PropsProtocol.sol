@@ -67,6 +67,9 @@ contract PropsProtocol is
     // Mapping of the total amount of Props rewards staked by each user to every app
     // eg. rewardStakes[userAddress][appPointsAddress]
     mapping(address => mapping(address => uint256)) public rewardStakes;
+    // Mapping of the total amount of Props staked to each app
+    // eg. appStakes[appPointsAddress]
+    mapping(address => uint256) appStakes;
 
     // Keeps track of the staking delegatees of users
     mapping(address => address) public delegates;
@@ -253,6 +256,18 @@ contract PropsProtocol is
      * @param _status The whitelist status of the app
      */
     function updateAppWhitelist(address _app, bool _status) external only(controller) {
+        require(appWhitelist[_app] != _status, "Invalid status");
+
+        if (appStakes[_app] > 0) {
+            if (_status == true) {
+                // On whitelisting, re-stake all sProps previously staked to the app
+                IStaking(propsAppStaking).stake(_app, appStakes[_app]);
+            } else {
+                // On blacklisting, withdraw all sProps staked to the app
+                IStaking(propsAppStaking).withdraw(_app, appStakes[_app]);
+            }
+        }
+
         appWhitelist[_app] = _status;
         emit AppWhitelistUpdated(_app, _status);
     }
@@ -475,8 +490,6 @@ contract PropsProtocol is
         only(OwnableUpgradeable(_app).owner())
         whenNotPaused
     {
-        require(appWhitelist[_app], "App not whitelisted");
-
         // Claim the rewards and transfer them to the user's wallet
         uint256 reward = IStaking(propsAppStaking).earned(_app);
         if (reward > 0) {
@@ -497,8 +510,6 @@ contract PropsProtocol is
         only(OwnableUpgradeable(_app).owner())
         whenNotPaused
     {
-        require(appWhitelist[_app], "App not whitelisted");
-
         uint256 reward = IStaking(propsAppStaking).earned(_app);
         if (reward > 0) {
             IStaking(propsAppStaking).claimReward(_app);
@@ -622,11 +633,17 @@ contract PropsProtocol is
                     stakes[_to][_apps[i]] = stakes[_to][_apps[i]].sub(amountToUnstake);
                 }
 
+                // Update app total staked amount
+                appStakes[_apps[i]] = appStakes[_apps[i]].sub(amountToUnstake);
+
                 // Unstake the Props from the app points staking contract
                 IStaking(appPointsStaking[_apps[i]]).withdraw(_to, amountToUnstake);
 
                 // Unstake the sProps from the app Props staking contract
-                IStaking(propsAppStaking).withdraw(_apps[i], amountToUnstake);
+                if (appWhitelist[_apps[i]]) {
+                    // The sProps are only staked in the app Props staking contract if the app is whitelisted
+                    IStaking(propsAppStaking).withdraw(_apps[i], amountToUnstake);
+                }
 
                 // Don't unstake the sProps from the user Props staking contract since some
                 // of them might get re-staked when handling the positive amounts (only unstake
@@ -652,6 +669,9 @@ contract PropsProtocol is
                 } else {
                     stakes[_to][_apps[i]] = stakes[_to][_apps[i]].add(amountToStake);
                 }
+
+                // Update app total staked amount
+                appStakes[_apps[i]] = appStakes[_apps[i]].add(amountToStake);
 
                 if (totalUnstakedAmount >= amountToStake) {
                     // If the previously unstaked amount can cover the stake then use that
