@@ -19,7 +19,7 @@ async function main() {
     fs.readFileSync(`deployments/${process.env.L1_NETWORK}.json`).toString()
   ).slice(-1)[0];
 
-  console.log("Transferring `AppProxyFactoryL1` control to the controller multisig");
+  console.log("Transferring `AppProxyFactoryL1` control to ControllerMultisigL1");
   appProxyFactory = (await ethers.getContractFactory("AppProxyFactoryL1", deployer)).attach(
     l1Addresses["appProxyFactory"]
   ) as AppProxyFactoryL1;
@@ -28,7 +28,7 @@ async function main() {
     .transferControl(`${process.env.CONTROLLER_MULTISIG_L1}`)
     .then((tx: ContractTransaction) => tx.wait());
 
-  console.log("Transferring `ProxyAdmin` ownership to the controller multisig");
+  console.log("Transferring `ProxyAdmin` ownership to ControllerMultisigL1");
   await upgrades.admin.transferProxyAdminOwnership(`${process.env.CONTROLLER_MULTISIG_L1}`);
 
   // To change the admin via an arbitrary address, run the following:

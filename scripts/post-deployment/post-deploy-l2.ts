@@ -21,7 +21,7 @@ async function main() {
     fs.readFileSync(`deployments/${process.env.L2_NETWORK}.json`).toString()
   ).slice(-1)[0];
 
-  console.log("Transferring `PropsTokenL2` ownership to the controller multisig");
+  console.log("Transferring `PropsTokenL2` ownership to ControllerMultisigL2");
   propsToken = (await ethers.getContractFactory("PropsTokenL2", deployer)).attach(
     l2Addresses["propsToken"]
   ) as PropsTokenL2;
@@ -30,7 +30,7 @@ async function main() {
     .transferOwnership(`${process.env.CONTROLLER_MULTISIG_L2}`)
     .then((tx: ContractTransaction) => tx.wait());
 
-  console.log("Transferring `AppProxyFactoryL2` control to the controller multisig");
+  console.log("Transferring `AppProxyFactoryL2` control to ControllerMultisigL2");
   appProxyFactory = (await ethers.getContractFactory("AppProxyFactoryL2", deployer)).attach(
     l2Addresses["appProxyFactory"]
   ) as AppProxyFactoryL2;
@@ -39,7 +39,7 @@ async function main() {
     .transferControl(`${process.env.CONTROLLER_MULTISIG_L2}`)
     .then((tx: ContractTransaction) => tx.wait());
 
-  console.log("Transferring `PropsProtocol` control to the controller multisig");
+  console.log("Transferring `PropsProtocol` control to ControllerMultisigL2");
   propsProtocol = (await ethers.getContractFactory("PropsProtocol", deployer)).attach(
     l2Addresses["propsProtocol"]
   ) as PropsProtocol;
@@ -48,7 +48,7 @@ async function main() {
     .transferControl(`${process.env.CONTROLLER_MULTISIG_L2}`)
     .then((tx: ContractTransaction) => tx.wait());
 
-  console.log("Transferring `ProxyAdmin` ownership to the controller multisig");
+  console.log("Transferring `ProxyAdmin` ownership to ControllerMultisigL2");
   await upgrades.admin.transferProxyAdminOwnership(`${process.env.CONTROLLER_MULTISIG_L2}`);
 
   // To change the admin via an arbitrary address, run the following:
