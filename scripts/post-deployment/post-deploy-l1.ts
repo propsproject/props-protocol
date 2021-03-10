@@ -30,6 +30,11 @@ async function main() {
 
   console.log("Transferring `ProxyAdmin` ownership to the controller multisig");
   await upgrades.admin.transferProxyAdminOwnership(`${process.env.CONTROLLER_MULTISIG_L1}`);
+
+  // To change the admin via an arbitrary address, run the following:
+  // await (await upgrades.admin.getInstance())
+  //   .connect(controller)
+  //   .transferOwnership(`${process.env.CONTROLLER_MULTISIG_L1}`);
 }
 
 main()
