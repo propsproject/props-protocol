@@ -13,6 +13,8 @@ GUARDIAN_ADDRESS=
 
 CONTROLLER_MULTISIG_L1=
 CONTROLLER_MULTISIG_L2=
+
+PROPS_TOKEN_L1=
 ```
 
 Make sure the deployer and controller accounts used during the deployment phase are properly funded (with both ETH and MATIC).

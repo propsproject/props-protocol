@@ -65,7 +65,7 @@ async function main() {
     "To be sent by `PropsTokenL1`'s `ProxyAdmin` owner to `PropsTokenL1`'s `ProxyAdmin`:"
   );
   console.log(
-    `changeProxyAdmin(${l1Addresses["propsToken"]}, ${
+    `changeProxyAdmin(${process.env.PROPS_TOKEN_L1}, ${
       (await upgrades.admin.getInstance()).address
     })`
   );
@@ -73,7 +73,7 @@ async function main() {
     new ethers.utils.Interface([
       "function changeProxyAdmin(address, address)",
     ]).encodeFunctionData("changeProxyAdmin", [
-      l1Addresses["propsToken"],
+      process.env.PROPS_TOKEN_L1,
       (await upgrades.admin.getInstance()).address,
     ])
   );
