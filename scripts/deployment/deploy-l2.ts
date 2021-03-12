@@ -1,4 +1,3 @@
-import { ContractTransaction } from "@ethersproject/contracts";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import * as fs from "fs";
 import { ethers } from "hardhat";
@@ -130,33 +129,33 @@ async function main() {
     await appProxyFactory
       .connect(controller)
       .changeAppProxyFactoryBridge(appProxyFactoryBridge.address)
-      .then((tx: ContractTransaction) => tx.wait());
+      .then((tx) => tx.wait());
 
     console.log("Setting required parameters on the contracts");
     await propsToken
       .connect(controller)
       .addMinter(rPropsToken.address)
-      .then((tx: ContractTransaction) => tx.wait());
+      .then((tx) => tx.wait());
     await propsProtocol
       .connect(controller)
       .setAppProxyFactory(appProxyFactory.address)
-      .then((tx: ContractTransaction) => tx.wait());
+      .then((tx) => tx.wait());
     await propsProtocol
       .connect(controller)
       .setRPropsToken(rPropsToken.address)
-      .then((tx: ContractTransaction) => tx.wait());
+      .then((tx) => tx.wait());
     await propsProtocol
       .connect(controller)
       .setSPropsToken(sPropsToken.address)
-      .then((tx: ContractTransaction) => tx.wait());
+      .then((tx) => tx.wait());
     await propsProtocol
       .connect(controller)
       .setPropsAppStaking(propsAppStaking.address)
-      .then((tx: ContractTransaction) => tx.wait());
+      .then((tx) => tx.wait());
     await propsProtocol
       .connect(controller)
       .setPropsUserStaking(propsUserStaking.address)
-      .then((tx: ContractTransaction) => tx.wait());
+      .then((tx) => tx.wait());
 
     console.log("Deployment succedded...");
 
@@ -190,7 +189,7 @@ async function main() {
       await appProxyFactoryBridge
         .connect(deployer)
         .setFxRootTunnel(l1Addresses["appProxyFactoryBridge"])
-        .then((tx: ContractTransaction) => tx.wait());
+        .then((tx) => tx.wait());
     }
   }
 }

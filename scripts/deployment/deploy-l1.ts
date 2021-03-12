@@ -1,4 +1,3 @@
-import { ContractTransaction } from "@ethersproject/contracts";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import * as fs from "fs";
 import { ethers } from "hardhat";
@@ -60,7 +59,7 @@ async function main() {
     await appProxyFactory
       .connect(controller)
       .changeAppProxyFactoryBridge(appProxyFactoryBridge.address)
-      .then((tx: ContractTransaction) => tx.wait());
+      .then((tx) => tx.wait());
 
     console.log("Deployment succedded...");
 
@@ -94,7 +93,7 @@ async function main() {
       await appProxyFactoryBridge
         .connect(deployer)
         .setFxChildTunnel(l2Addresses["appProxyFactoryBridge"])
-        .then((tx: ContractTransaction) => tx.wait());
+        .then((tx) => tx.wait());
     }
   }
 }

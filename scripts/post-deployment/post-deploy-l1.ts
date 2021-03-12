@@ -1,4 +1,3 @@
-import { ContractTransaction } from "@ethersproject/contracts";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import * as fs from "fs";
 import { ethers, upgrades } from "hardhat";
@@ -31,7 +30,7 @@ async function main() {
   appProxyFactory
     .connect(controller)
     .transferControl(`${process.env.CONTROLLER_MULTISIG_L1}`)
-    .then((tx: ContractTransaction) => tx.wait());
+    .then((tx) => tx.wait());
 
   console.log("Transferring protocol `ProxyAdmin` ownership to ControllerMultisigL1");
   await upgrades.admin.transferProxyAdminOwnership(`${process.env.CONTROLLER_MULTISIG_L1}`);
