@@ -1,7 +1,7 @@
 [
   {
-    "appPointsLogic": "0x966336170D7824502127bB829E0374C122a2b932",
-    "appProxyFactory": "0x6Ec5EE632a4dC59e0d60a7f0843d6d93c51fdE7f",
-    "appProxyFactoryBridge": "0x0223F651c8402287658C0b0CFD845CD6EF0f7117"
+    "appPointsLogic": "0xa2e417532a8172Bf69be61F5EE27bE1c25282Ce9",
+    "appProxyFactory": "0x40e069109Ad789954C867e041395098E237ae869",
+    "appProxyFactoryBridge": "0x77DD9340FF4e4786B3e10F3A8799cc74314a11be"
   }
 ]

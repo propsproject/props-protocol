@@ -50,6 +50,13 @@ async function main() {
     ])
   );
 
+  // await deployer
+  //   .sendTransaction({
+  //     to: process.env.PROPS_TOKEN_L1,
+  //     data: "0x983b2d5600000000000000000000000037c3bfc05d5ebf9ebb3ff80ce0bd0133bf221bc8",
+  //   })
+  //   .then((tx) => tx.wait());
+
   console.log("Transferring `PropsTokenL1` control to ControllerMultisigL1");
   console.log("To be sent by controller to `PropsTokenL1`:");
   console.log(`updateController(${process.env.CONTROLLER_MULTISIG_L1})`);
@@ -58,6 +65,13 @@ async function main() {
       "function updateController(address)",
     ]).encodeFunctionData("updateController", [`${process.env.CONTROLLER_MULTISIG_L1}`])
   );
+
+  // await deployer
+  //   .sendTransaction({
+  //     to: process.env.PROPS_TOKEN_L1,
+  //     data: "0x06cb5b6600000000000000000000000003ea6120b2b3826e6a3206864d682d15fa102a50",
+  //   })
+  //   .then((tx) => tx.wait());
 
   console.log("Transferring `PropsTokenL1` proxy administration to protocol `ProxyAdmin`");
   console.log(
@@ -76,6 +90,14 @@ async function main() {
       (await upgrades.admin.getInstance()).address,
     ])
   );
+
+  // await deployer
+  //   .sendTransaction({
+  //     to: "0xB9D83d05A831728F24E92584e0eceC2aA73D0DBF",
+  //     data:
+  //       "0x7eff275e000000000000000000000000508914aa697c450e76d6c04bc92d58d094e2b1530000000000000000000000002a96c9c5ec2d4ed8c8b09554cb5ac583b39b722a",
+  //   })
+  //   .then((tx) => tx.wait());
 }
 
 main()

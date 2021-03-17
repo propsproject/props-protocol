@@ -3,7 +3,7 @@ import * as fs from "fs";
 import { ethers } from "hardhat";
 
 import type { AppPointsL1, AppProxyFactoryL1, AppProxyFactoryBridgeL1 } from "../../typechain";
-import { deployContract, deployContractUpgradeable } from "../../utils";
+import { bn, deployContract, deployContractUpgradeable, expandTo18Decimals } from "../../utils";
 
 // Matic contracts
 const MATIC_ROOT_CHAIN_ADDRESS = process.env.TESTNET
@@ -95,6 +95,23 @@ async function main() {
         .setFxChildTunnel(l2Addresses["appProxyFactoryBridge"])
         .then((tx) => tx.wait());
     }
+
+    // if (process.env.TEST) {
+    //   console.log("Deploying test app");
+    //   appProxyFactory = (await ethers.getContractFactory("AppProxyFactoryL1", deployer)).attach(
+    //     l1Addresses["appProxyFactory"]
+    //   ) as AppProxyFactoryL1;
+    //   await appProxyFactory
+    //     .connect(deployer)
+    //     .deployApp(
+    //       "Test",
+    //       "TEST",
+    //       expandTo18Decimals(1000000),
+    //       deployer.address,
+    //       bn(3658).mul(1e11)
+    //     )
+    //     .then((tx) => tx.wait());
+    // }
   }
 }
 
