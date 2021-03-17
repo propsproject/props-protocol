@@ -69,7 +69,7 @@ contract PropsProtocol is
     mapping(address => mapping(address => uint256)) public rewardStakes;
     // Mapping of the total amount of Props staked to each app
     // eg. appStakes[appPointsAddress]
-    mapping(address => uint256) appStakes;
+    mapping(address => uint256) public appStakes;
 
     // Keeps track of the staking delegatees of users
     mapping(address => address) public delegates;
@@ -92,7 +92,7 @@ contract PropsProtocol is
     event Staked(address indexed app, address indexed account, int256 amount, bool rewards);
     event RewardsEscrowUpdated(address indexed account, uint256 lockedAmount, uint256 unlockTime);
     event PropsRewardsClaimed(address indexed account, uint256 amount, bool app);
-    event AppPointsRewardsClaimed(address indexed account, uint256 amount);
+    event AppPointsRewardsClaimed(address indexed app, address indexed account, uint256 amount);
     event AppWhitelistUpdated(address indexed app, bool status);
     event DelegateChanged(address indexed delegator, address indexed delegatee);
 
@@ -478,7 +478,7 @@ contract PropsProtocol is
             IStaking(appPointsStaking[_app]).claimReward(_msgSender());
             IERC20Upgradeable(_app).safeTransfer(_msgSender(), reward);
 
-            emit AppPointsRewardsClaimed(_msgSender(), reward);
+            emit AppPointsRewardsClaimed(_app, _msgSender(), reward);
         }
     }
 

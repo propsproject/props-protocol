@@ -2,8 +2,8 @@
   "manifestVersion": "3.1",
   "impls": {
     "b29e72a54178e6a7d3a177e43e30c63ae96e2e43d39b5c84eb7e8e1031107f4c": {
-      "address": "0x60Ca343763440caAB34CdB97B931267F1C983804",
-      "txHash": "0x0cfa50aaaec8cc2f28d05eef7cea46c54afe8a27a9673b82c6fe29a3c9dfe31f",
+      "address": "0xfc3b83AD73d2a5Ab538B891e8de91774b870eF0F",
+      "txHash": "0xa5d82f1c69a1bea025dc2edf445f0ecc83786a10697ab450b083ec68cfea06d4",
       "layout": {
         "storage": [
           {
@@ -155,9 +155,9 @@
         }
       }
     },
-    "6366d9fd001244023c9c124ce6610e6fa72d8eda605bce92326e0dadcaa3d313": {
-      "address": "0xb67b990549f1F279631E5c6CA6c1c0014f458657",
-      "txHash": "0xfd595b7a1eb1512e6e717227cb4e5f816deaa7e8ab805a9cec43f6223e68ec6d",
+    "d5b8f5a4c758d4cddf082a0894e60ad6e2a61f289827376b5a8483e2b0d669fa": {
+      "address": "0xFD305b74f5b59E022Ee81424D20AE1Fd04102EcF",
+      "txHash": "0x63384a231edf1e13658c399243c8e3574db5d127477905d0e33d2e741dcd7076",
       "layout": {
         "storage": [
           {
@@ -358,8 +358,8 @@
       }
     },
     "fc69c377304695052ea0b8c9b98e6a63b6edd05baa05328856014e1a0fe7088c": {
-      "address": "0x20e73EBAfB19dCBdbFB074A6977297e8dAbEA48d",
-      "txHash": "0x34bba6827837b8f2e3e9318aa5812d5d0b32730696b348dc4453e71a732e0c76",
+      "address": "0x0C85f44F779fBFD1B642Ac7eb7DCFD94AF4800D1",
+      "txHash": "0x97d57bc70101490d4972e12c44c5f02f81f2062ae45f6fa0d071ea09094dc88b",
       "layout": {
         "storage": [
           {
@@ -479,8 +479,8 @@
       }
     },
     "d6654787184c29f5d6211810935a8ee7acb93ea634872f9bc02286543010b89e": {
-      "address": "0x146090bCd6D5a28AB91c0cA6db9d2730fE63b5F9",
-      "txHash": "0x2a9300a27b67a204e1d6ae03a0a0e03c60b696b1cea25bc88311d81e0b456f67",
+      "address": "0x6dcd06B11B9d1825Ed4269aeB7a450638239C540",
+      "txHash": "0x8032fe4bc996485fcca53f0e6b2a8b68002f43fde3efa3d8ab53328b0ceb5cad",
       "layout": {
         "storage": [
           {
@@ -546,7 +546,7 @@
           {
             "contract": "SPropsToken",
             "label": "checkpoints",
-            "type": "t_mapping(t_address,t_mapping(t_uint32,t_struct(Checkpoint)9232_storage))",
+            "type": "t_mapping(t_address,t_mapping(t_uint32,t_struct(Checkpoint)9235_storage))",
             "src": "contracts/tokens/props/SPropsToken.sol:57"
           },
           {
@@ -599,16 +599,16 @@
           "t_mapping(t_address,t_address)": {
             "label": "mapping(address => address)"
           },
-          "t_mapping(t_address,t_mapping(t_uint32,t_struct(Checkpoint)9232_storage))": {
+          "t_mapping(t_address,t_mapping(t_uint32,t_struct(Checkpoint)9235_storage))": {
             "label": "mapping(address => mapping(uint32 => struct SPropsToken.Checkpoint))"
           },
-          "t_mapping(t_uint32,t_struct(Checkpoint)9232_storage)": {
+          "t_mapping(t_uint32,t_struct(Checkpoint)9235_storage)": {
             "label": "mapping(uint32 => struct SPropsToken.Checkpoint)"
           },
           "t_uint32": {
             "label": "uint32"
           },
-          "t_struct(Checkpoint)9232_storage": {
+          "t_struct(Checkpoint)9235_storage": {
             "label": "struct SPropsToken.Checkpoint",
             "members": [
               {
@@ -637,8 +637,8 @@
       }
     },
     "af2f5d6f0239efa0e6de819821694128f2179329b2b61946a0e9ebc752d500ef": {
-      "address": "0xCEf4330549970c7562Cbf0FdF5863Dc5933788E9",
-      "txHash": "0x6d1794fd6b2b9730676c4e1355d21a5963952440ce5a4b467844a7fbd7de3cb7",
+      "address": "0x7A57524117Dfa7b6943D8F3EAaE4B223d64082d3",
+      "txHash": "0xa0f80b688e88be5c80144ca5605aa3a330350b40f34a5f11e7bb67650261a075",
       "layout": {
         "storage": [
           {
@@ -764,8 +764,8 @@
       }
     },
     "259a6fc2103db7f5f9d098a98fabc58b90b0468a1fc928228975ae126add57ad": {
-      "address": "0xba435D6cc28d7F741759973f382Cb57f160A773D",
-      "txHash": "0x2dfcc46ba51b28833831cdce59ad878665b6f0fae6bb78821b72bc941a4439f9",
+      "address": "0x56171122C3be0a0Bc07600f6B978eDBD5840f1E8",
+      "txHash": "0xfe204c3351e3a94b2293f8ae495d36ad2e1a132dad9b8278a33129c0527dfc26",
       "layout": {
         "storage": [
           {
@@ -829,7 +829,7 @@
     }
   },
   "admin": {
-    "address": "0xb227D6C77FCb7Ca047C4782B9199e121d1bc9255",
-    "txHash": "0xa8f99db4b0f3c50e633ccf9307e061df18f6c591d727f5f445af29bce5f5a79c"
+    "address": "0x2BE67210A8Ab62161DB53d30bCe99e9215D1d154",
+    "txHash": "0x8bc26688ccff5d2ac8d4195a57f97409903ea4a2463a548e03f9ed9a6c8eaedc"
   }
 }
