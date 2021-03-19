@@ -12,7 +12,7 @@ import type {
   RPropsToken,
   SPropsToken,
 } from "../../typechain";
-import { bn, deployContract, deployContractUpgradeable } from "../../utils";
+import { bn, deployContract, deployContractUpgradeable, expandTo18Decimals } from "../../utils";
 
 // Constants
 const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
@@ -191,6 +191,46 @@ async function main() {
         .setFxRootTunnel(l1Addresses["appProxyFactoryBridge"])
         .then((tx) => tx.wait());
     }
+
+    // if (process.env.TEST) {
+    //   console.log("Permissioning controller as minter on `PropsTokenL2`");
+    //   propsToken = (await ethers.getContractFactory("PropsTokenL2", deployer)).attach(
+    //     l2Addresses["propsToken"]
+    //   ) as PropsTokenL2;
+    //   await propsToken
+    //     .connect(controller)
+    //     .addMinter(controller.address)
+    //     .then((tx) => tx.wait());
+
+    //   console.log("Minting Props tokens on L2");
+    //   await propsToken
+    //     .connect(controller)
+    //     .mint("0x6E4A0a74D85B7053176b3ad95358a3185190E4Dc", expandTo18Decimals(1000000))
+    //     .then((tx) => tx.wait());
+    //   await propsToken
+    //     .connect(controller)
+    //     .mint("0xA30C032f2995aCA0e180dd0D27f996c6f1662D7d", expandTo18Decimals(1000000))
+    //     .then((tx) => tx.wait());
+    //   await propsToken
+    //     .connect(controller)
+    //     .mint("0x064Ca8bD5Ca372D70AF0F6A61557c87027bd5c2b", expandTo18Decimals(1000000))
+    //     .then((tx) => tx.wait());
+
+    //   console.log("Distributing Props rewards");
+    //   propsProtocol = (await ethers.getContractFactory("PropsProtocol", deployer)).attach(
+    //     l2Addresses["propsProtocol"]
+    //   ) as PropsProtocol;
+    //   await propsProtocol
+    //     .connect(controller)
+    //     .distributePropsRewards(expandTo18Decimals(100000000), bn(800000), bn(200000))
+    //     .then((tx) => tx.wait());
+
+    //   console.log("Whitelisting app");
+    //   await propsProtocol
+    //     .connect(controller)
+    //     .updateAppWhitelist("0x82e878a213dcd6c2daed2f39c52afcb7193598a9", true)
+    //     .then((tx) => tx.wait());
+    // }
   }
 }
 
