@@ -90,6 +90,8 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
     event Staked(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount);
     event RewardPaid(address indexed user, uint256 reward);
+    event DailyRewardEmissionChanged(uint256 dailyRewardEmission);
+    event RewardsDistributionChanged(address indexed rewardsDistribution);
 
     /**************************************
                     MODIFIERS
@@ -154,7 +156,7 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
         controller = _controller;
         rewardsDistribution = _rewardsDistribution;
         rewardsToken = _rewardsToken;
-        rewardsDuration = uint256(1e18).div(_dailyRewardEmission).mul(1 days);
+        rewardsDuration = uint256(1e18).mul(1 days).div(_dailyRewardEmission);
     }
 
     /***************************************
@@ -358,7 +360,8 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
         override
         only(rewardsDistribution)
     {
-        rewardsDuration = uint256(1e18).div(_dailyRewardEmission).mul(1 days);
+        rewardsDuration = uint256(1e18).mul(1 days).div(_dailyRewardEmission);
+        emit DailyRewardEmissionChanged(_dailyRewardEmission);
     }
 
     /**
@@ -371,6 +374,7 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
         only(rewardsDistribution)
     {
         rewardsDistribution = _account;
+        emit RewardsDistributionChanged(_account);
     }
 
     /***************************************

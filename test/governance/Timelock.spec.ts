@@ -149,11 +149,11 @@ describe("Timelock", () => {
     ).to.be.revertedWith("Transaction is stale");
   });
 
-  it("pausability", async () => {
+  it("halting", async () => {
     const timelockTx: TimelockTx = {
       target: timelock.address,
       value: 0,
-      signature: "pause()",
+      signature: "halt()",
       data: "0x",
       eta: (await now()).add(TIMELOCK_DELAY).add(daysToTimestamp(1)),
     };
@@ -167,12 +167,12 @@ describe("Timelock", () => {
     // Execute transactions
     await execute(timelock.connect(admin).executeTransaction, timelockTx);
 
-    // Check that the timelock contract got paused
-    expect(await timelock.paused()).to.be.true;
+    // Check that the timelock contract got halted
+    expect(await timelock.halted()).to.be.true;
 
     // Once paused, no transactions can get queued/cancelled/executed anymore
     await expect(execute(timelock.connect(admin).queueTransaction, timelockTx)).to.be.revertedWith(
-      "Contract must not be paused"
+      "Contract must not be halted"
     );
   });
 });

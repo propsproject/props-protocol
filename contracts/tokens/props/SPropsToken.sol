@@ -213,21 +213,10 @@ contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken {
     }
 
     /**
-     * @notice Approve `spender` to transfer up to `amount` from `src`.
-     * @param spender The address of the account which may transfer tokens
-     * @param rawAmount The number of tokens that are approved (2^256-1 means infinite)
-     * @return Whether or not the transfer succeeded
+     * @dev sProps are not transferrable, so here we simply revert.
      */
-    function approve(address spender, uint256 rawAmount) external override returns (bool) {
-        uint96 amount;
-        if (rawAmount == uint256(-1)) {
-            amount = uint96(-1);
-        } else {
-            amount = safe96(rawAmount);
-        }
-
-        _allowances[msg.sender][spender] = amount;
-        return true;
+    function approve(address, uint256) external pure override returns (bool) {
+        revert("sProps are not transferrable");
     }
 
     /**

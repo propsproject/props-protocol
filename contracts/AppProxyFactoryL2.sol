@@ -97,6 +97,7 @@ contract AppProxyFactoryL2 is Initializable, MinimalProxyFactory {
      * @param _controller The new controller
      */
     function transferControl(address _controller) external only(controller) {
+        require(_controller != address(0), "Cannot be set to the zero address");
         controller = _controller;
     }
 

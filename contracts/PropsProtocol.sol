@@ -168,6 +168,7 @@ contract PropsProtocol is
      * @param _controller The new controller
      */
     function transferControl(address _controller) external only(controller) {
+        require(_controller != address(0), "Cannot be set to the zero address");
         controller = _controller;
     }
 
@@ -176,6 +177,7 @@ contract PropsProtocol is
      * @param _guardian The new guardian
      */
     function transferGuardianship(address _guardian) external only(controller) {
+        require(_guardian != address(0), "Cannot be set to the zero address");
         guardian = _guardian;
     }
 
@@ -429,7 +431,10 @@ contract PropsProtocol is
     }
 
     /**
-     * @dev Stake on behalf of a delegator.
+     * @dev Stake on behalf of a delegator. The delegatee can only readjust
+     *      existing stake (eg. unstaking amount X from an app and staking
+     *      back the same amount X to another app) but not add or remove any
+     *      other stake.
      * @param _apps Array of app tokens to stake/unstake to/from
      * @param _amounts Array of amounts to stake/unstake to/from each app token
      * @param _account Delegator account to stake on behalf of

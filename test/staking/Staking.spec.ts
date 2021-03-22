@@ -67,7 +67,7 @@ describe("Staking", () => {
     // The rewards duration is correctly set
     const rewardsDuration = await staking.rewardsDuration();
     expect(rewardsDuration).to.eq(
-      expandTo18Decimals(1).div(DAILY_REWARDS_EMISSION).mul(daysToTimestamp(1))
+      expandTo18Decimals(1).mul(daysToTimestamp(1)).div(DAILY_REWARDS_EMISSION)
     );
 
     // The reward rate is correctly set
