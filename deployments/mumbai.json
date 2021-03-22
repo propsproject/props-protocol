@@ -1,14 +1,38 @@
 [
   {
-    "propsToken": "0x1ed20F8Cb432ED2f9E13112A3eDEC382C5a3dd4D",
-    "propsProtocol": "0x35b4c135727f008FE80c91724Eb50FDfF6e2e1cF",
-    "rPropsToken": "0x9049811FC739C3b85469048b468c43F36b95Ac41",
-    "sPropsToken": "0x2FDD95cbf053BEBf4eF28300706A0c07BE653e03",
-    "propsAppStaking": "0xc313994b8d12B583e6eC1FDd14e42813063A844E",
-    "propsUserStaking": "0x945Bf2147256E2EE5C9D7bD80902f56023BBcC47",
-    "appPointsLogic": "0xa9d0057fc5558F3e090D74d1a1068D304bE55770",
-    "appPointsStakingLogic": "0x6e3401645d84DF896C3bDdDE13b2C263405422Ca",
-    "appProxyFactory": "0xD8A9572FDcf92A7d2c1c2A27E67d2A54c75247a0",
-    "appProxyFactoryBridge": "0x4470c20dA3DC7b17dcd10D95E46933AF4E77Ceb2"
+    "propsToken": "0xeA7b70705CFAe81c64Bd69E1aaeeAc01400F0272",
+    "propsProtocol": "0xc57210C3f2b9D310fa68c7551e4968481dB80756",
+    "rPropsToken": "0xcB093C98A7a669f8ffe78909DE167Acb8AaF68aF",
+    "sPropsToken": "0xdd429129335B05d372F2A1367551f7b493d82590",
+    "propsAppStaking": "0xb8b98A7D71d9658C43dAA49d607b4261A33BC942",
+    "propsUserStaking": "0xa6Dd6E9275944151c27986C427D16a5687Aa57c4",
+    "appPointsLogic": "0xe350D99AF7c6134139086cfA331DdFF75E0C2b7C",
+    "appPointsStakingLogic": "0x7F8747Ba32287dFceF21f3fb83A3db0A0Bf13943",
+    "appProxyFactory": "0x90E740D4fA4Ac98018A3cc8f9FF120e792Ab833B",
+    "appProxyFactoryBridge": "0xa1E869Cb592F626c6D374C9637154E56fE4DA570"
+  },
+  {
+    "propsToken": "0x4508489cAd493977f1EB8De7481de90c81d56c60",
+    "propsProtocol": "0x894bEcDd87b5A0D4466A23DF6502AfD5471F24B9",
+    "rPropsToken": "0xf11Cb2042c6b86d56B26Efd36aA37736DD337c9f",
+    "sPropsToken": "0x4Ab29Ad78A4d18b138B09EE78a8f62a16A3A24eb",
+    "propsAppStaking": "0x9eb818d4E632D75DecDF160dd644F97Fe87a1729",
+    "propsUserStaking": "0x6A4302CC17273f3FdCF5aa6a8244c6B4e2Ba4ee3",
+    "appPointsLogic": "0xbf076ec83e2593032752c6253653cF4ae144a294",
+    "appPointsStakingLogic": "0x23a8A086f036d855814e6187B8CafE57287c8201",
+    "appProxyFactory": "0x57aE4b2ECa44235fa30968615c09f202292326b7",
+    "appProxyFactoryBridge": "0xa493D14792f52f38712049974bce47AC858d8632"
+  },
+  {
+    "propsToken": "0x34Da22F2fA2b8CF4965b2Fb57b16C92F3AA80E60",
+    "propsProtocol": "0xC68355809b08162cb862689508dBBFc26d091309",
+    "rPropsToken": "0xed0091946784b606B5ed0E417Dc140C99a0De4C5",
+    "sPropsToken": "0x2fC65227bD839deB4ba5CBf8A636dc7d09F58083",
+    "propsAppStaking": "0xBdF0d9172A8097817d472c83EE23BB3Bdd316E48",
+    "propsUserStaking": "0x5a56d77d03FE5dd7228363df88451a3aa3556dd3",
+    "appPointsLogic": "0x1E6bcAa71EEc846eb4f8ad05F3C37d34FB8fAe2e",
+    "appPointsStakingLogic": "0x654Fb0B86e839d8B7170360227484F29d387e668",
+    "appProxyFactory": "0x17d7366895Ab7611408aA8799Fa3cBC3c69Eda96",
+    "appProxyFactoryBridge": "0xB25E431A91629Ed2E27f1b665F42Dfde9EB79a3D"
   }
 ]

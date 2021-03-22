@@ -1,9 +1,9 @@
 {
   "manifestVersion": "3.1",
   "impls": {
-    "d145b5cc7c4cae01659331c8cc9dd864afa87da5f58e77a7ddd0aaf20e8b1af9": {
-      "address": "0x449A115Ff1a97070DAd0e6e443EB733022ffe611",
-      "txHash": "0xbe3a73e7153cee19e292125c1fc42c437c307c1df326535ecf6721274443f1fb",
+    "b29e72a54178e6a7d3a177e43e30c63ae96e2e43d39b5c84eb7e8e1031107f4c": {
+      "address": "0xfc3b83AD73d2a5Ab538B891e8de91774b870eF0F",
+      "txHash": "0xa5d82f1c69a1bea025dc2edf445f0ecc83786a10697ab450b083ec68cfea06d4",
       "layout": {
         "storage": [
           {
@@ -155,9 +155,9 @@
         }
       }
     },
-    "e1fed47ceec154d32700aaf07a27497249fd78bdcef0024009fc8ace65ffaec0": {
-      "address": "0xAf71AB42b24837000c2acf71C615910C86367933",
-      "txHash": "0xb0162135083a2f2b81acfe934bc7da4c13c4554e4310c00944d13ec9eb960fda",
+    "d5b8f5a4c758d4cddf082a0894e60ad6e2a61f289827376b5a8483e2b0d669fa": {
+      "address": "0xFD305b74f5b59E022Ee81424D20AE1Fd04102EcF",
+      "txHash": "0x63384a231edf1e13658c399243c8e3574db5d127477905d0e33d2e741dcd7076",
       "layout": {
         "storage": [
           {
@@ -288,33 +288,39 @@
           },
           {
             "contract": "PropsProtocol",
+            "label": "appStakes",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/PropsProtocol.sol:72"
+          },
+          {
+            "contract": "PropsProtocol",
             "label": "delegates",
             "type": "t_mapping(t_address,t_address)",
-            "src": "contracts/PropsProtocol.sol:72"
+            "src": "contracts/PropsProtocol.sol:75"
           },
           {
             "contract": "PropsProtocol",
             "label": "rewardsEscrow",
             "type": "t_mapping(t_address,t_uint256)",
-            "src": "contracts/PropsProtocol.sol:75"
+            "src": "contracts/PropsProtocol.sol:78"
           },
           {
             "contract": "PropsProtocol",
             "label": "rewardsEscrowUnlock",
             "type": "t_mapping(t_address,t_uint256)",
-            "src": "contracts/PropsProtocol.sol:77"
+            "src": "contracts/PropsProtocol.sol:80"
           },
           {
             "contract": "PropsProtocol",
             "label": "rewardsEscrowCooldown",
             "type": "t_uint256",
-            "src": "contracts/PropsProtocol.sol:80"
+            "src": "contracts/PropsProtocol.sol:83"
           },
           {
             "contract": "PropsProtocol",
             "label": "appWhitelist",
             "type": "t_mapping(t_address,t_bool)",
-            "src": "contracts/PropsProtocol.sol:83"
+            "src": "contracts/PropsProtocol.sol:86"
           }
         ],
         "types": {
@@ -351,9 +357,9 @@
         }
       }
     },
-    "2d59e604f96012241ef7f4971a593191605e4848d620a0fe924aa02b6a1e2b03": {
-      "address": "0xc61BA16E5D6eFB019742D1e32E797a077fF241d1",
-      "txHash": "0x5f7387889111d78db652d0946efbf3f1199a67a83e9c77bd771603dc6683c4f1",
+    "fc69c377304695052ea0b8c9b98e6a63b6edd05baa05328856014e1a0fe7088c": {
+      "address": "0x0C85f44F779fBFD1B642Ac7eb7DCFD94AF4800D1",
+      "txHash": "0x97d57bc70101490d4972e12c44c5f02f81f2062ae45f6fa0d071ea09094dc88b",
       "layout": {
         "storage": [
           {
@@ -472,9 +478,9 @@
         }
       }
     },
-    "d404dac22524632a8a5e9d62e4cce1b29bc41a09250859091a3e1535c1523826": {
-      "address": "0xb5eA484bdBDec58Ea14921977ED91e97A72073c3",
-      "txHash": "0x3d16edb4b7dec4ad8b199caa942f769f6734509f16c085e6881097eae9073169",
+    "d6654787184c29f5d6211810935a8ee7acb93ea634872f9bc02286543010b89e": {
+      "address": "0x6dcd06B11B9d1825Ed4269aeB7a450638239C540",
+      "txHash": "0x8032fe4bc996485fcca53f0e6b2a8b68002f43fde3efa3d8ab53328b0ceb5cad",
       "layout": {
         "storage": [
           {
@@ -540,7 +546,7 @@
           {
             "contract": "SPropsToken",
             "label": "checkpoints",
-            "type": "t_mapping(t_address,t_mapping(t_uint32,t_struct(Checkpoint)9120_storage))",
+            "type": "t_mapping(t_address,t_mapping(t_uint32,t_struct(Checkpoint)9235_storage))",
             "src": "contracts/tokens/props/SPropsToken.sol:57"
           },
           {
@@ -593,16 +599,16 @@
           "t_mapping(t_address,t_address)": {
             "label": "mapping(address => address)"
           },
-          "t_mapping(t_address,t_mapping(t_uint32,t_struct(Checkpoint)9120_storage))": {
+          "t_mapping(t_address,t_mapping(t_uint32,t_struct(Checkpoint)9235_storage))": {
             "label": "mapping(address => mapping(uint32 => struct SPropsToken.Checkpoint))"
           },
-          "t_mapping(t_uint32,t_struct(Checkpoint)9120_storage)": {
+          "t_mapping(t_uint32,t_struct(Checkpoint)9235_storage)": {
             "label": "mapping(uint32 => struct SPropsToken.Checkpoint)"
           },
           "t_uint32": {
             "label": "uint32"
           },
-          "t_struct(Checkpoint)9120_storage": {
+          "t_struct(Checkpoint)9235_storage": {
             "label": "struct SPropsToken.Checkpoint",
             "members": [
               {
@@ -630,9 +636,9 @@
         }
       }
     },
-    "d7c6e6011ec16d95a53876b870fb6eb27b9803ae22060aafc9c9ac9a26b9341c": {
-      "address": "0x743faE38b30c1dc08C7D9eB9d34c58aCAa21E891",
-      "txHash": "0x6beead70d9f7200156eb0a862075f7540aa09cb63affc991e3f05d799c74536e",
+    "af2f5d6f0239efa0e6de819821694128f2179329b2b61946a0e9ebc752d500ef": {
+      "address": "0x7A57524117Dfa7b6943D8F3EAaE4B223d64082d3",
+      "txHash": "0xa0f80b688e88be5c80144ca5605aa3a330350b40f34a5f11e7bb67650261a075",
       "layout": {
         "storage": [
           {
@@ -757,9 +763,9 @@
         }
       }
     },
-    "1dece66ec2e6a105b43c2dc45b928d9839eda182f9f49eb66350d1ea6a706d07": {
-      "address": "0x6fa8689dD6995b6d5E30cf5D57C817b66fE53E2B",
-      "txHash": "0xe33219ad0e532ffdd83d3601c0f9a9f92224f0130800a192f34996d78799a1e9",
+    "259a6fc2103db7f5f9d098a98fabc58b90b0468a1fc928228975ae126add57ad": {
+      "address": "0x56171122C3be0a0Bc07600f6B978eDBD5840f1E8",
+      "txHash": "0xfe204c3351e3a94b2293f8ae495d36ad2e1a132dad9b8278a33129c0527dfc26",
       "layout": {
         "storage": [
           {
@@ -820,10 +826,276 @@
           }
         }
       }
+    },
+    "c02a98e0196bd083a1b528c7f7c48779ded664dc468eb1494a06a6ee661f1738": {
+      "address": "0xcCa4b0573db8cB85cdd08d9b066445B6e4aF86E0",
+      "txHash": "0x42afd28ef583bbbdb7f578e58943ffb54a39cf70e5017278851ec9f6cb5c7aa9",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:25"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:30"
+          },
+          {
+            "contract": "ReentrancyGuardUpgradeable",
+            "label": "_status",
+            "type": "t_uint256",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:37"
+          },
+          {
+            "contract": "ReentrancyGuardUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:67"
+          },
+          {
+            "contract": "Staking",
+            "label": "controller",
+            "type": "t_address",
+            "src": "contracts/staking/Staking.sol:50"
+          },
+          {
+            "contract": "Staking",
+            "label": "rewardsDistribution",
+            "type": "t_address",
+            "src": "contracts/staking/Staking.sol:53"
+          },
+          {
+            "contract": "Staking",
+            "label": "rewardsToken",
+            "type": "t_address",
+            "src": "contracts/staking/Staking.sol:56"
+          },
+          {
+            "contract": "Staking",
+            "label": "totalRewardsDistributed",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:59"
+          },
+          {
+            "contract": "Staking",
+            "label": "periodFinish",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:62"
+          },
+          {
+            "contract": "Staking",
+            "label": "rewardRate",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:64"
+          },
+          {
+            "contract": "Staking",
+            "label": "rewardsDuration",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:66"
+          },
+          {
+            "contract": "Staking",
+            "label": "lastUpdateTime",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:68"
+          },
+          {
+            "contract": "Staking",
+            "label": "rewardPerTokenStored",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:70"
+          },
+          {
+            "contract": "Staking",
+            "label": "lastRewardRateUpdate",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:72"
+          },
+          {
+            "contract": "Staking",
+            "label": "userRewardPerTokenPaid",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/staking/Staking.sol:75"
+          },
+          {
+            "contract": "Staking",
+            "label": "rewards",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/staking/Staking.sol:77"
+          },
+          {
+            "contract": "Staking",
+            "label": "_totalSupply",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:80"
+          },
+          {
+            "contract": "Staking",
+            "label": "_balances",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/staking/Staking.sol:82"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_bool": {
+            "label": "bool"
+          }
+        }
+      }
+    },
+    "3be3ad9fb60f8cf4be0889a7eccc4e470f475c9c3ba208fe6d17bdd47d4177dd": {
+      "address": "0x842206ad09f2FC07De9699D0dc494C2AcCc0600e",
+      "txHash": "0x7f605df370d83360e06eeb5cedeef154b08fcea129533d85fb1db5f21aecb36a",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:25"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:30"
+          },
+          {
+            "contract": "ReentrancyGuardUpgradeable",
+            "label": "_status",
+            "type": "t_uint256",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:37"
+          },
+          {
+            "contract": "ReentrancyGuardUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:67"
+          },
+          {
+            "contract": "Staking",
+            "label": "controller",
+            "type": "t_address",
+            "src": "contracts/staking/Staking.sol:50"
+          },
+          {
+            "contract": "Staking",
+            "label": "rewardsDistribution",
+            "type": "t_address",
+            "src": "contracts/staking/Staking.sol:53"
+          },
+          {
+            "contract": "Staking",
+            "label": "rewardsToken",
+            "type": "t_address",
+            "src": "contracts/staking/Staking.sol:56"
+          },
+          {
+            "contract": "Staking",
+            "label": "totalRewardsDistributed",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:59"
+          },
+          {
+            "contract": "Staking",
+            "label": "periodFinish",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:62"
+          },
+          {
+            "contract": "Staking",
+            "label": "rewardRate",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:64"
+          },
+          {
+            "contract": "Staking",
+            "label": "rewardsDuration",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:66"
+          },
+          {
+            "contract": "Staking",
+            "label": "lastUpdateTime",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:68"
+          },
+          {
+            "contract": "Staking",
+            "label": "rewardPerTokenStored",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:70"
+          },
+          {
+            "contract": "Staking",
+            "label": "lastRewardRateUpdate",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:72"
+          },
+          {
+            "contract": "Staking",
+            "label": "userRewardPerTokenPaid",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/staking/Staking.sol:75"
+          },
+          {
+            "contract": "Staking",
+            "label": "rewards",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/staking/Staking.sol:77"
+          },
+          {
+            "contract": "Staking",
+            "label": "_totalSupply",
+            "type": "t_uint256",
+            "src": "contracts/staking/Staking.sol:80"
+          },
+          {
+            "contract": "Staking",
+            "label": "_balances",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/staking/Staking.sol:82"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_bool": {
+            "label": "bool"
+          }
+        }
+      }
     }
   },
   "admin": {
-    "address": "0x17a5d597e0B948B49e44eaA115E563Ba0eb466c9",
-    "txHash": "0x5180f5e211602a66047ccca5573e76a37fdf34c4b76b9f617844ea9835aedf1e"
+    "address": "0x2BE67210A8Ab62161DB53d30bCe99e9215D1d154",
+    "txHash": "0x8bc26688ccff5d2ac8d4195a57f97409903ea4a2463a548e03f9ed9a6c8eaedc"
   }
 }

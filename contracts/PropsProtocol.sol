@@ -69,7 +69,7 @@ contract PropsProtocol is
     mapping(address => mapping(address => uint256)) public rewardStakes;
     // Mapping of the total amount of Props staked to each app
     // eg. appStakes[appPointsAddress]
-    mapping(address => uint256) appStakes;
+    mapping(address => uint256) public appStakes;
 
     // Keeps track of the staking delegatees of users
     mapping(address => address) public delegates;
@@ -91,6 +91,8 @@ contract PropsProtocol is
 
     event Staked(address indexed app, address indexed account, int256 amount, bool rewards);
     event RewardsEscrowUpdated(address indexed account, uint256 lockedAmount, uint256 unlockTime);
+    event PropsRewardsClaimed(address indexed account, uint256 amount, bool app);
+    event AppPointsRewardsClaimed(address indexed app, address indexed account, uint256 amount);
     event AppWhitelistUpdated(address indexed app, bool status);
     event DelegateChanged(address indexed delegator, address indexed delegatee);
 
@@ -475,6 +477,8 @@ contract PropsProtocol is
         if (reward > 0) {
             IStaking(appPointsStaking[_app]).claimReward(_msgSender());
             IERC20Upgradeable(_app).safeTransfer(_msgSender(), reward);
+
+            emit AppPointsRewardsClaimed(_app, _msgSender(), reward);
         }
     }
 
@@ -496,6 +500,8 @@ contract PropsProtocol is
             IERC20Upgradeable(rPropsToken).safeTransfer(_wallet, reward);
             // Since the rewards are in rProps, swap it for regular Props
             IRPropsToken(rPropsToken).swap(_wallet);
+
+            emit PropsRewardsClaimed(_app, reward, true);
         }
     }
 
@@ -514,6 +520,8 @@ contract PropsProtocol is
             IStaking(propsAppStaking).claimReward(_app);
             // Since the rewards are in rProps, swap it for regular Props
             IRPropsToken(rPropsToken).swap(address(this));
+
+            emit PropsRewardsClaimed(_app, reward, true);
 
             address[] memory _apps = new address[](1);
             _apps[0] = _app;
@@ -534,6 +542,8 @@ contract PropsProtocol is
             IStaking(propsUserStaking).claimReward(_msgSender());
             // Since the rewards are in rProps, swap it for regular Props
             IRPropsToken(rPropsToken).swap(address(this));
+
+            emit PropsRewardsClaimed(_msgSender(), reward, false);
 
             // Place the rewards in the escrow and extend the cooldown period
             rewardsEscrow[_msgSender()] = rewardsEscrow[_msgSender()].add(reward);
@@ -750,6 +760,8 @@ contract PropsProtocol is
             IStaking(propsUserStaking).claimReward(_account);
             // Since the rewards are in rProps, swap it for regular Props
             IRPropsToken(rPropsToken).swap(address(this));
+
+            emit PropsRewardsClaimed(_account, reward, false);
 
             // Place the rewards in the escrow but don't extend the cooldown period
             rewardsEscrow[_account] = rewardsEscrow[_account].add(reward);

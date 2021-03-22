@@ -55,6 +55,9 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
     // Token to be used for rewards
     address public rewardsToken;
 
+    // Total amount of rewards ever distributed
+    uint256 public totalRewardsDistributed;
+
     // The finish time of the current rewards period (timestamp in seconds)
     uint256 public periodFinish;
     // The currently active reward rate
@@ -207,6 +210,26 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
                 .add(rewards[_account]);
     }
 
+    /**
+     * @dev Gets the current earnings rate of a given account.
+     */
+    function earningsPerSecond(address _account) public view returns (uint256) {
+        if (_totalSupply > 0) {
+            return _balances[_account].mul(rewardRate).div(_totalSupply);
+        }
+        return 0;
+    }
+
+    /**
+     * @dev Gets the amount of rewards left for distribution to stakers.
+     */
+    function rewardsLeftToDistribute() public view returns (uint256) {
+        if (periodFinish >= block.timestamp) {
+            return periodFinish.sub(block.timestamp).mul(rewardRate);
+        }
+        return 0;
+    }
+
     /***************************************
                 CONTROLLER ACTIONS
     ****************************************/
@@ -293,6 +316,8 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
             rewardRate = _reward.add(leftover).div(rewardsDuration);
         }
 
+        totalRewardsDistributed = totalRewardsDistributed.add(_reward);
+
         _updateParameters();
         emit RewardAdded(_reward);
     }
@@ -317,6 +342,8 @@ contract Staking is Initializable, ReentrancyGuardUpgradeable, IStaking {
         uint256 remaining = periodFinish.sub(block.timestamp);
         uint256 leftover = remaining.mul(rewardRate).sub(_amount);
         rewardRate = leftover.div(rewardsDuration);
+
+        totalRewardsDistributed = totalRewardsDistributed.sub(_amount);
 
         _updateParameters();
         emit RewardWithdrawn(_amount);
