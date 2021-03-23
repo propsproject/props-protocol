@@ -459,7 +459,10 @@ contract PropsProtocol is
     }
 
     /**
-     * @dev Stake rewards on behalf of a delegator.
+     * @dev Stake rewards on behalf of a delegator. While the delegatee can
+     *      introduce additional stake from the delegator's escrow, it cannot
+     *      trigger any withdraws (which would increase the delegator's escrow
+     *      unlock time).
      * @param _apps Array of apps to stake/unstake to/from
      * @param _amounts Array of amounts to stake/unstake to/from each app
      * @param _account Delegator account to stake on behalf of

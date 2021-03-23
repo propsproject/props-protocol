@@ -36,7 +36,7 @@ function stake(address[] _apps, int256[] _amounts)
 
 ##### Stake as delegate
 
-Delegated staking. Readjust existing stake on behalf of an account that explicitly delegated its staking rights.
+Delegated staking. Readjust existing stake on behalf of an account that explicitly delegated its staking rights. The delegatee cannot introduce new stake or remove existing stake on behalf of the delegator.
 
 ```solidity
 function stakeAsDelegate(
@@ -56,7 +56,7 @@ function stakeRewards(address[] _apps, int256[] _amounts)
 
 ##### Stake rewards as delegate
 
-Delegated rewards staking. Readjust existing rewards stake on behalf of an account that explicitly delegated its staking rights.
+Delegated rewards staking. Readjust existing rewards stake on behalf of an account that explicitly delegated its staking rights. As opposed to `stakeAsDelegate`, the delegatee can introduce new stake from the delegator's rewards escrow but it cannot withdraw existing stake.
 
 ```solidity
 function stakeRewardsAsDelegate(
