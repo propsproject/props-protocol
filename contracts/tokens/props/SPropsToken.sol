@@ -109,12 +109,10 @@ contract SPropsToken is Initializable, IERC20Upgradeable, ISPropsToken {
         _decimals = 18;
         _totalSupply = 0;
 
-        DOMAIN_TYPEHASH = keccak256(
-            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-        );
-        DELEGATION_TYPEHASH = keccak256(
-            "Delegation(address delegatee,uint256 nonce,uint256 expiry)"
-        );
+        DOMAIN_TYPEHASH = // keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+        0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f;
+        DELEGATION_TYPEHASH = // keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)")
+        0xe48329057bfd03d55e49b547132e39cffd9c1820ad7b9d4c5307691425d15adf;
     }
 
     /***************************************

@@ -69,11 +69,8 @@ abstract contract MetaTransactionProvider is Initializable {
 
         DOMAIN_SEPARATOR_L1 = keccak256(
             abi.encode(
-                keccak256(
-                    bytes(
-                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                    )
-                ),
+                // keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+                0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f,
                 keccak256(bytes(_name)),
                 keccak256(bytes(_version)),
                 ROOT_CHAIN_ID,
@@ -83,11 +80,8 @@ abstract contract MetaTransactionProvider is Initializable {
 
         DOMAIN_SEPARATOR_L2 = keccak256(
             abi.encode(
-                keccak256(
-                    bytes(
-                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                    )
-                ),
+                // keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+                0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f,
                 keccak256(bytes(_name)),
                 keccak256(bytes(_version)),
                 _getChainId(),
@@ -95,9 +89,7 @@ abstract contract MetaTransactionProvider is Initializable {
             )
         );
 
-        META_TRANSACTION_TYPEHASH = keccak256(
-            bytes("MetaTransaction(uint256 nonce,address from,bytes callData,uint256 deadline)")
-        );
+        META_TRANSACTION_TYPEHASH = 0x7711d7a2f53160a6cdce3fa7984799eba474a9075435604e9cc927b3c4ce0b0f; // keccak256("MetaTransaction(uint256 nonce,address from,bytes callData,uint256 deadline)")
     }
 
     /**
@@ -174,16 +166,14 @@ abstract contract MetaTransactionProvider is Initializable {
         return keccak256(abi.encodePacked("\x19\x01", _domainSeparator, _messageDigest));
     }
 
-    function _convertBytesToBytes4(bytes memory _inBytes) internal pure returns (bytes4) {
+    function _convertBytesToBytes4(bytes memory _inBytes) internal pure returns (bytes4 outBytes) {
         if (_inBytes.length == 0) {
             return 0x0;
         }
 
-        bytes4 outBytes;
         assembly {
             outBytes := mload(add(_inBytes, 32))
         }
-        return outBytes;
     }
 
     function _verify(

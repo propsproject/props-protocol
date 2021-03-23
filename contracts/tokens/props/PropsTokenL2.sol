@@ -58,11 +58,8 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
 
         DOMAIN_SEPARATOR_L1 = keccak256(
             abi.encode(
-                keccak256(
-                    bytes(
-                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                    )
-                ),
+                // keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+                0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f,
                 keccak256(bytes(name())),
                 keccak256(bytes("1")),
                 ROOT_CHAIN_ID,
@@ -72,11 +69,8 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
 
         DOMAIN_SEPARATOR_L2 = keccak256(
             abi.encode(
-                keccak256(
-                    bytes(
-                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                    )
-                ),
+                // keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+                0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f,
                 keccak256(bytes(name())),
                 keccak256(bytes("1")),
                 _getChainId(),
@@ -84,9 +78,8 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
             )
         );
 
-        PERMIT_TYPEHASH = keccak256(
-            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-        );
+        PERMIT_TYPEHASH = // keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
+        0x6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c9;
     }
 
     /***************************************

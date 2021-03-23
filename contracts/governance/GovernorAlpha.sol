@@ -108,10 +108,13 @@ contract GovernorAlpha {
 
     // The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH =
-        keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
+        // keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)")
+        0x8cad95687ba82c2ce50e74f7b754645e5117c3a5bec8151c0726d5857980a866;
 
     // The EIP-712 typehash for the ballot struct used by the contract
-    bytes32 public constant BALLOT_TYPEHASH = keccak256("Ballot(uint256 proposalId,bool support)");
+    bytes32 public constant BALLOT_TYPEHASH =
+        // keccak256("Ballot(uint256 proposalId,bool support)")
+        0x8e25870c07e0b0b3884c78da52790939a455c275406c44ae8b434b692fb916ee;
 
     // An event emitted when a new proposal is created
     event ProposalCreated(

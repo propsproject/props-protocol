@@ -70,9 +70,8 @@ contract AppPointsL1 is Initializable, AppPointsCommon {
 
         DOMAIN_SEPARATOR_L1 = keccak256(
             abi.encode(
-                keccak256(
-                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                ),
+                // keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+                0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f,
                 keccak256(bytes(name())),
                 keccak256(bytes("1")),
                 _getChainId(),
