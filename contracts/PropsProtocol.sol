@@ -434,7 +434,7 @@ contract PropsProtocol is
      * @dev Stake on behalf of a delegator. The delegatee can only readjust
      *      existing stake (eg. unstaking amount X from an app and staking
      *      back the same amount X to another app) but not add or remove any
-     *      other stake.
+     *      other stake (the call will fail in such cases).
      * @param _apps Array of app tokens to stake/unstake to/from
      * @param _amounts Array of amounts to stake/unstake to/from each app token
      * @param _account Delegator account to stake on behalf of
