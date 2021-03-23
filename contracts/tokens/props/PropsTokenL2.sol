@@ -34,6 +34,8 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
     bytes32 public DOMAIN_SEPARATOR_L2;
     // solhint-disable-next-line var-name-mixedcase
     bytes32 public PERMIT_TYPEHASH;
+    // solhint-disable-next-line var-name-mixedcase
+    bytes32 public PERMIT_AND_CALL_TYPEHASH;
 
     // Nonces for permit
     mapping(address => uint256) public nonces;
@@ -78,8 +80,10 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
             )
         );
 
-        PERMIT_TYPEHASH = // keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
-        0x6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c9;
+        // keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
+        PERMIT_TYPEHASH = 0x6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c9;
+        // keccak256("PermitAndCall(address owner,address spender,uint256 value,address callTo,bytes callData,uint256 nonce,uint256 deadline)")
+        PERMIT_AND_CALL_TYPEHASH = 0x372f0368a822e115c12612c14ba8201411bafdc6b0c2a9593736434cd00c7f3a;
     }
 
     /***************************************
@@ -151,10 +155,15 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
     ) external override {
         require(_deadline >= block.timestamp, "Permit expired");
 
+        bytes32 digest =
+            keccak256(
+                abi.encode(PERMIT_TYPEHASH, _owner, _spender, _amount, nonces[_owner], _deadline)
+            );
+
         // We allow either L1 or L2 signatures
         require(
-            _verify(DOMAIN_SEPARATOR_L1, _owner, _spender, _amount, _deadline, _v, _r, _s) ||
-                _verify(DOMAIN_SEPARATOR_L2, _owner, _spender, _amount, _deadline, _v, _r, _s),
+            _verify(DOMAIN_SEPARATOR_L1, digest, _owner, _v, _r, _s) ||
+                _verify(DOMAIN_SEPARATOR_L2, digest, _owner, _v, _r, _s),
             "Invalid signature"
         );
         nonces[_owner]++;
@@ -162,9 +171,69 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
         _approve(_owner, _spender, _amount);
     }
 
+    function permitAndCall(
+        address _owner,
+        address _spender,
+        uint256 _amount,
+        address _callTo,
+        bytes memory _callData,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) public returns (bytes memory) {
+        require(_deadline >= block.timestamp, "Permit expired");
+
+        // Don't pass the nonce directly (`nonces[_owner]`) to avoid 'Stack too deep' errors
+        uint256 nonce = nonces[_owner];
+        bytes32 digest =
+            keccak256(
+                abi.encode(
+                    PERMIT_AND_CALL_TYPEHASH,
+                    _owner,
+                    _spender,
+                    _amount,
+                    _callTo,
+                    keccak256(_callData),
+                    nonce,
+                    _deadline
+                )
+            );
+
+        // We allow either L1 or L2 signatures
+        require(
+            _verify(DOMAIN_SEPARATOR_L1, digest, _owner, _v, _r, _s) ||
+                _verify(DOMAIN_SEPARATOR_L2, digest, _owner, _v, _r, _s),
+            "Invalid signature"
+        );
+        nonces[_owner]++;
+
+        _approve(_owner, _spender, _amount);
+
+        // Pass `_owner` at the end of the calldata
+        (bool success, bytes memory returnData) =
+            // solhint-disable-next-line avoid-low-level-calls
+            _callTo.call(abi.encodePacked(_callData, _owner));
+        require(success, "Unsuccessfull call");
+
+        return returnData;
+    }
+
     /***************************************
                     HELPERS
     ****************************************/
+
+    function _verify(
+        bytes32 _domainSeparator,
+        bytes32 _digest,
+        address _owner,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) internal view returns (bool) {
+        address signer = ecrecover(_toEIP712Digest(_domainSeparator, _digest), _v, _r, _s);
+        return signer != address(0) && signer == _owner;
+    }
 
     function _toEIP712Digest(bytes32 _domainSeparator, bytes32 _messageDigest)
         internal
@@ -172,25 +241,6 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
         returns (bytes32)
     {
         return keccak256(abi.encodePacked("\x19\x01", _domainSeparator, _messageDigest));
-    }
-
-    function _verify(
-        bytes32 _domainSeparator,
-        address _owner,
-        address _spender,
-        uint256 _amount,
-        uint256 _deadline,
-        uint8 _v,
-        bytes32 _r,
-        bytes32 _s
-    ) internal view returns (bool) {
-        bytes32 digest =
-            keccak256(
-                abi.encode(PERMIT_TYPEHASH, _owner, _spender, _amount, nonces[_owner], _deadline)
-            );
-
-        address signer = ecrecover(_toEIP712Digest(_domainSeparator, digest), _v, _r, _s);
-        return signer != address(0) && signer == _owner;
     }
 
     function _getChainId() internal pure returns (uint256 chainId) {

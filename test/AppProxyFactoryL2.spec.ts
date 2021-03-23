@@ -7,8 +7,8 @@ import type {
   AppPointsL2,
   AppProxyFactoryL2,
   PropsProtocol,
+  PropsTokenL2,
   Staking,
-  MockPropsToken,
 } from "../typechain";
 import {
   bn,
@@ -29,7 +29,7 @@ describe("AppProxyFactoryL2", () => {
   let appProxyFactoryBridge: SignerWithAddress;
   let mock: SignerWithAddress;
 
-  let propsToken: MockPropsToken;
+  let propsToken: PropsTokenL2;
   let appProxyFactory: AppProxyFactoryL2;
   let propsProtocol: PropsProtocol;
 
@@ -74,7 +74,7 @@ describe("AppProxyFactoryL2", () => {
       mock,
     ] = await ethers.getSigners();
 
-    propsToken = await deployContractUpgradeable("MockPropsToken", deployer, PROPS_TOKEN_AMOUNT);
+    propsToken = await deployContractUpgradeable("PropsTokenL2", deployer, deployer.address);
 
     propsProtocol = await deployContractUpgradeable(
       "PropsProtocol",
@@ -96,6 +96,10 @@ describe("AppProxyFactoryL2", () => {
       appPointsLogic.address,
       appPointsStakingLogic.address
     );
+
+    // Mint some Props tokens beforehand
+    await propsToken.connect(deployer).addMinter(deployer.address);
+    await propsToken.connect(deployer).mint(deployer.address, PROPS_TOKEN_AMOUNT);
 
     // Set needed parameters
     await appProxyFactory

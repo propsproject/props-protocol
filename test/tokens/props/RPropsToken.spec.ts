@@ -3,7 +3,7 @@ import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import { ethers } from "hardhat";
 
-import type { RPropsToken, Staking, MockPropsToken } from "../../../typechain";
+import type { RPropsToken, PropsTokenL2, Staking } from "../../../typechain";
 import {
   bn,
   daysToTimestamp,
@@ -22,7 +22,7 @@ describe("RPropsToken", () => {
   let alice: SignerWithAddress;
   let mock: SignerWithAddress;
 
-  let propsToken: MockPropsToken;
+  let propsToken: PropsTokenL2;
   let rPropsToken: RPropsToken;
   let propsAppStaking: Staking;
   let propsUserStaking: Staking;
@@ -36,7 +36,7 @@ describe("RPropsToken", () => {
   beforeEach(async () => {
     [deployer, controller, alice, mock] = await ethers.getSigners();
 
-    propsToken = await deployContractUpgradeable("MockPropsToken", deployer, PROPS_TOKEN_AMOUNT);
+    propsToken = await deployContractUpgradeable("PropsTokenL2", deployer, deployer.address);
 
     rPropsToken = await deployContractUpgradeable(
       "RPropsToken",
@@ -63,10 +63,14 @@ describe("RPropsToken", () => {
       DAILY_REWARDS_EMISSION
     );
 
+    // Mint some Props tokens beforehand
+    await propsToken.connect(deployer).addMinter(deployer.address);
+    await propsToken.connect(deployer).mint(deployer.address, PROPS_TOKEN_AMOUNT);
+
     // Set needed parameters
-    propsToken.connect(deployer).addMinter(rPropsToken.address);
-    rPropsToken.connect(controller).setPropsAppStaking(propsAppStaking.address);
-    rPropsToken.connect(controller).setPropsUserStaking(propsUserStaking.address);
+    await propsToken.connect(deployer).addMinter(rPropsToken.address);
+    await rPropsToken.connect(controller).setPropsAppStaking(propsAppStaking.address);
+    await rPropsToken.connect(controller).setPropsUserStaking(propsUserStaking.address);
   });
 
   it("distribute rewards to the app and user Props staking contracts", async () => {

@@ -621,6 +621,18 @@ contract PropsProtocol is
         override(ContextUpgradeable, MetaTransactionProvider)
         returns (address payable)
     {
+        // Allow `permitAndCall` calls from the Props token contract
+        if (msg.sender == propsToken) {
+            bytes memory array = msg.data;
+            uint256 index = msg.data.length;
+
+            address payable sender;
+            assembly {
+                // Load the 32 bytes word from memory with the address on the lower 20 bytes, and mask those
+                sender := and(mload(add(array, index)), 0xffffffffffffffffffffffffffffffffffffffff)
+            }
+            return sender;
+        }
         return MetaTransactionProvider._msgSender();
     }
 

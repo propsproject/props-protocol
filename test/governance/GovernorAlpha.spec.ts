@@ -9,9 +9,9 @@ import type {
   AppProxyFactoryL2,
   GovernorAlpha,
   PropsProtocol,
+  PropsTokenL2,
   SPropsToken,
   Staking,
-  MockPropsToken,
   Timelock,
 } from "../../typechain";
 import {
@@ -38,7 +38,7 @@ describe("GovernorAlpha", () => {
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
 
-  let propsToken: MockPropsToken;
+  let propsToken: PropsTokenL2;
   let sPropsToken: SPropsToken;
   let appProxyFactory: AppProxyFactoryL2;
   let propsProtocol: PropsProtocol;
@@ -100,7 +100,7 @@ describe("GovernorAlpha", () => {
       bob,
     ] = await ethers.getSigners();
 
-    propsToken = await deployContractUpgradeable("MockPropsToken", deployer, PROPS_TOKEN_AMOUNT);
+    propsToken = await deployContractUpgradeable("PropsTokenL2", deployer, deployer.address);
 
     propsProtocol = await deployContractUpgradeable(
       "PropsProtocol",
@@ -149,6 +149,10 @@ describe("GovernorAlpha", () => {
       appPointsLogic.address,
       appPointsStakingLogic.address
     );
+
+    // Mint some Props tokens beforehand
+    await propsToken.connect(deployer).addMinter(deployer.address);
+    await propsToken.connect(deployer).mint(deployer.address, PROPS_TOKEN_AMOUNT);
 
     // Set needed parameters
     await propsToken.connect(deployer).addMinter(rPropsToken.address);

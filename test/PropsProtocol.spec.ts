@@ -9,10 +9,10 @@ import type {
   AppPointsL2,
   AppProxyFactoryL2,
   PropsProtocol,
+  PropsTokenL2,
   RPropsToken,
   SPropsToken,
   Staking,
-  MockPropsToken,
 } from "../typechain";
 import {
   bn,
@@ -40,7 +40,7 @@ describe("PropsProtocol", () => {
   let bob: SignerWithAddress;
   let mock: SignerWithAddress;
 
-  let propsToken: MockPropsToken;
+  let propsToken: PropsTokenL2;
   let rPropsToken: RPropsToken;
   let sPropsToken: SPropsToken;
   let propsAppStaking: Staking;
@@ -100,7 +100,7 @@ describe("PropsProtocol", () => {
       mock,
     ] = await ethers.getSigners();
 
-    propsToken = await deployContractUpgradeable("MockPropsToken", deployer, PROPS_TOKEN_AMOUNT);
+    propsToken = await deployContractUpgradeable("PropsTokenL2", deployer, deployer.address);
 
     propsProtocol = await deployContractUpgradeable(
       "PropsProtocol",
@@ -149,6 +149,10 @@ describe("PropsProtocol", () => {
       appPointsLogic.address,
       appPointsStakingLogic.address
     );
+
+    // Mint some Props tokens beforehand
+    await propsToken.connect(deployer).addMinter(deployer.address);
+    await propsToken.connect(deployer).mint(deployer.address, PROPS_TOKEN_AMOUNT);
 
     // Set needed parameters
     await propsToken.connect(deployer).addMinter(rPropsToken.address);
@@ -1420,5 +1424,78 @@ describe("PropsProtocol", () => {
 
     // Check that the sProps previously staked on behalf of the app were re-staked
     expect(await propsAppStaking.balanceOf(appPoints.address)).to.eq(stakeAmount.div(2));
+  });
+
+  it("permit and stake within the same transaction", async () => {
+    const [appPoints, appPointsStaking] = await deployApp();
+    const stakeAmount = expandTo18Decimals(100);
+
+    const message = {
+      owner: alice.address,
+      spender: propsProtocol.address,
+      value: stakeAmount.toString(),
+      callTo: propsProtocol.address,
+      callData: propsProtocol.interface.encodeFunctionData("stake", [
+        [appPoints.address],
+        [stakeAmount],
+      ]),
+      nonce: (await propsToken.nonces(alice.address)).toNumber(),
+      deadline: (await now()).add(daysToTimestamp(1)).toString(),
+    };
+
+    const permitAndCallData = {
+      types: {
+        EIP712Domain: [
+          { name: "name", type: "string" },
+          { name: "version", type: "string" },
+          { name: "chainId", type: "uint256" },
+          { name: "verifyingContract", type: "address" },
+        ],
+        PermitAndCall: [
+          { name: "owner", type: "address" },
+          { name: "spender", type: "address" },
+          { name: "value", type: "uint256" },
+          { name: "callTo", type: "address" },
+          { name: "callData", type: "bytes" },
+          { name: "nonce", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+        ],
+      },
+      domain: {
+        name: await propsToken.name(),
+        version: "1",
+        verifyingContract: propsToken.address,
+        chainId: (await ethers.provider.getNetwork()).chainId,
+      },
+      primaryType: "PermitAndCall" as const,
+      message,
+    };
+
+    const permitAndCallSig = ethUtil.fromRpcSig(
+      sigUtil.signTypedData_v4(getPrivateKey(alice.address), { data: permitAndCallData })
+    );
+
+    // Permit and stake in a single transaction
+    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
+    await propsToken
+      // Since this works by checking the signature, the transaction can be relayed by anyone
+      .connect(bob)
+      .permitAndCall(
+        message.owner,
+        message.spender,
+        message.value,
+        message.callTo,
+        message.callData,
+        message.deadline,
+        permitAndCallSig.v,
+        permitAndCallSig.r,
+        permitAndCallSig.s
+      );
+
+    // Check the sProps balance and staked amounts
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(stakeAmount);
+    expect(await appPointsStaking.balanceOf(alice.address)).to.eq(stakeAmount);
+    expect(await propsAppStaking.balanceOf(appPoints.address)).to.eq(stakeAmount);
+    expect(await propsUserStaking.balanceOf(alice.address)).to.eq(stakeAmount);
   });
 });
