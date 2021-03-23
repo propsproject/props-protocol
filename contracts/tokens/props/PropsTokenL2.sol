@@ -230,7 +230,7 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
         uint8 _v,
         bytes32 _r,
         bytes32 _s
-    ) internal view returns (bool) {
+    ) internal pure returns (bool) {
         address signer = ecrecover(_toEIP712Digest(_domainSeparator, _digest), _v, _r, _s);
         return signer != address(0) && signer == _owner;
     }
