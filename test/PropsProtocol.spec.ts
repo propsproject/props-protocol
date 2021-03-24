@@ -797,7 +797,7 @@ describe("PropsProtocol", () => {
     const earned = await appPointsStaking.earned(alice.address);
 
     // Claim app points rewards
-    await propsProtocol.connect(alice).claimAppPointsRewards(appPoints.address);
+    await propsProtocol.connect(alice).claimAppPointsRewards([appPoints.address]);
 
     // Ensure results are within .01%
     const inWallet = await appPoints.balanceOf(alice.address);

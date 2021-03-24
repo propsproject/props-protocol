@@ -477,16 +477,20 @@ contract PropsProtocol is
 
     /**
      * @dev Allow users to claim their app points rewards.
-     * @param _app The app to claim the app points rewards of
+     * @param _apps Array of apps to claim the app points rewards of
      */
-    function claimAppPointsRewards(address _app) external validApp(_app) whenNotPaused {
-        // Claim the rewards and transfer them to the user's wallet
-        uint256 reward = IStaking(appPointsStaking[_app]).earned(_msgSender());
-        if (reward > 0) {
-            IStaking(appPointsStaking[_app]).claimReward(_msgSender());
-            IERC20Upgradeable(_app).safeTransfer(_msgSender(), reward);
+    function claimAppPointsRewards(address[] memory _apps) external whenNotPaused {
+        for (uint256 i = 0; i < _apps.length; i++) {
+            require(appPointsStaking[_apps[i]] != address(0), "Invalid app");
 
-            emit AppPointsRewardsClaimed(_app, _msgSender(), reward);
+            // Claim the rewards and transfer them to the user's wallet
+            uint256 reward = IStaking(appPointsStaking[_apps[i]]).earned(_msgSender());
+            if (reward > 0) {
+                IStaking(appPointsStaking[_apps[i]]).claimReward(_msgSender());
+                IERC20Upgradeable(_apps[i]).safeTransfer(_msgSender(), reward);
+
+                emit AppPointsRewardsClaimed(_apps[i], _msgSender(), reward);
+            }
         }
     }
 
