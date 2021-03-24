@@ -4,4 +4,4 @@
 [submodule "props-token-distribution"]
 	path = props-token-distribution
 	url = https://github.com/propsproject/props-token-distribution.git
-  branch = feature/add-permit-and-transfer-contract-funds
+  branch = feature/upgrade-for-props-protocol-staking
