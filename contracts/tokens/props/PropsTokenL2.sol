@@ -171,6 +171,21 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
         _approve(_owner, _spender, _amount);
     }
 
+    /**
+     * @dev Allows for approving tokens and calling an external contract in a
+     *      single transaction. The called contract must support have support
+     *      for a custom calldata format (with the sender of the transaction
+     *      appended at the end of the calldata).
+     * @param _owner The approver of the tokens
+     * @param _spender The spender of the tokens
+     * @param _amount Approved amount
+     * @param _callTo Contract address to call
+     * @param _callData Calldata of the contract call
+     * @param _deadline Approval deadline
+     * @param _v Part of signature
+     * @param _r Part of signature
+     * @param _s Part of signature
+     */
     function permitAndCall(
         address _owner,
         address _spender,
