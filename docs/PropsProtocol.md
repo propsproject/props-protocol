@@ -68,10 +68,10 @@ function stakeRewardsAsDelegate(
 
 ##### Claim AppPoints rewards
 
-Allow users to claim their AppPoints rewards from any given app token. The claimed AppPoints tokens will get transferred from the AppPoints staking contract to the user's wallet.
+Allow users to claim their AppPoints rewards from any given apps. The claimed AppPoints tokens will get transferred from the AppPoints staking contract to the user's wallet.
 
 ```solidity
-function claimAppPointsRewards(address _app)
+function claimAppPointsRewards(address[] _app)
 ```
 
 ##### Claim app Props rewards
