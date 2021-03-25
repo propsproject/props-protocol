@@ -89,7 +89,8 @@ abstract contract MetaTransactionProvider is Initializable {
             )
         );
 
-        META_TRANSACTION_TYPEHASH = 0x7711d7a2f53160a6cdce3fa7984799eba474a9075435604e9cc927b3c4ce0b0f; // keccak256("MetaTransaction(uint256 nonce,address from,bytes callData,uint256 deadline)")
+        // keccak256("MetaTransaction(uint256 nonce,address from,bytes callData,uint256 deadline)")
+        META_TRANSACTION_TYPEHASH = 0x7711d7a2f53160a6cdce3fa7984799eba474a9075435604e9cc927b3c4ce0b0f;
     }
 
     /**
