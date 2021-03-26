@@ -4,6 +4,7 @@ import { ethers } from "hardhat";
 import type { AppProxyFactoryL1 } from "../../typechain";
 
 async function main() {
+  // TODO: Add support for Gnosis Safe
   const owner = new ethers.Wallet(`${process.env.OWNER_PRIVATE_KEY}`).connect(ethers.provider);
 
   const l1Addresses = JSON.parse(

@@ -4,6 +4,7 @@ import { ethers } from "hardhat";
 import type { PropsProtocol } from "../../typechain";
 
 async function main() {
+  // TODO: Add support for Gnosis Safe
   const controller = new ethers.Wallet(`${process.env.CONTROLLER_PRIVATE_KEY}`).connect(
     ethers.provider
   );
