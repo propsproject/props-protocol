@@ -1,0 +1,14 @@
+[
+  {
+    "propsToken": "0x48987E8B356e0dE474ddE9Bc10541F8106C88A23",
+    "propsProtocol": "0x8cD2A62524e6bCb001F858a52fD2dBb31D223f94",
+    "rPropsToken": "0xA2367b4F1963B533E9839B549EC008BE63A1B78c",
+    "sPropsToken": "0x7ff0E3229fdFb484Df3c75b85fbD89e51021F619",
+    "propsAppStaking": "0x297BF404B474EE83af7C43E40A2260F5a23039e5",
+    "propsUserStaking": "0x55D012CE7fA7a9e1B5bC26d1086b63e9f7101dCe",
+    "appPointsLogic": "0x5d0AECFdDe805C82a6a18DB934E67E9D49a16e68",
+    "appPointsStakingLogic": "0x7a652687E2f9167cdC9831C0f9B5C3Ff5E5Bc5C7",
+    "appProxyFactory": "0xd20BFB345b9880b41627d2043c28A0AEa504eb84",
+    "appProxyFactoryBridge": "0x1352daDc7FfaeD159ccE59482021144331759186"
+  }
+]
