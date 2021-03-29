@@ -77,7 +77,7 @@ describe("PropsProtocol", () => {
     ) as AppPointsL2;
 
     // Mint to the app owner (workaround for having to move app points tokens across the bridge)
-    await appPoints.connect(appOwner).addMinter(appOwner.address);
+    await appPoints.connect(appOwner).setMinter(appOwner.address);
     await appPoints.connect(appOwner).mint(appOwner.address, APP_POINTS_TOKEN_AMOUNT);
 
     await propsProtocol.connect(controller).updateAppWhitelist(appPointsAddress, true);

@@ -65,7 +65,8 @@ abstract contract AppPointsCommon is
         PausableUpgradeable.__Pausable_init();
         ERC20Upgradeable.__ERC20_init(_name, _symbol);
 
-        PERMIT_TYPEHASH = 0x6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c9; // keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
+        // keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
+        PERMIT_TYPEHASH = 0x6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c9;
     }
 
     /***************************************

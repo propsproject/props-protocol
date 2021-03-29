@@ -42,20 +42,12 @@ Update the IPFS hash pointing to the app's info. Each app can have optional info
 function changeAppInfo(bytes _appInfo)
 ```
 
-##### Add minter
+##### Set minter
 
-Grant minting permissions to an address. The intended role of this function is to allow AppPoints tokens to be ported over from L1 to L2 and back (the bridge must be granted permissions to mint tokens, on L2, if it detects L1 bridge deposits).
-
-```solidity
-function addMinter(address _minter)
-```
-
-##### Remove minter
-
-Remove minting permissions from an address.
+Set the minter address. The intended role of this function is to allow AppPoints tokens to be ported over from L1 to L2 and back (the bridge must be granted permissions to mint tokens, on L2, if it detects L1 bridge deposits).
 
 ```solidity
-function removeMinter(address _minter)
+function setMinter(address _minter)
 ```
 
 The following functions are available on both the L1 and L2 variants of AppPoints tokens:

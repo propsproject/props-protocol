@@ -124,32 +124,29 @@ describe("AppPointsL2", () => {
     expect(await appPoints.appInfo()).to.eq("0x99");
   });
 
-  it("minters can mint/burn", async () => {
-    // Only the app owner can add new minters
-    await expect(appPoints.connect(alice).addMinter(minter.address)).to.be.revertedWith(
+  it("minter can mint/burn", async () => {
+    // Only the app owner can set the minter
+    await expect(appPoints.connect(alice).setMinter(minter.address)).to.be.revertedWith(
       "Ownable: caller is not the owner"
     );
-    await appPoints.connect(appOwner).addMinter(minter.address);
+    await appPoints.connect(appOwner).setMinter(minter.address);
 
-    // Only a minter can mint new tokens
+    // Only the minter can mint new tokens
     await expect(appPoints.connect(alice).mint(alice.address, bn(100))).to.be.revertedWith(
       "Unauthorized"
     );
     await appPoints.connect(minter).mint(alice.address, bn(100));
     expect(await appPoints.balanceOf(alice.address)).to.eq(bn(100));
 
-    // Only a minter can burn existing tokens
+    // Only the minter can burn existing tokens
     await expect(appPoints.connect(alice).burn(alice.address, bn(100))).to.be.revertedWith(
       "Unauthorized"
     );
     await appPoints.connect(minter).burn(alice.address, bn(100));
     expect(await appPoints.balanceOf(alice.address)).to.eq(bn(0));
 
-    // Only the app owner can remove existing minters
-    await expect(appPoints.connect(alice).removeMinter(minter.address)).to.be.revertedWith(
-      "Ownable: caller is not the owner"
-    );
-    await appPoints.connect(appOwner).removeMinter(minter.address);
+    // Remove the minter
+    await appPoints.connect(appOwner).setMinter("0x0000000000000000000000000000000000000000");
 
     // Once removed, a minter can no longer mint new tokens
     await expect(appPoints.connect(minter).mint(alice.address, bn(100))).to.be.revertedWith(

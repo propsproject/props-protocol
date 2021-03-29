@@ -16,8 +16,8 @@ contract AppPointsL2 is Initializable, AppPointsCommon {
                      FIELDS
     ****************************************/
 
-    // Set of addresses allowed to mint and burn (needed for bridging the tokens between L1 and L2)
-    mapping(address => bool) public isMinter;
+    // Address allowed to mint and burn (needed for bridging the tokens between L1 and L2)
+    address public minter;
 
     // IPFS hash pointing to app information
     bytes public appInfo;
@@ -91,16 +91,8 @@ contract AppPointsL2 is Initializable, AppPointsCommon {
      * @dev Give minting permissions to an address.
      * @param _minter The address to give minting permissions to
      */
-    function addMinter(address _minter) external onlyOwner {
-        isMinter[_minter] = true;
-    }
-
-    /**
-     * @dev Remove minting permissions from an address.
-     * @param _minter The address to remove minting permissions from
-     */
-    function removeMinter(address _minter) external onlyOwner {
-        isMinter[_minter] = false;
+    function setMinter(address _minter) external onlyOwner {
+        minter = _minter;
     }
 
     /***************************************
@@ -113,7 +105,7 @@ contract AppPointsL2 is Initializable, AppPointsCommon {
      * @param _amount The amount of tokens to mint
      */
     function mint(address _account, uint256 _amount) external {
-        require(isMinter[msg.sender], "Unauthorized");
+        require(msg.sender == minter, "Unauthorized");
         _mint(_account, _amount);
     }
 
@@ -123,7 +115,7 @@ contract AppPointsL2 is Initializable, AppPointsCommon {
      * @param _amount The amount of tokens to burn
      */
     function burn(address _account, uint256 _amount) external {
-        require(isMinter[msg.sender], "Unauthorized");
+        require(msg.sender == minter, "Unauthorized");
         _burn(_account, _amount);
     }
 
