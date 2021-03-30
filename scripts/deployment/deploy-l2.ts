@@ -192,45 +192,81 @@ async function main() {
         .then((tx) => tx.wait());
     }
 
-    // if (process.env.TEST) {
-    //   console.log("Permissioning controller as minter on `PropsTokenL2`");
-    //   propsToken = (await ethers.getContractFactory("PropsTokenL2", deployer)).attach(
-    //     l2Addresses["propsToken"]
-    //   ) as PropsTokenL2;
-    //   await propsToken
-    //     .connect(controller)
-    //     .addMinter(controller.address)
-    //     .then((tx) => tx.wait());
-
-    //   console.log("Minting Props tokens on L2");
-    //   await propsToken
-    //     .connect(controller)
-    //     .mint("0x6E4A0a74D85B7053176b3ad95358a3185190E4Dc", expandTo18Decimals(1000000))
-    //     .then((tx) => tx.wait());
-    //   await propsToken
-    //     .connect(controller)
-    //     .mint("0xA30C032f2995aCA0e180dd0D27f996c6f1662D7d", expandTo18Decimals(1000000))
-    //     .then((tx) => tx.wait());
-    //   await propsToken
-    //     .connect(controller)
-    //     .mint("0x064Ca8bD5Ca372D70AF0F6A61557c87027bd5c2b", expandTo18Decimals(1000000))
-    //     .then((tx) => tx.wait());
-
-    //   console.log("Distributing Props rewards");
-    //   propsProtocol = (await ethers.getContractFactory("PropsProtocol", deployer)).attach(
-    //     l2Addresses["propsProtocol"]
-    //   ) as PropsProtocol;
-    //   await propsProtocol
-    //     .connect(controller)
-    //     .distributePropsRewards(expandTo18Decimals(100000000), bn(800000), bn(200000))
-    //     .then((tx) => tx.wait());
-
-    //   console.log("Whitelisting app");
-    //   await propsProtocol
-    //     .connect(controller)
-    //     .updateAppWhitelist("0x82e878a213dcd6c2daed2f39c52afcb7193598a9", true)
-    //     .then((tx) => tx.wait());
-    // }
+    if (process.env.TEST) {
+      // console.log("Permissioning controller as minter on `PropsTokenL2`");
+      // propsToken = (await ethers.getContractFactory("PropsTokenL2", deployer)).attach(
+      //   l2Addresses["propsToken"]
+      // ) as PropsTokenL2;
+      // await propsToken
+      //   .connect(controller)
+      //   .addMinter(controller.address)
+      //   .then((tx) => tx.wait());
+      // console.log("Minting Props tokens on L2");
+      // await propsToken
+      //   .connect(controller)
+      //   .mint("0x6E4A0a74D85B7053176b3ad95358a3185190E4Dc", expandTo18Decimals(1000000))
+      //   .then((tx) => tx.wait());
+      // await propsToken
+      //   .connect(controller)
+      //   .mint("0xA30C032f2995aCA0e180dd0D27f996c6f1662D7d", expandTo18Decimals(1000000))
+      //   .then((tx) => tx.wait());
+      // await propsToken
+      //   .connect(controller)
+      //   .mint("0x064Ca8bD5Ca372D70AF0F6A61557c87027bd5c2b", expandTo18Decimals(1000000))
+      //   .then((tx) => tx.wait());
+      // await propsToken
+      //   .connect(controller)
+      //   .mint("0xACC92F8a8236971B83477315068702dC687d5D55", expandTo18Decimals(1000000))
+      //   .then((tx) => tx.wait());
+      // await propsToken
+      //   .connect(controller)
+      //   .mint("0xf18E1378Ff4ec37e7d1eD3aDa9912f24527D24fA", expandTo18Decimals(1000000))
+      //   .then((tx) => tx.wait());
+      // console.log("Distributing Props rewards");
+      // propsProtocol = (await ethers.getContractFactory("PropsProtocol", deployer)).attach(
+      //   l2Addresses["propsProtocol"]
+      // ) as PropsProtocol;
+      // await propsProtocol
+      //   .connect(controller)
+      //   .changeDailyUserRewardEmission(ethers.utils.parseEther("0.1").div(100))
+      //   .then((tx) => tx.wait());
+      // await propsProtocol
+      //   .connect(controller)
+      //   .distributePropsRewards(expandTo18Decimals(100000000), bn(200000), bn(800000))
+      //   .then((tx) => tx.wait());
+      // console.log("Whitelisting apps");
+      // await propsProtocol
+      //   .connect(controller)
+      //   .updateAppWhitelist("0xad87aa0a38028945afb6bd7d9a36f451e392e613", true)
+      //   .then((tx) => tx.wait());
+      // await propsProtocol
+      //   .connect(controller)
+      //   .updateAppWhitelist("0x48d1f1a747a82a229f53ff79ecdfc0de84f51892", true)
+      //   .then((tx) => tx.wait());
+      // await propsProtocol
+      //   .connect(controller)
+      //   .updateAppWhitelist("0x163fbbcca1f8e8aeca3982d5df8b8fc073a9be6a", true)
+      //   .then((tx) => tx.wait());
+      // console.log("Minting AppPoints");
+      // const appPoints = (await ethers.getContractFactory("AppPointsL2", deployer)).attach(
+      //   "0xad87aa0a38028945afb6bd7d9a36f451e392e613"
+      // ) as AppPointsL2;
+      // await appPoints
+      //   .connect(controller)
+      //   .setMinter(controller.address)
+      //   .then((tx) => tx.wait());
+      // await appPoints
+      //   .connect(controller)
+      //   .mint("0xf47c22e3226b6d1e6efbfdca4fa3376c6602e478", expandTo18Decimals(100000000))
+      //   .then((tx) => tx.wait());
+      // const appPointsStaking = (await ethers.getContractFactory("Staking", deployer)).attach(
+      //   "0xf47c22e3226b6d1e6efbfdca4fa3376c6602e478"
+      // ) as Staking;
+      // await appPointsStaking
+      //   .connect(controller)
+      //   .notifyRewardAmount(expandTo18Decimals(100000000))
+      //   .then((tx) => tx.wait());
+    }
   }
 }
 
