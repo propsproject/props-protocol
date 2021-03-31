@@ -56,7 +56,7 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
 
         // The root chain id must correspond to the chain id of the underlying root Ethereum network (either mainnet or testnet)
         // This way, users won't have to change networks in order to be able to sign transactions
-        ROOT_CHAIN_ID = 1;
+        ROOT_CHAIN_ID = 5;
 
         DOMAIN_SEPARATOR_L1 = keccak256(
             abi.encode(
@@ -120,14 +120,49 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
         _mint(_account, _amount);
     }
 
+    /***************************************
+                 BRIDGE ACTIONS
+    ****************************************/
+
     /**
-     * @dev Burn existing tokens of an account.
-     * @param _account The address to burn from
-     * @param _amount The amount of tokens to burn
+     * @dev Deposit tokens from L1.
+     * @param _account The address to deposit to
+     * @param _data Deposit data
      */
-    function burn(address _account, uint256 _amount) external override {
+    function deposit(address _account, bytes calldata _data) external {
         require(isMinter[msg.sender], "Unauthorized");
-        _burn(_account, _amount);
+        _mint(_account, abi.decode(_data, (uint256)));
+    }
+
+    /**
+     * @dev Withdraw tokens to L1.
+     * @param _amount The amount of tokens to withdraw
+     */
+    function withdraw(uint256 _amount) external {
+        _burn(msg.sender, _amount);
+    }
+
+    /**
+     * @dev Same as `withdraw`, but uses a permit for allowing an
+     *      external address to withdraw on behalf of the owner.
+     */
+    function withdrawWithPermit(
+        address _owner,
+        address _spender,
+        uint256 _amount,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external {
+        require(_spender == address(this), "Wrong permit");
+
+        // We only use the permit as a meta-transaction feature
+        permit(_owner, _spender, _amount, _deadline, _v, _r, _s);
+        // So we don't want the approval to persist
+        _approve(_owner, _spender, 0);
+
+        _burn(_owner, _amount);
     }
 
     /***************************************
@@ -152,7 +187,7 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
         uint8 _v,
         bytes32 _r,
         bytes32 _s
-    ) external override {
+    ) public override {
         require(_deadline >= block.timestamp, "Permit expired");
 
         bytes32 digest =

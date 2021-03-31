@@ -76,9 +76,14 @@ describe("PropsProtocol", () => {
       appPointsAddress
     ) as AppPointsL2;
 
-    // Mint to the app owner (workaround for having to move app points tokens across the bridge)
+    // Mimick cross-chain deposit
     await appPoints.connect(appOwner).setMinter(appOwner.address);
-    await appPoints.connect(appOwner).mint(appOwner.address, APP_POINTS_TOKEN_AMOUNT);
+    await appPoints
+      .connect(appOwner)
+      .deposit(
+        appOwner.address,
+        new ethers.utils.AbiCoder().encode(["uint256"], [APP_POINTS_TOKEN_AMOUNT])
+      );
 
     await propsProtocol.connect(controller).updateAppWhitelist(appPointsAddress, true);
 

@@ -16,7 +16,7 @@ contract AppPointsL2 is Initializable, AppPointsCommon {
                      FIELDS
     ****************************************/
 
-    // Address allowed to mint and burn (needed for bridging the tokens between L1 and L2)
+    // Address allowed to mint (needed for bridging tokens from L1)
     address public minter;
 
     // IPFS hash pointing to app information
@@ -96,27 +96,48 @@ contract AppPointsL2 is Initializable, AppPointsCommon {
     }
 
     /***************************************
-                 MINTER ACTIONS
+                 BRIDGE ACTIONS
     ****************************************/
 
     /**
-     * @dev Mint new tokens to an account.
-     * @param _account The address to mint to
-     * @param _amount The amount of tokens to mint
+     * @dev Deposit tokens from L1.
+     * @param _account The address to deposit to
+     * @param _data Deposit data
      */
-    function mint(address _account, uint256 _amount) external {
+    function deposit(address _account, bytes calldata _data) external {
         require(msg.sender == minter, "Unauthorized");
-        _mint(_account, _amount);
+        _mint(_account, abi.decode(_data, (uint256)));
     }
 
     /**
-     * @dev Burn existing tokens of an account.
-     * @param _account The address to burn from
-     * @param _amount The amount of tokens to burn
+     * @dev Withdraw tokens to L1.
+     * @param _amount The amount of tokens to withdraw
      */
-    function burn(address _account, uint256 _amount) external {
-        require(msg.sender == minter, "Unauthorized");
-        _burn(_account, _amount);
+    function withdraw(uint256 _amount) external {
+        _burn(msg.sender, _amount);
+    }
+
+    /**
+     * @dev Same as `withdraw`, but uses a permit for allowing an
+     *      external address to withdraw on behalf of the owner.
+     */
+    function withdrawWithPermit(
+        address _owner,
+        address _spender,
+        uint256 _amount,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external {
+        require(_spender == address(this), "Wrong permit");
+
+        // We only use the permit as a meta-transaction feature
+        permit(_owner, _spender, _amount, _deadline, _v, _r, _s);
+        // So we don't want the approval to persist
+        _approve(_owner, _spender, 0);
+
+        _burn(_owner, _amount);
     }
 
     /***************************************

@@ -5,8 +5,6 @@ pragma solidity 0.7.3;
 interface IPropsTokenL2 {
     function mint(address _account, uint256 _amount) external;
 
-    function burn(address _account, uint256 _amount) external;
-
     function permit(
         address _owner,
         address _spender,

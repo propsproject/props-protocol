@@ -136,7 +136,7 @@ abstract contract AppPointsCommon is
         uint8 _v,
         bytes32 _r,
         bytes32 _s
-    ) external {
+    ) public {
         require(_deadline >= block.timestamp, "Permit expired");
         require(
             verifyPermitSignature(_owner, _spender, _amount, _deadline, _v, _r, _s),
