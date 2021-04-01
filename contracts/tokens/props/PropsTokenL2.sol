@@ -56,7 +56,7 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
 
         // The root chain id must correspond to the chain id of the underlying root Ethereum network (either mainnet or testnet)
         // This way, users won't have to change networks in order to be able to sign transactions
-        ROOT_CHAIN_ID = 5;
+        ROOT_CHAIN_ID = 1;
 
         DOMAIN_SEPARATOR_L1 = keccak256(
             abi.encode(

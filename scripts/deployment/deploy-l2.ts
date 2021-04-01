@@ -193,6 +193,37 @@ async function main() {
     }
 
     if (process.env.TEST) {
+      // // You can also pull in your JSON ABI; I'm not sure of the structure inside artifacts
+      // let abi = [
+      //   "event Staked(address indexed app,address indexed account,int256 amount,bool rewards)",
+      // ];
+      // let iface = new ethers.utils.Interface(abi);
+      // var logPromise = ethers.provider.getLogs({
+      //   address: l2Addresses["propsProtocol"],
+      //   fromBlock: 0,
+      // });
+      // await logPromise
+      //   .then(function (logs) {
+      //     const stakedEvents: any = [];
+      //     logs.forEach((log) => {
+      //       try {
+      //         const parsedLog = iface.parseLog(log);
+      //         if (
+      //           parsedLog.args[1].toLowerCase() === "0xacc92f8a8236971b83477315068702dc687d5d55"
+      //         ) {
+      //           stakedEvents.push({
+      //             app: parsedLog.args[0],
+      //             account: parsedLog.args[1],
+      //             amount: ethers.utils.formatEther(parsedLog.args[2]),
+      //           });
+      //         }
+      //       } catch {}
+      //     });
+      //     console.log(stakedEvents);
+      //   })
+      //   .catch(function (err) {
+      //     console.log(err);
+      //   });
       // console.log("Permissioning controller as minter on `PropsTokenL2`");
       // propsToken = (await ethers.getContractFactory("PropsTokenL2", deployer)).attach(
       //   l2Addresses["propsToken"]
@@ -249,23 +280,32 @@ async function main() {
       //   .then((tx) => tx.wait());
       // console.log("Minting AppPoints");
       // const appPoints = (await ethers.getContractFactory("AppPointsL2", deployer)).attach(
-      //   "0xad87aa0a38028945afb6bd7d9a36f451e392e613"
+      //   "0x48d1f1a747a82A229f53FF79eCDfc0De84F51892"
       // ) as AppPointsL2;
       // await appPoints
       //   .connect(controller)
       //   .setMinter(controller.address)
       //   .then((tx) => tx.wait());
-      // await appPoints
-      //   .connect(controller)
-      //   .mint("0xf47c22e3226b6d1e6efbfdca4fa3376c6602e478", expandTo18Decimals(100000000))
+      // console.log("Set minter");
+      // const iface = new ethers.utils.Interface(["function mint(address,uint256)"]);
+      // await controller
+      //   .sendTransaction({
+      //     to: appPoints.address,
+      //     data: iface.encodeFunctionData("mint", [
+      //       "0xebcccda2d255bc3b1aa6240cac01d6c47ac95550",
+      //       expandTo18Decimals(100000000),
+      //     ]),
+      //   })
       //   .then((tx) => tx.wait());
+      // console.log("Deposit");
       // const appPointsStaking = (await ethers.getContractFactory("Staking", deployer)).attach(
-      //   "0xf47c22e3226b6d1e6efbfdca4fa3376c6602e478"
+      //   "0xebcccda2d255bc3b1aa6240cac01d6c47ac95550"
       // ) as Staking;
       // await appPointsStaking
       //   .connect(controller)
       //   .notifyRewardAmount(expandTo18Decimals(100000000))
       //   .then((tx) => tx.wait());
+      // console.log("Distribute rewards");
     }
   }
 }
