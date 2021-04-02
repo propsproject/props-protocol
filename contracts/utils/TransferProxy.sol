@@ -31,7 +31,6 @@ contract TransferProxy {
      */
     function transferWithPermit(
         address _token,
-        address _recipient,
         address _owner,
         address _spender,
         uint256 _amount,
@@ -41,7 +40,6 @@ contract TransferProxy {
         bytes32 _s
     ) external {
         IPermit(_token).permit(_owner, _spender, _amount, _deadline, _v, _r, _s);
-        IERC20Upgradeable(_token).safeTransferFrom(_owner, address(this), _amount);
-        IERC20Upgradeable(_token).safeTransfer(_recipient, _amount);
+        IERC20Upgradeable(_token).safeTransferFrom(_owner, _spender, _amount);
     }
 }
