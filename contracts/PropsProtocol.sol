@@ -91,6 +91,12 @@ contract PropsProtocol is
                      EVENTS
     ***************************************/
 
+    event AccountDataUpdated(
+        address indexed account,
+        uint256 totalPrincipalStaked,
+        uint256 totalRewardsStaked
+    );
+    event AppDataUpdated(address indexed app, uint256 totalStaked);
     event AppPointsRewardsClaimed(address indexed app, address indexed account, uint256 amount);
     event AppWhitelistUpdated(address indexed app, bool status);
     event DelegateChanged(address indexed delegator, address indexed delegatee);
@@ -693,6 +699,14 @@ contract PropsProtocol is
             totalRewardsStaked[_account] = totalRewardsStaked[_account].add(_amount);
         }
 
+        emit AppDataUpdated(_app, appStakes[_app]);
+        if (_mode != StakeMode.Reallocation) {
+            emit AccountDataUpdated(
+                _account,
+                totalPrincipalStaked[_account],
+                totalRewardsStaked[_account]
+            );
+        }
         emit StakeUpdated(_app, _account, IStaking(appPointsStaking[_app]).balanceOf(_account));
     }
 
@@ -730,6 +744,14 @@ contract PropsProtocol is
             totalRewardsStaked[_account] = totalRewardsStaked[_account].sub(_amount);
         }
 
+        emit AppDataUpdated(_app, appStakes[_app]);
+        if (_mode != StakeMode.Reallocation) {
+            emit AccountDataUpdated(
+                _account,
+                totalPrincipalStaked[_account],
+                totalRewardsStaked[_account]
+            );
+        }
         emit StakeUpdated(_app, _account, IStaking(appPointsStaking[_app]).balanceOf(_account));
     }
 
