@@ -448,15 +448,10 @@ contract PropsProtocol is
     /**
      * @dev Reallocate existing stake between apps.
      * @param _apps Array of apps to reallocate the stake of
-     * @param _unstakeAmounts Array of amounts to unstake from each app
-     * @param _stakeAmounts Array of amounts to stake to each app
+     * @param _reallocations Array of reallocations for each of the given apps
      */
-    function reallocateStakes(
-        address[] calldata _apps,
-        uint256[] calldata _unstakeAmounts,
-        uint256[] calldata _stakeAmounts
-    ) external {
-        _reallocateStakes(_apps, _unstakeAmounts, _stakeAmounts, _msgSender());
+    function reallocateStakes(address[] calldata _apps, int256[] calldata _reallocations) external {
+        _reallocateStakes(_apps, _reallocations, _msgSender());
     }
 
     /**
@@ -464,11 +459,10 @@ contract PropsProtocol is
      */
     function reallocateStakesAsDelegate(
         address[] calldata _apps,
-        uint256[] calldata _unstakeAmounts,
-        uint256[] calldata _stakeAmounts,
+        int256[] calldata _reallocations,
         address _account
     ) external only(delegatee[_account]) {
-        _reallocateStakes(_apps, _unstakeAmounts, _stakeAmounts, _account);
+        _reallocateStakes(_apps, _reallocations, _account);
     }
 
     /**
@@ -757,34 +751,42 @@ contract PropsProtocol is
 
     function _reallocateStakes(
         address[] memory _apps,
-        uint256[] memory _unstakeAmounts,
-        uint256[] memory _stakeAmounts,
+        int256[] calldata _reallocations,
         address _account
     ) internal {
-        require(_apps.length == _unstakeAmounts.length, "Invalid input");
-        require(_apps.length == _stakeAmounts.length, "Invalid input");
+        require(_apps.length == _reallocations.length, "Invalid input");
 
         // In a reallocation, the the total staked amount must remain constant
-        // That is, no new stake can be added and no existing stake can get withdrawn
+        // That is, no new stake can be added and no existing stake can be withdrawn
         uint256 totalUnstakedAmount = 0;
         uint256 totalStakedAmount = 0;
         for (uint256 i = 0; i < _apps.length; i++) {
-            totalUnstakedAmount = totalUnstakedAmount.add(_unstakeAmounts[i]);
-            totalStakedAmount = totalStakedAmount.add(_stakeAmounts[i]);
+            if (_reallocations[i] < 0) {
+                totalUnstakedAmount = totalUnstakedAmount.add(
+                    uint256(SignedSafeMathUpgradeable.mul(_reallocations[i], -1))
+                );
+            } else {
+                totalStakedAmount = totalStakedAmount.add(uint256(_reallocations[i]));
+            }
         }
         require(totalStakedAmount == totalUnstakedAmount, "Invalid reallocation");
 
         // First, handle the unstakes to free funds that might be needed
         for (uint256 i = 0; i < _apps.length; i++) {
-            if (_unstakeAmounts[i] > 0) {
-                _unstake(_apps[i], _unstakeAmounts[i], _account, StakeMode.Reallocation);
+            if (_reallocations[i] < 0) {
+                _unstake(
+                    _apps[i],
+                    uint256(SignedSafeMathUpgradeable.mul(_reallocations[i], -1)),
+                    _account,
+                    StakeMode.Reallocation
+                );
             }
         }
 
         // Then, handle the stakes
         for (uint256 i = 0; i < _apps.length; i++) {
-            if (_stakeAmounts[i] > 0) {
-                _stake(_apps[i], _stakeAmounts[i], _account, StakeMode.Reallocation);
+            if (_reallocations[i] > 0) {
+                _stake(_apps[i], uint256(_reallocations[i]), _account, StakeMode.Reallocation);
             }
         }
     }

@@ -683,8 +683,11 @@ describe("PropsProtocol", () => {
       .connect(alice)
       .reallocateStakes(
         [appPoints1.address, appPoints2.address, appPoints3.address],
-        [rewardsStakeAmount1, rewardsStakeAmount2, bn(0)],
-        [bn(0), rewardsStakeAmount1, rewardsStakeAmount2]
+        [
+          rewardsStakeAmount1.mul(-1),
+          rewardsStakeAmount1.sub(rewardsStakeAmount2),
+          rewardsStakeAmount2,
+        ]
       );
 
     // Check the total staked amounts
@@ -738,7 +741,6 @@ describe("PropsProtocol", () => {
         .connect(alice)
         .reallocateStakes(
           [appPoints1.address, appPoints2.address],
-          [bn(0), bn(0)],
           [stakeAmount1.add(bn(10)), stakeAmount2.add(bn(10))]
         )
     ).to.be.revertedWith("Invalid reallocation");
@@ -749,8 +751,7 @@ describe("PropsProtocol", () => {
         .connect(alice)
         .reallocateStakes(
           [appPoints1.address, appPoints2.address],
-          [stakeAmount1.add(bn(10)), stakeAmount2.add(bn(10))],
-          [bn(0), bn(0)]
+          [stakeAmount1.add(bn(-10)), stakeAmount2.add(bn(-10))]
         )
     ).to.be.revertedWith("Invalid reallocation");
   });
@@ -1138,8 +1139,7 @@ describe("PropsProtocol", () => {
       .connect(bob)
       .reallocateStakesAsDelegate(
         [appPoints1.address, appPoints2.address],
-        [expandTo18Decimals(20), bn(0)],
-        [bn(0), expandTo18Decimals(20)],
+        [expandTo18Decimals(-20), expandTo18Decimals(20)],
         alice.address
       );
 
@@ -1158,8 +1158,7 @@ describe("PropsProtocol", () => {
         .connect(bob)
         .reallocateStakesAsDelegate(
           [appPoints1.address, appPoints2.address],
-          [expandTo18Decimals(20), bn(0)],
-          [bn(0), expandTo18Decimals(20)],
+          [expandTo18Decimals(-20), expandTo18Decimals(20)],
           alice.address
         )
     ).to.be.revertedWith("Unauthorized");

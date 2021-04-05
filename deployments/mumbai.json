@@ -1,26 +1,14 @@
 [
   {
-    "propsToken": "0x48987E8B356e0dE474ddE9Bc10541F8106C88A23",
-    "propsProtocol": "0x8cD2A62524e6bCb001F858a52fD2dBb31D223f94",
-    "rPropsToken": "0xA2367b4F1963B533E9839B549EC008BE63A1B78c",
-    "sPropsToken": "0x7ff0E3229fdFb484Df3c75b85fbD89e51021F619",
-    "propsAppStaking": "0x297BF404B474EE83af7C43E40A2260F5a23039e5",
-    "propsUserStaking": "0x55D012CE7fA7a9e1B5bC26d1086b63e9f7101dCe",
-    "appPointsLogic": "0x5d0AECFdDe805C82a6a18DB934E67E9D49a16e68",
-    "appPointsStakingLogic": "0x7a652687E2f9167cdC9831C0f9B5C3Ff5E5Bc5C7",
-    "appProxyFactory": "0xd20BFB345b9880b41627d2043c28A0AEa504eb84",
-    "appProxyFactoryBridge": "0x1352daDc7FfaeD159ccE59482021144331759186"
-  },
-  {
-    "propsToken": "0x78E2dcD53603940d16A34C2464B24bcF447a565b",
-    "propsProtocol": "0x6ea00762a8C31B92E713Feb72a97075711c6Ebd9",
-    "rPropsToken": "0x5EF7e27214fF2EE0bCb67B8716Cfac3e62A0A42F",
-    "sPropsToken": "0xCB741b424384496a805FADa333592d7b8da47351",
-    "propsAppStaking": "0xde6CEDE80752C4bb6DE7b1fCF8148940562e07Cf",
-    "propsUserStaking": "0x6b22C5ee65Bde43C17bdCEc77379926b6bFF4792",
-    "appPointsLogic": "0xAbe3E51B63F510eeC3F77cEff85a6FA8588cE272",
-    "appPointsStakingLogic": "0xb9F137ff70333C13909482E7F67CdC16Fd9a6188",
-    "appProxyFactory": "0xE01382aa2f11Dd829D1Ca0404eb09b0267bf51a9",
-    "appProxyFactoryBridge": "0xfB8e3fbC95c7a60FF79800e6Ce2453Ca53cF0aE8"
+    "propsToken": "0x573Eb91bCa2D7bc7AFC9Feed6A3975c496b8ca39",
+    "propsProtocol": "0xafD81e1a28D6D8C810822f295511974C70923Fc7",
+    "rPropsToken": "0x59d68aEFB9385A922067D2A7aA0e8d668536079E",
+    "sPropsToken": "0x8e56FB073326315a697cf9333Df4C0de11e1c663",
+    "propsAppStaking": "0x9ebC1be722D082b08225e913585Ff2ed0955702E",
+    "propsUserStaking": "0x8aD5900688Ee97E9040d52322692518FF87c05c7",
+    "appPointsLogic": "0xAe7211fddBF329978F1880DF680e695a70f7A4bc",
+    "appPointsStakingLogic": "0x6C8AAF5A7f255fc463c2c09510CFdfb3087930Cf",
+    "appProxyFactory": "0x4663fb76C9E3A11d075d2d1596EEee39092bcdc9",
+    "appProxyFactoryBridge": "0xbF8446F61AFECF0924D4E73086612EBc881bbe91"
   }
 ]

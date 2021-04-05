@@ -193,119 +193,93 @@ async function main() {
     }
 
     if (process.env.TEST) {
-      // // You can also pull in your JSON ABI; I'm not sure of the structure inside artifacts
-      // let abi = [
-      //   "event Staked(address indexed app,address indexed account,int256 amount,bool rewards)",
-      // ];
-      // let iface = new ethers.utils.Interface(abi);
-      // var logPromise = ethers.provider.getLogs({
-      //   address: l2Addresses["propsProtocol"],
-      //   fromBlock: 0,
-      // });
-      // await logPromise
-      //   .then(function (logs) {
-      //     const stakedEvents: any = [];
-      //     logs.forEach((log) => {
-      //       try {
-      //         const parsedLog = iface.parseLog(log);
-      //         if (
-      //           parsedLog.args[1].toLowerCase() === "0xacc92f8a8236971b83477315068702dc687d5d55"
-      //         ) {
-      //           stakedEvents.push({
-      //             app: parsedLog.args[0],
-      //             account: parsedLog.args[1],
-      //             amount: ethers.utils.formatEther(parsedLog.args[2]),
-      //           });
-      //         }
-      //       } catch {}
-      //     });
-      //     console.log(stakedEvents);
-      //   })
-      //   .catch(function (err) {
-      //     console.log(err);
-      //   });
-      // console.log("Permissioning controller as minter on `PropsTokenL2`");
-      // propsToken = (await ethers.getContractFactory("PropsTokenL2", deployer)).attach(
-      //   l2Addresses["propsToken"]
-      // ) as PropsTokenL2;
-      // await propsToken
-      //   .connect(controller)
-      //   .addMinter(controller.address)
-      //   .then((tx) => tx.wait());
-      // console.log("Minting Props tokens on L2");
-      // await propsToken
-      //   .connect(controller)
-      //   .mint("0x6E4A0a74D85B7053176b3ad95358a3185190E4Dc", expandTo18Decimals(1000000))
-      //   .then((tx) => tx.wait());
-      // await propsToken
-      //   .connect(controller)
-      //   .mint("0xA30C032f2995aCA0e180dd0D27f996c6f1662D7d", expandTo18Decimals(1000000))
-      //   .then((tx) => tx.wait());
-      // await propsToken
-      //   .connect(controller)
-      //   .mint("0x064Ca8bD5Ca372D70AF0F6A61557c87027bd5c2b", expandTo18Decimals(1000000))
-      //   .then((tx) => tx.wait());
-      // await propsToken
-      //   .connect(controller)
-      //   .mint("0xACC92F8a8236971B83477315068702dC687d5D55", expandTo18Decimals(1000000))
-      //   .then((tx) => tx.wait());
-      // await propsToken
-      //   .connect(controller)
-      //   .mint("0xf18E1378Ff4ec37e7d1eD3aDa9912f24527D24fA", expandTo18Decimals(1000000))
-      //   .then((tx) => tx.wait());
-      // console.log("Distributing Props rewards");
-      // propsProtocol = (await ethers.getContractFactory("PropsProtocol", deployer)).attach(
-      //   l2Addresses["propsProtocol"]
-      // ) as PropsProtocol;
-      // await propsProtocol
-      //   .connect(controller)
-      //   .changeDailyUserRewardEmission(ethers.utils.parseEther("0.1").div(100))
-      //   .then((tx) => tx.wait());
-      // await propsProtocol
-      //   .connect(controller)
-      //   .distributePropsRewards(expandTo18Decimals(100000000), bn(200000), bn(800000))
-      //   .then((tx) => tx.wait());
-      // console.log("Whitelisting apps");
-      // await propsProtocol
-      //   .connect(controller)
-      //   .updateAppWhitelist("0xad87aa0a38028945afb6bd7d9a36f451e392e613", true)
-      //   .then((tx) => tx.wait());
-      // await propsProtocol
-      //   .connect(controller)
-      //   .updateAppWhitelist("0x48d1f1a747a82a229f53ff79ecdfc0de84f51892", true)
-      //   .then((tx) => tx.wait());
-      // await propsProtocol
-      //   .connect(controller)
-      //   .updateAppWhitelist("0x163fbbcca1f8e8aeca3982d5df8b8fc073a9be6a", true)
-      //   .then((tx) => tx.wait());
-      // console.log("Minting AppPoints");
-      // const appPoints = (await ethers.getContractFactory("AppPointsL2", deployer)).attach(
-      //   "0x48d1f1a747a82A229f53FF79eCDfc0De84F51892"
-      // ) as AppPointsL2;
-      // await appPoints
-      //   .connect(controller)
-      //   .setMinter(controller.address)
-      //   .then((tx) => tx.wait());
-      // console.log("Set minter");
-      // const iface = new ethers.utils.Interface(["function mint(address,uint256)"]);
-      // await controller
-      //   .sendTransaction({
-      //     to: appPoints.address,
-      //     data: iface.encodeFunctionData("mint", [
-      //       "0xebcccda2d255bc3b1aa6240cac01d6c47ac95550",
-      //       expandTo18Decimals(100000000),
-      //     ]),
-      //   })
-      //   .then((tx) => tx.wait());
-      // console.log("Deposit");
-      // const appPointsStaking = (await ethers.getContractFactory("Staking", deployer)).attach(
-      //   "0xebcccda2d255bc3b1aa6240cac01d6c47ac95550"
-      // ) as Staking;
-      // await appPointsStaking
-      //   .connect(controller)
-      //   .notifyRewardAmount(expandTo18Decimals(100000000))
-      //   .then((tx) => tx.wait());
-      // console.log("Distribute rewards");
+      console.log("Permissioning controller as minter on `PropsTokenL2`");
+      propsToken = (await ethers.getContractFactory("PropsTokenL2", deployer)).attach(
+        l2Addresses["propsToken"]
+      ) as PropsTokenL2;
+      await propsToken
+        .connect(controller)
+        .addMinter(controller.address)
+        .then((tx) => tx.wait());
+
+      console.log("Minting Props tokens on L2");
+      await propsToken
+        .connect(controller)
+        .mint("0x6E4A0a74D85B7053176b3ad95358a3185190E4Dc", expandTo18Decimals(1000000))
+        .then((tx) => tx.wait());
+      await propsToken
+        .connect(controller)
+        .mint("0xA30C032f2995aCA0e180dd0D27f996c6f1662D7d", expandTo18Decimals(1000000))
+        .then((tx) => tx.wait());
+      await propsToken
+        .connect(controller)
+        .mint("0xBaeC4F55b566D7743c83e4D6BFD78a0593ad8047", expandTo18Decimals(1000000))
+        .then((tx) => tx.wait());
+      await propsToken
+        .connect(controller)
+        .mint("0xACC92F8a8236971B83477315068702dC687d5D55", expandTo18Decimals(1000000))
+        .then((tx) => tx.wait());
+      await propsToken
+        .connect(controller)
+        .mint("0xf18E1378Ff4ec37e7d1eD3aDa9912f24527D24fA", expandTo18Decimals(1000000))
+        .then((tx) => tx.wait());
+      await propsToken
+        .connect(controller)
+        .mint("0x4De4279596Ba064fD30275C6982DCbf01bc79EeF", expandTo18Decimals(10000000))
+        .then((tx) => tx.wait());
+
+      console.log("Distributing Props rewards");
+      propsProtocol = (await ethers.getContractFactory("PropsProtocol", deployer)).attach(
+        l2Addresses["propsProtocol"]
+      ) as PropsProtocol;
+      await propsProtocol
+        .connect(controller)
+        .changeDailyUserRewardEmission(ethers.utils.parseEther("0.1").div(100))
+        .then((tx) => tx.wait());
+      await propsProtocol
+        .connect(controller)
+        .distributePropsRewards(expandTo18Decimals(100000000), bn(200000), bn(800000))
+        .then((tx) => tx.wait());
+
+      for (const [appPointsAddress, appPointsStakingAddress] of [
+        [
+          "0x5f473dabe0b31475607faf6c163bcf0b100f40a2",
+          "0x2c9aa8631e1610771afc0e7e2597e4c3875253b7",
+        ],
+        [
+          "0x8a513383b40fa5f26e2cfd9233046a94e5fa1ec0",
+          "0xf4a29b6064ad469a4c3ec02425929a97e8d30633",
+        ],
+        [
+          "0x9ba3f765eeded1a173e4302cb9b26ddb62f1b4af",
+          "0x6cce52a4d129034d24430e3c0d4d9a0acf12df45",
+        ],
+      ]) {
+        console.log("Minting AppPoints");
+        const appPoints = (await ethers.getContractFactory("AppPointsL2", deployer)).attach(
+          appPointsAddress
+        ) as AppPointsL2;
+        await appPoints
+          .connect(controller)
+          .setMinter(controller.address)
+          .then((tx) => tx.wait());
+        await appPoints
+          .connect(controller)
+          .deposit(
+            appPointsStakingAddress,
+            new ethers.utils.AbiCoder().encode(["uint256"], [expandTo18Decimals(100000000)])
+          )
+          .then((tx) => tx.wait());
+
+        console.log("Distributin AppPoints rewards");
+        const appPointsStaking = (await ethers.getContractFactory("Staking", deployer)).attach(
+          appPointsStakingAddress
+        ) as Staking;
+        await appPointsStaking
+          .connect(controller)
+          .notifyRewardAmount(expandTo18Decimals(100000000))
+          .then((tx) => tx.wait());
+      }
     }
   }
 }
