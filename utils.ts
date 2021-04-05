@@ -48,7 +48,7 @@ export const deployContractUpgradeable = async <T extends Contract>(
   return (await contractInstance.deployed()) as T;
 };
 
-// Retrieves an on-chain event"s parameters
+// Retrieves an event's parameters
 export const getEvents = async (
   txReceipt: ContractReceipt,
   eventSignature: string,

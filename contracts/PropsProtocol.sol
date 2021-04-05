@@ -377,35 +377,18 @@ contract PropsProtocol is
         require(_apps.length == _amounts.length, "Invalid input");
 
         for (uint256 i = 0; i < _apps.length; i++) {
-            // Transfer the needed Props from the sender
-            IERC20Upgradeable(propsToken).safeTransferFrom(
-                _msgSender(),
-                address(this),
-                _amounts[i]
-            );
+            if (_amounts[i] > 0) {
+                // Transfer the needed Props from the sender
+                IERC20Upgradeable(propsToken).safeTransferFrom(
+                    _msgSender(),
+                    address(this),
+                    _amounts[i]
+                );
 
-            // Do the actual stake on behalf of the given account
-            _stake(_apps[i], _amounts[i], _account, StakeMode.Principal);
+                // Do the actual stake on behalf of the given account
+                _stake(_apps[i], _amounts[i], _account, StakeMode.Principal);
+            }
         }
-    }
-
-    /**
-     * @dev Same as `stakeOnBehalf`, but uses a permit for approving Props transfers.
-     */
-    function stakeOnBehalfWithPermit(
-        address[] calldata _apps,
-        uint256[] calldata _amounts,
-        address _account,
-        address _owner,
-        address _spender,
-        uint256 _amount,
-        uint256 _deadline,
-        uint8 _v,
-        bytes32 _r,
-        bytes32 _s
-    ) external {
-        IPropsTokenL2(propsToken).permit(_owner, _spender, _amount, _deadline, _v, _r, _s);
-        stakeOnBehalf(_apps, _amounts, _account);
     }
 
     /**
@@ -417,34 +400,18 @@ contract PropsProtocol is
         require(_apps.length == _amounts.length, "Invalid input");
 
         for (uint256 i = 0; i < _apps.length; i++) {
-            // Transfer the needed Props from the sender
-            IERC20Upgradeable(propsToken).safeTransferFrom(
-                _msgSender(),
-                address(this),
-                _amounts[i]
-            );
+            if (_amounts[i] > 0) {
+                // Transfer the needed Props from the sender
+                IERC20Upgradeable(propsToken).safeTransferFrom(
+                    _msgSender(),
+                    address(this),
+                    _amounts[i]
+                );
 
-            // Do the actual stake
-            _stake(_apps[i], _amounts[i], _msgSender(), StakeMode.Principal);
+                // Do the actual stake
+                _stake(_apps[i], _amounts[i], _msgSender(), StakeMode.Principal);
+            }
         }
-    }
-
-    /**
-     * @dev Same as `stake`, but uses a permit for approving Props transfers.
-     */
-    function stakeWithPermit(
-        address[] calldata _apps,
-        uint256[] calldata _amounts,
-        address _owner,
-        address _spender,
-        uint256 _amount,
-        uint256 _deadline,
-        uint8 _v,
-        bytes32 _r,
-        bytes32 _s
-    ) external {
-        IPropsTokenL2(propsToken).permit(_owner, _spender, _amount, _deadline, _v, _r, _s);
-        stake(_apps, _amounts);
     }
 
     /**
@@ -456,11 +423,13 @@ contract PropsProtocol is
         require(_apps.length == _amounts.length, "Invalid input");
 
         for (uint256 i = 0; i < _apps.length; i++) {
-            // Get the needed Props from the sender's rewards escrow
-            rewardsEscrow[_msgSender()] = rewardsEscrow[_msgSender()].sub(_amounts[i]);
+            if (_amounts[i] > 0) {
+                // Get the needed Props from the sender's rewards escrow
+                rewardsEscrow[_msgSender()] = rewardsEscrow[_msgSender()].sub(_amounts[i]);
 
-            // Do the actual stake
-            _stake(_apps[i], _amounts[i], _msgSender(), StakeMode.Rewards);
+                // Do the actual stake
+                _stake(_apps[i], _amounts[i], _msgSender(), StakeMode.Rewards);
+            }
         }
 
         emit RewardsEscrowUpdated(
@@ -785,12 +754,16 @@ contract PropsProtocol is
 
         // First, handle the unstakes to free funds that might be needed
         for (uint256 i = 0; i < _apps.length; i++) {
-            _unstake(_apps[i], _unstakeAmounts[i], _account, StakeMode.Reallocation);
+            if (_unstakeAmounts[i] > 0) {
+                _unstake(_apps[i], _unstakeAmounts[i], _account, StakeMode.Reallocation);
+            }
         }
 
         // Then, handle the stakes
         for (uint256 i = 0; i < _apps.length; i++) {
-            _stake(_apps[i], _stakeAmounts[i], _account, StakeMode.Reallocation);
+            if (_stakeAmounts[i] > 0) {
+                _stake(_apps[i], _stakeAmounts[i], _account, StakeMode.Reallocation);
+            }
         }
     }
 
@@ -809,9 +782,6 @@ contract PropsProtocol is
             IRPropsToken(rPropsToken).swap(address(this));
 
             emit PropsRewardsClaimed(_account, reward, false);
-
-            // Place the rewards in the escrow but don't extend the cooldown period
-            rewardsEscrow[_account] = rewardsEscrow[_account].add(reward);
 
             // Calculate amounts from the given percentages
             uint256 totalPercentage = 0;
@@ -833,8 +803,9 @@ contract PropsProtocol is
 
             // Do the actual rewards stakes to apps
             for (uint256 i = 0; i < _apps.length; i++) {
-                rewardsEscrow[_account] = rewardsEscrow[_account].sub(amounts[i]);
-                _stake(_apps[i], amounts[i], _account, StakeMode.Rewards);
+                if (amounts[i] > 0) {
+                    _stake(_apps[i], amounts[i], _account, StakeMode.Rewards);
+                }
             }
 
             emit RewardsEscrowUpdated(

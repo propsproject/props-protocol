@@ -202,6 +202,12 @@ describe("PropsProtocol", () => {
       .connect(alice)
       .stakeOnBehalf([appPoints.address], [stakeAmount], bob.address);
 
+    // Check the total staked amounts
+    expect(await propsProtocol.totalPrincipalStaked(alice.address)).to.eq(bn(0));
+    expect(await propsProtocol.totalRewardsStaked(alice.address)).to.eq(bn(0));
+    expect(await propsProtocol.totalPrincipalStaked(bob.address)).to.eq(stakeAmount);
+    expect(await propsProtocol.totalRewardsStaked(bob.address)).to.eq(bn(0));
+
     // Check the sProps balance and staked amounts are all under Bob's ownership
     expect(await sPropsToken.balanceOf(bob.address)).to.eq(stakeAmount);
     expect(await appPointsStaking.balanceOf(bob.address)).to.eq(stakeAmount);
@@ -209,79 +215,6 @@ describe("PropsProtocol", () => {
     expect(await propsUserStaking.balanceOf(bob.address)).to.eq(stakeAmount);
 
     // Check Alice has nothing staked
-    expect(await sPropsToken.balanceOf(alice.address)).to.eq(bn(0));
-    expect(await appPointsStaking.balanceOf(alice.address)).to.eq(bn(0));
-    expect(await propsUserStaking.balanceOf(alice.address)).to.eq(bn(0));
-  });
-
-  it("stake on behalf with permit", async () => {
-    const [appPoints, appPointsStaking] = await deployApp();
-
-    const stakeAmount = expandTo18Decimals(100);
-
-    // Sign the permit
-    const permitMessage = {
-      owner: alice.address,
-      spender: propsProtocol.address,
-      value: stakeAmount.toString(),
-      nonce: (await propsToken.nonces(alice.address)).toString(),
-      deadline: (await now()).add(daysToTimestamp(1)).toString(),
-    };
-
-    const permitData = {
-      domain: {
-        chainId: (await ethers.provider.getNetwork()).chainId,
-        name: await propsToken.name(),
-        verifyingContract: propsToken.address,
-        version: "1",
-      },
-      message: permitMessage,
-      primaryType: "Permit" as const,
-      types: {
-        EIP712Domain: [
-          { name: "name", type: "string" },
-          { name: "version", type: "string" },
-          { name: "chainId", type: "uint256" },
-          { name: "verifyingContract", type: "address" },
-        ],
-        Permit: [
-          { name: "owner", type: "address" },
-          { name: "spender", type: "address" },
-          { name: "value", type: "uint256" },
-          { name: "nonce", type: "uint256" },
-          { name: "deadline", type: "uint256" },
-        ],
-      },
-    };
-
-    const permitSig = ethUtil.fromRpcSig(
-      sigUtil.signTypedData_v4(getPrivateKey(alice.address), { data: permitData })
-    );
-
-    // Stake on behalf with permit
-    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
-    await propsProtocol
-      .connect(alice)
-      .stakeOnBehalfWithPermit(
-        [appPoints.address],
-        [stakeAmount],
-        bob.address,
-        permitMessage.owner,
-        permitMessage.spender,
-        permitMessage.value,
-        permitMessage.deadline,
-        permitSig.v,
-        permitSig.r,
-        permitSig.s
-      );
-
-    // Check the sProps balance and staked amounts are all under Bob's ownership
-    expect(await sPropsToken.balanceOf(bob.address)).to.eq(stakeAmount);
-    expect(await appPointsStaking.balanceOf(bob.address)).to.eq(stakeAmount);
-    expect(await propsAppStaking.balanceOf(appPoints.address)).to.eq(stakeAmount);
-    expect(await propsUserStaking.balanceOf(bob.address)).to.eq(stakeAmount);
-
-    // Check that Alice has nothing staked
     expect(await sPropsToken.balanceOf(alice.address)).to.eq(bn(0));
     expect(await appPointsStaking.balanceOf(alice.address)).to.eq(bn(0));
     expect(await propsUserStaking.balanceOf(alice.address)).to.eq(bn(0));
@@ -300,6 +233,10 @@ describe("PropsProtocol", () => {
     await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
     await propsToken.connect(alice).approve(propsProtocol.address, stakeAmount);
     const tx = await propsProtocol.connect(alice).stake([appPoints.address], [stakeAmount]);
+
+    // Check the total staked amounts
+    expect(await propsProtocol.totalPrincipalStaked(alice.address)).to.eq(stakeAmount);
+    expect(await propsProtocol.totalRewardsStaked(alice.address)).to.eq(bn(0));
 
     // Check that a `StakeUpdated` event got emitted
     const [[app, account, amount]] = await getEvents(
@@ -339,6 +276,10 @@ describe("PropsProtocol", () => {
         [stakeAmount1, stakeAmount2, stakeAmount3]
       );
 
+    // Check the total staked amounts
+    expect(await propsProtocol.totalPrincipalStaked(alice.address)).to.eq(totalAmountStaked);
+    expect(await propsProtocol.totalRewardsStaked(alice.address)).to.eq(bn(0));
+
     // Check that several `StakeUpdated` events got emitted
     const events = await getEvents(
       await tx.wait(),
@@ -356,73 +297,6 @@ describe("PropsProtocol", () => {
     expect(await propsAppStaking.balanceOf(appPoints2.address)).to.eq(stakeAmount2);
     expect(await propsAppStaking.balanceOf(appPoints3.address)).to.eq(stakeAmount3);
     expect(await propsUserStaking.balanceOf(alice.address)).to.eq(totalAmountStaked);
-  });
-
-  it("principal stake with permit", async () => {
-    const [appPoints, appPointsStaking] = await deployApp();
-
-    const stakeAmount = expandTo18Decimals(100);
-
-    // Sign the permit
-    const permitMessage = {
-      owner: alice.address,
-      spender: propsProtocol.address,
-      value: stakeAmount.toString(),
-      nonce: (await propsToken.nonces(alice.address)).toString(),
-      deadline: (await now()).add(daysToTimestamp(1)).toString(),
-    };
-
-    const permitData = {
-      domain: {
-        chainId: (await ethers.provider.getNetwork()).chainId,
-        name: await propsToken.name(),
-        verifyingContract: propsToken.address,
-        version: "1",
-      },
-      message: permitMessage,
-      primaryType: "Permit" as const,
-      types: {
-        EIP712Domain: [
-          { name: "name", type: "string" },
-          { name: "version", type: "string" },
-          { name: "chainId", type: "uint256" },
-          { name: "verifyingContract", type: "address" },
-        ],
-        Permit: [
-          { name: "owner", type: "address" },
-          { name: "spender", type: "address" },
-          { name: "value", type: "uint256" },
-          { name: "nonce", type: "uint256" },
-          { name: "deadline", type: "uint256" },
-        ],
-      },
-    };
-
-    const permitSig = ethUtil.fromRpcSig(
-      sigUtil.signTypedData_v4(getPrivateKey(alice.address), { data: permitData })
-    );
-
-    // Stake with permit
-    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
-    await propsProtocol
-      .connect(alice)
-      .stakeWithPermit(
-        [appPoints.address],
-        [stakeAmount],
-        permitMessage.owner,
-        permitMessage.spender,
-        permitMessage.value,
-        permitMessage.deadline,
-        permitSig.v,
-        permitSig.r,
-        permitSig.s
-      );
-
-    // Check the sProps balance and staked amounts
-    expect(await sPropsToken.balanceOf(alice.address)).to.eq(stakeAmount);
-    expect(await appPointsStaking.balanceOf(alice.address)).to.eq(stakeAmount);
-    expect(await propsAppStaking.balanceOf(appPoints.address)).to.eq(stakeAmount);
-    expect(await propsUserStaking.balanceOf(alice.address)).to.eq(stakeAmount);
   });
 
   it("various principal stake edge cases", async () => {
@@ -445,9 +319,15 @@ describe("PropsProtocol", () => {
     );
 
     // Stake an amount of 0
-    await expect(propsProtocol.connect(alice).stake([appPoints.address], [0])).to.be.revertedWith(
-      "Cannot stake 0"
-    );
+    const zeroStakeTx = await propsProtocol.connect(alice).stake([appPoints.address], [0]);
+    // Check that no `StakeUpdated` events got emitted
+    expect(
+      await getEvents(
+        await zeroStakeTx.wait(),
+        "StakeUpdated(address,address,uint256)",
+        "PropsProtocol"
+      )
+    ).is.empty;
   });
 
   it("principal unstake from single app", async () => {
@@ -469,6 +349,12 @@ describe("PropsProtocol", () => {
     const tx = await propsProtocol
       .connect(alice)
       .unstake([appPoints.address], [unstakeAmount], unstakeAmount);
+
+    // Check the total staked amounts
+    expect(await propsProtocol.totalPrincipalStaked(alice.address)).to.eq(
+      stakeAmount.sub(unstakeAmount)
+    );
+    expect(await propsProtocol.totalRewardsStaked(alice.address)).to.eq(bn(0));
 
     // Check that a `StakeUpdated` event got emitted
     const [[app, account, amount]] = await getEvents(
@@ -521,6 +407,12 @@ describe("PropsProtocol", () => {
         totalAmountUnstaked
       );
 
+    // Check the total staked amounts
+    expect(await propsProtocol.totalPrincipalStaked(alice.address)).to.eq(
+      totalAmountStaked.sub(totalAmountUnstaked)
+    );
+    expect(await propsProtocol.totalRewardsStaked(alice.address)).to.eq(bn(0));
+
     // Check that several `StakeUpdated` events got emitted
     const events = await getEvents(
       await tx.wait(),
@@ -572,6 +464,10 @@ describe("PropsProtocol", () => {
     // Stake rewards
     await propsProtocol.connect(alice).stakeRewards([appPoints.address], [rewardsStakeAmount]);
 
+    // Check the total staked amounts
+    expect(await propsProtocol.totalPrincipalStaked(alice.address)).to.eq(stakeAmount);
+    expect(await propsProtocol.totalRewardsStaked(alice.address)).to.eq(rewardsStakeAmount);
+
     // Check the sProps balance and staked amounts
     expect(await sPropsToken.balanceOf(alice.address)).to.eq(stakeAmount.add(rewardsStakeAmount));
     expect(await appPointsStaking.balanceOf(alice.address)).to.eq(
@@ -590,51 +486,274 @@ describe("PropsProtocol", () => {
     );
   });
 
-  it("rewards stake to several apps", async () => {});
+  it("rewards stake to several apps", async () => {
+    const [appPoints1, appPointsStaking1] = await deployApp();
+    const [appPoints2, appPointsStaking2] = await deployApp();
 
-  it("simple stake reallocation", async () => {});
+    // Stake
+    const [stakeAmount1, stakeAmount2] = [expandTo18Decimals(100), expandTo18Decimals(50)];
+    const totalPrincipalStaked = stakeAmount1.add(stakeAmount2);
+    await propsToken.connect(deployer).transfer(alice.address, totalPrincipalStaked);
+    await propsToken.connect(alice).approve(propsProtocol.address, totalPrincipalStaked);
+    await propsProtocol
+      .connect(alice)
+      .stake([appPoints1.address, appPoints2.address], [stakeAmount1, stakeAmount2]);
 
-  it("more complex stake reallocation", async () => {});
+    // Fast-forward a few days
+    await mineBlock((await now()).add(daysToTimestamp(10)));
 
-  it("properly handles invalid stake reallocations", async () => {
-    // const [appPoints1] = await deployApp();
-    // const [appPoints2] = await deployApp();
-    // // Various invalid scenarios with multiple apps
-    // await propsToken.connect(deployer).transfer(alice.address, expandTo18Decimals(1000));
-    // await propsToken.connect(alice).approve(propsProtocol.address, expandTo18Decimals(1000));
-    // await propsProtocol
-    //   .connect(alice)
-    //   .stake(
-    //     [appPoints1.address, appPoints2.address],
-    //     [expandTo18Decimals(50), expandTo18Decimals(50)]
-    //   );
-    // await expect(
-    //   propsProtocol
-    //     .connect(alice)
-    //     .stake(
-    //       [appPoints1.address, appPoints2.address],
-    //       [expandTo18Decimals(-60), expandTo18Decimals(60)]
-    //     )
-    // ).to.be.revertedWith("SafeMath: subtraction overflow");
-    // await expect(
-    //   propsProtocol
-    //     .connect(alice)
-    //     .stake(
-    //       [appPoints1.address, appPoints2.address],
-    //       [expandTo18Decimals(60), expandTo18Decimals(-60)]
-    //     )
-    // ).to.be.revertedWith("SafeMath: subtraction overflow");
-    // await expect(
-    //   propsProtocol
-    //     .connect(alice)
-    //     .stake(
-    //       [appPoints1.address, appPoints2.address],
-    //       [expandTo18Decimals(900), expandTo18Decimals(1)]
-    //     )
-    // ).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+    // Claim user Props rewards
+    await propsProtocol.connect(alice).claimUserPropsRewards();
+
+    const escrowedRewards = await propsProtocol.rewardsEscrow(alice.address);
+    const [rewardsStakeAmount1, rewardsStakeAmount2] = [
+      escrowedRewards.div(3),
+      escrowedRewards.div(4),
+    ];
+    const totalRewardsStaked = rewardsStakeAmount1.add(rewardsStakeAmount2);
+
+    // Stake rewards
+    await propsProtocol
+      .connect(alice)
+      .stakeRewards(
+        [appPoints1.address, appPoints2.address],
+        [rewardsStakeAmount1, rewardsStakeAmount2]
+      );
+
+    // Check the total staked amounts
+    expect(await propsProtocol.totalPrincipalStaked(alice.address)).to.eq(totalPrincipalStaked);
+    expect(await propsProtocol.totalRewardsStaked(alice.address)).to.eq(totalRewardsStaked);
+
+    // Check the sProps balance and staked amounts
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(
+      totalPrincipalStaked.add(totalRewardsStaked)
+    );
+    expect(await appPointsStaking1.balanceOf(alice.address)).to.eq(
+      stakeAmount1.add(rewardsStakeAmount1)
+    );
+    expect(await appPointsStaking2.balanceOf(alice.address)).to.eq(
+      stakeAmount2.add(rewardsStakeAmount2)
+    );
+    expect(await propsAppStaking.balanceOf(appPoints1.address)).to.eq(
+      stakeAmount1.add(rewardsStakeAmount1)
+    );
+    expect(await propsAppStaking.balanceOf(appPoints2.address)).to.eq(
+      stakeAmount2.add(rewardsStakeAmount2)
+    );
+    expect(await propsUserStaking.balanceOf(alice.address)).to.eq(
+      totalPrincipalStaked.add(totalRewardsStaked)
+    );
+
+    // Check the escrow
+    expect(await propsProtocol.rewardsEscrow(alice.address)).to.eq(
+      escrowedRewards.sub(totalRewardsStaked)
+    );
   });
 
-  it("unstake both principal and rewards", async () => {});
+  it("unstake both principal and rewards", async () => {
+    const [appPoints1] = await deployApp();
+    const [appPoints2] = await deployApp();
+
+    // Stake
+    const [stakeAmount1, stakeAmount2] = [expandTo18Decimals(100), expandTo18Decimals(50)];
+    const totalPrincipalStaked = stakeAmount1.add(stakeAmount2);
+    await propsToken.connect(deployer).transfer(alice.address, totalPrincipalStaked);
+    await propsToken.connect(alice).approve(propsProtocol.address, totalPrincipalStaked);
+    await propsProtocol
+      .connect(alice)
+      .stake([appPoints1.address, appPoints2.address], [stakeAmount1, stakeAmount2]);
+
+    // Fast-forward a few days
+    await mineBlock((await now()).add(daysToTimestamp(10)));
+
+    // Claim user Props rewards
+    await propsProtocol.connect(alice).claimUserPropsRewards();
+
+    const escrowedRewards = await propsProtocol.rewardsEscrow(alice.address);
+    const [rewardsStakeAmount1, rewardsStakeAmount2] = [
+      escrowedRewards.div(3),
+      escrowedRewards.div(4),
+    ];
+    const totalRewardsStaked = rewardsStakeAmount1.add(rewardsStakeAmount2);
+
+    // Stake rewards
+    await propsProtocol
+      .connect(alice)
+      .stakeRewards(
+        [appPoints1.address, appPoints2.address],
+        [rewardsStakeAmount1, rewardsStakeAmount2]
+      );
+
+    // Unstake
+    await propsProtocol
+      .connect(alice)
+      .unstake(
+        [appPoints1.address, appPoints2.address],
+        [rewardsStakeAmount1, rewardsStakeAmount2],
+        rewardsStakeAmount1
+      );
+
+    // Check the total staked amounts
+    expect(await propsProtocol.totalPrincipalStaked(alice.address)).to.eq(
+      totalPrincipalStaked.sub(rewardsStakeAmount1)
+    );
+    expect(await propsProtocol.totalRewardsStaked(alice.address)).to.eq(
+      totalRewardsStaked.sub(rewardsStakeAmount2)
+    );
+
+    // Not enough principal to unstake
+    await expect(
+      propsProtocol
+        .connect(alice)
+        .unstake(
+          [appPoints1.address, appPoints2.address],
+          [stakeAmount1, stakeAmount2],
+          totalPrincipalStaked
+        )
+    ).to.be.revertedWith("SafeMath: subtraction overflow");
+
+    // Not enough rewards to unstake
+    await expect(
+      propsProtocol
+        .connect(alice)
+        .unstake([appPoints1.address, appPoints2.address], [stakeAmount1, stakeAmount2], bn(0))
+    ).to.be.revertedWith("SafeMath: subtraction overflow");
+
+    // Unstake
+    await propsProtocol
+      .connect(alice)
+      .unstake(
+        [appPoints1.address, appPoints2.address],
+        [stakeAmount1, stakeAmount2],
+        totalPrincipalStaked.sub(rewardsStakeAmount1)
+      );
+
+    // Check the total staked amounts
+    expect(await propsProtocol.totalPrincipalStaked(alice.address)).to.eq(bn(0));
+    expect(await propsProtocol.totalRewardsStaked(alice.address)).to.eq(bn(0));
+  });
+
+  it("stake reallocation", async () => {
+    const [appPoints1, appPointsStaking1] = await deployApp();
+    const [appPoints2, appPointsStaking2] = await deployApp();
+    const [appPoints3, appPointsStaking3] = await deployApp();
+
+    // Stake
+    const [stakeAmount1, stakeAmount2, stakeAmount3] = [
+      expandTo18Decimals(100),
+      expandTo18Decimals(50),
+      expandTo18Decimals(80),
+    ];
+    const totalPrincipalStaked = stakeAmount1.add(stakeAmount2).add(stakeAmount3);
+    await propsToken.connect(deployer).transfer(alice.address, totalPrincipalStaked);
+    await propsToken.connect(alice).approve(propsProtocol.address, totalPrincipalStaked);
+    await propsProtocol
+      .connect(alice)
+      .stake(
+        [appPoints1.address, appPoints2.address, appPoints3.address],
+        [stakeAmount1, stakeAmount2, stakeAmount3]
+      );
+
+    // Fast-forward a few days
+    await mineBlock((await now()).add(daysToTimestamp(10)));
+
+    // Claim user Props rewards
+    await propsProtocol.connect(alice).claimUserPropsRewards();
+
+    const escrowedRewards = await propsProtocol.rewardsEscrow(alice.address);
+    const [rewardsStakeAmount1, rewardsStakeAmount2, rewardsStakeAmount3] = [
+      escrowedRewards.div(3),
+      escrowedRewards.div(4),
+      escrowedRewards.div(5),
+    ];
+    const totalRewardsStaked = rewardsStakeAmount1
+      .add(rewardsStakeAmount2)
+      .add(rewardsStakeAmount3);
+
+    // Stake rewards
+    await propsProtocol
+      .connect(alice)
+      .stakeRewards(
+        [appPoints1.address, appPoints2.address, appPoints3.address],
+        [rewardsStakeAmount1, rewardsStakeAmount2, rewardsStakeAmount3]
+      );
+
+    // Reallocate stake
+    await propsProtocol
+      .connect(alice)
+      .reallocateStakes(
+        [appPoints1.address, appPoints2.address, appPoints3.address],
+        [rewardsStakeAmount1, rewardsStakeAmount2, bn(0)],
+        [bn(0), rewardsStakeAmount1, rewardsStakeAmount2]
+      );
+
+    // Check the total staked amounts
+    expect(await propsProtocol.totalPrincipalStaked(alice.address)).to.eq(totalPrincipalStaked);
+    expect(await propsProtocol.totalRewardsStaked(alice.address)).to.eq(totalRewardsStaked);
+
+    // Check the sProps balance and staked amounts
+    expect(await sPropsToken.balanceOf(alice.address)).to.eq(
+      totalPrincipalStaked.add(totalRewardsStaked)
+    );
+    expect(await appPointsStaking1.balanceOf(alice.address)).to.eq(stakeAmount1);
+    expect(await appPointsStaking2.balanceOf(alice.address)).to.eq(
+      stakeAmount2.add(rewardsStakeAmount1)
+    );
+    expect(await appPointsStaking3.balanceOf(alice.address)).to.eq(
+      stakeAmount3.add(rewardsStakeAmount3).add(rewardsStakeAmount2)
+    );
+    expect(await propsAppStaking.balanceOf(appPoints1.address)).to.eq(stakeAmount1);
+    expect(await propsAppStaking.balanceOf(appPoints2.address)).to.eq(
+      stakeAmount2.add(rewardsStakeAmount1)
+    );
+    expect(await propsAppStaking.balanceOf(appPoints3.address)).to.eq(
+      stakeAmount3.add(rewardsStakeAmount3).add(rewardsStakeAmount2)
+    );
+    expect(await propsUserStaking.balanceOf(alice.address)).to.eq(
+      totalPrincipalStaked.add(totalRewardsStaked)
+    );
+
+    // Check the escrow
+    expect(await propsProtocol.rewardsEscrow(alice.address)).to.eq(
+      escrowedRewards.sub(totalRewardsStaked)
+    );
+  });
+
+  it("properly handles invalid stake reallocation", async () => {
+    const [appPoints1] = await deployApp();
+    const [appPoints2] = await deployApp();
+
+    // Stake
+    const [stakeAmount1, stakeAmount2] = [expandTo18Decimals(100), expandTo18Decimals(50)];
+    const totalAmountStaked = stakeAmount1.add(stakeAmount2);
+    await propsToken.connect(deployer).transfer(alice.address, totalAmountStaked);
+    await propsToken.connect(alice).approve(propsProtocol.address, totalAmountStaked);
+    await propsProtocol
+      .connect(alice)
+      .stake([appPoints1.address, appPoints2.address], [stakeAmount1, stakeAmount2]);
+
+    // Stake reallocation cannot add new stake
+    await expect(
+      propsProtocol
+        .connect(alice)
+        .reallocateStakes(
+          [appPoints1.address, appPoints2.address],
+          [bn(0), bn(0)],
+          [stakeAmount1.add(bn(10)), stakeAmount2.add(bn(10))]
+        )
+    ).to.be.revertedWith("Invalid reallocation");
+
+    // Stake reallocation cannot withdraw existing stake
+    await expect(
+      propsProtocol
+        .connect(alice)
+        .reallocateStakes(
+          [appPoints1.address, appPoints2.address],
+          [stakeAmount1.add(bn(10)), stakeAmount2.add(bn(10))],
+          [bn(0), bn(0)]
+        )
+    ).to.be.revertedWith("Invalid reallocation");
+  });
 
   it("stake to blacklisted apps", async () => {
     const [appPoints1] = await deployApp();
@@ -991,64 +1110,59 @@ describe("PropsProtocol", () => {
   });
 
   it("delegatee can reallocate stake", async () => {
-    // const [appPoints1, appPointsStaking1] = await deployApp();
-    // const [appPoints2, appPointsStaking2] = await deployApp();
-    // // Stake
-    // const [stakeAmount1, stakeAmount2] = [expandTo18Decimals(50), expandTo18Decimals(70)];
-    // await propsToken.connect(deployer).transfer(alice.address, expandTo18Decimals(120));
-    // await propsToken.connect(alice).approve(propsProtocol.address, expandTo18Decimals(120));
-    // await propsProtocol
-    //   .connect(alice)
-    //   .stake([appPoints1.address, appPoints2.address], [stakeAmount1, stakeAmount2]);
-    // // Delegate staking rights
-    // const tx = await propsProtocol.connect(alice).delegate(bob.address);
-    // // Check that `DelegateChanged` event got emitted
-    // const [[delegator, delegatee]] = await getEvents(
-    //   await tx.wait(),
-    //   "DelegateChanged(address,address)",
-    //   "PropsProtocol"
-    // );
-    // expect(delegator).to.eq(alice.address);
-    // expect(delegatee).to.eq(bob.address);
-    // // Delegatee is able to adjust the delegator's stakes
-    // const [adjustment1, adjustment2] = [expandTo18Decimals(20), expandTo18Decimals(-20)];
-    // await propsProtocol
-    //   .connect(bob)
-    //   .stakeAsDelegate(
-    //     [appPoints1.address, appPoints2.address],
-    //     [adjustment1, adjustment2],
-    //     alice.address
-    //   );
-    // // Check that the delegator's stakes were correctly adjusted
-    // expect(await appPointsStaking1.balanceOf(alice.address)).to.eq(expandTo18Decimals(70));
-    // expect(await appPointsStaking2.balanceOf(alice.address)).to.eq(expandTo18Decimals(50));
-    // // Delegatee cannot stake more than the existing stake
-    // await expect(
-    //   propsProtocol
-    //     .connect(bob)
-    //     .stakeAsDelegate(
-    //       [appPoints1.address, appPoints2.address],
-    //       [expandTo18Decimals(30), expandTo18Decimals(-20)],
-    //       alice.address
-    //     )
-    // ).to.be.revertedWith("Unauthorized");
-    // // Delegatee cannot trigger any withdraws
-    // await expect(
-    //   propsProtocol
-    //     .connect(bob)
-    //     .stakeAsDelegate([appPoints1.address, appPoints2.address], [bn(10), bn(-20)], alice.address)
-    // ).to.be.revertedWith("Unauthorized");
-    // // Remove delegation
-    // await propsProtocol.connect(alice).delegate(alice.address);
-    // await expect(
-    //   propsProtocol
-    //     .connect(bob)
-    //     .stakeAsDelegate(
-    //       [appPoints1.address, appPoints2.address],
-    //       [expandTo18Decimals(-10), expandTo18Decimals(10)],
-    //       alice.address
-    //     )
-    // ).to.be.revertedWith("Unauthorized");
+    const [appPoints1, appPointsStaking1] = await deployApp();
+    const [appPoints2, appPointsStaking2] = await deployApp();
+
+    // Stake
+    const [stakeAmount1, stakeAmount2] = [expandTo18Decimals(50), expandTo18Decimals(70)];
+    await propsToken.connect(deployer).transfer(alice.address, expandTo18Decimals(120));
+    await propsToken.connect(alice).approve(propsProtocol.address, expandTo18Decimals(120));
+    await propsProtocol
+      .connect(alice)
+      .stake([appPoints1.address, appPoints2.address], [stakeAmount1, stakeAmount2]);
+
+    // Delegate staking rights
+    const tx = await propsProtocol.connect(alice).delegate(bob.address);
+
+    // Check that `DelegateChanged` event got emitted
+    const [[delegator, delegatee]] = await getEvents(
+      await tx.wait(),
+      "DelegateChanged(address,address)",
+      "PropsProtocol"
+    );
+    expect(delegator).to.eq(alice.address);
+    expect(delegatee).to.eq(bob.address);
+
+    // Delegatee can reallocate the delegator's stakes
+    await propsProtocol
+      .connect(bob)
+      .reallocateStakesAsDelegate(
+        [appPoints1.address, appPoints2.address],
+        [expandTo18Decimals(20), bn(0)],
+        [bn(0), expandTo18Decimals(20)],
+        alice.address
+      );
+
+    // Check that the delegator's stakes were correctly adjusted
+    expect(await appPointsStaking1.balanceOf(alice.address)).to.eq(
+      stakeAmount1.sub(expandTo18Decimals(20))
+    );
+    expect(await appPointsStaking2.balanceOf(alice.address)).to.eq(
+      stakeAmount2.add(expandTo18Decimals(20))
+    );
+
+    // Remove delegation
+    await propsProtocol.connect(alice).delegate("0x0000000000000000000000000000000000000000");
+    await expect(
+      propsProtocol
+        .connect(bob)
+        .reallocateStakesAsDelegate(
+          [appPoints1.address, appPoints2.address],
+          [expandTo18Decimals(20), bn(0)],
+          [bn(0), expandTo18Decimals(20)],
+          alice.address
+        )
+    ).to.be.revertedWith("Unauthorized");
   });
 
   it("delegatee can directly stake delegator's Props rewards", async () => {
