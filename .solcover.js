@@ -6,5 +6,6 @@ module.exports = {
     "tokens/props/PropsTokenL2.sol",
     "tokens/props/SPropsToken.sol",
     "utils/MinimalProxyFactory.sol",
+    "utils/TransferProxy.sol"
   ],
 };

@@ -50,7 +50,7 @@ contract PropsTokenL2 is Initializable, OwnableUpgradeable, ERC20Upgradeable, IP
      */
     function initialize(address _owner) public initializer {
         OwnableUpgradeable.__Ownable_init();
-        ERC20Upgradeable.__ERC20_init("Props", "PROPS");
+        ERC20Upgradeable.__ERC20_init("Props Token", "PROPS");
 
         transferOwnership(_owner);
 

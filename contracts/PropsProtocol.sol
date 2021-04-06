@@ -487,24 +487,24 @@ contract PropsProtocol is
 
             // Handle principal unstakes
             if (principalToUnstake > 0) {
-                // Transfer the principal back to the user
-                IERC20Upgradeable(propsToken).safeTransfer(_msgSender(), principalToUnstake);
-
                 // Do the actual principal unstake
                 _unstake(_apps[i], principalToUnstake, _msgSender(), StakeMode.Principal);
 
                 // Update corresponding parameters
                 _principalAmount = _principalAmount.sub(principalToUnstake);
+
+                // Transfer the principal back to the user
+                IERC20Upgradeable(propsToken).safeTransfer(_msgSender(), principalToUnstake);
             }
 
             // Handle rewards unstakes
             if (rewardsToUnstake > 0) {
+                // Do the actual rewards unstake
+                _unstake(_apps[i], rewardsToUnstake, _msgSender(), StakeMode.Rewards);
+
                 // Put the rewards back into the escrow (extending its unlock time)
                 rewardsEscrow[_msgSender()] = rewardsEscrow[_msgSender()].add(rewardsToUnstake);
                 rewardsEscrowUnlock[_msgSender()] = block.timestamp.add(rewardsEscrowCooldown);
-
-                // Do the actual rewards unstake
-                _unstake(_apps[i], rewardsToUnstake, _msgSender(), StakeMode.Rewards);
             }
         }
     }
