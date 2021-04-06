@@ -507,6 +507,12 @@ contract PropsProtocol is
                 rewardsEscrowUnlock[_msgSender()] = block.timestamp.add(rewardsEscrowCooldown);
             }
         }
+
+        emit RewardsEscrowUpdated(
+            _msgSender(),
+            rewardsEscrow[_msgSender()],
+            rewardsEscrowUnlock[_msgSender()]
+        );
     }
 
     /**
@@ -831,12 +837,6 @@ contract PropsProtocol is
                     _stake(_apps[i], amounts[i], _account, StakeMode.Rewards);
                 }
             }
-
-            emit RewardsEscrowUpdated(
-                _account,
-                rewardsEscrow[_account],
-                rewardsEscrowUnlock[_account]
-            );
         }
     }
 }

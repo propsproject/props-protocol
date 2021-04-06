@@ -1734,6 +1734,214 @@
           }
         }
       }
+    },
+    "effcfa6ae3e0dbf81abb2362ea35d2fb577cabf4be034f6633fda628712580c7": {
+      "address": "0x5091E2A451041Fe13f729fb6036E3bEe8395c9eE",
+      "txHash": "0x26f21323e14cfa004aad2c6457a2d6dac4bf8131c13f9324eb5c01ec0478b862",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:24"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:29"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/GSN/ContextUpgradeable.sol:31"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "_paused",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:28"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:96"
+          },
+          {
+            "contract": "MetaTransactionProvider",
+            "label": "ROOT_CHAIN_ID",
+            "type": "t_uint256",
+            "src": "contracts/utils/MetaTransactionProvider.sol:40"
+          },
+          {
+            "contract": "MetaTransactionProvider",
+            "label": "DOMAIN_SEPARATOR_L1",
+            "type": "t_bytes32",
+            "src": "contracts/utils/MetaTransactionProvider.sol:42"
+          },
+          {
+            "contract": "MetaTransactionProvider",
+            "label": "DOMAIN_SEPARATOR_L2",
+            "type": "t_bytes32",
+            "src": "contracts/utils/MetaTransactionProvider.sol:44"
+          },
+          {
+            "contract": "MetaTransactionProvider",
+            "label": "META_TRANSACTION_TYPEHASH",
+            "type": "t_bytes32",
+            "src": "contracts/utils/MetaTransactionProvider.sol:47"
+          },
+          {
+            "contract": "MetaTransactionProvider",
+            "label": "nonces",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/utils/MetaTransactionProvider.sol:49"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "controller",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:43"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "guardian",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:46"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "propsToken",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:49"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "sPropsToken",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:50"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "rPropsToken",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:51"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "appProxyFactory",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:54"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "propsAppStaking",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:57"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "propsUserStaking",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:59"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "appPointsStaking",
+            "type": "t_mapping(t_address,t_address)",
+            "src": "contracts/PropsProtocol.sol:62"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "stakes",
+            "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+            "src": "contracts/PropsProtocol.sol:66"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "appStakes",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/PropsProtocol.sol:69"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "totalPrincipalStaked",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/PropsProtocol.sol:72"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "totalRewardsStaked",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/PropsProtocol.sol:74"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "delegatee",
+            "type": "t_mapping(t_address,t_address)",
+            "src": "contracts/PropsProtocol.sol:77"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "rewardsEscrow",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/PropsProtocol.sol:80"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "rewardsEscrowUnlock",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/PropsProtocol.sol:82"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "rewardsEscrowCooldown",
+            "type": "t_uint256",
+            "src": "contracts/PropsProtocol.sol:85"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "appWhitelist",
+            "type": "t_mapping(t_address,t_bool)",
+            "src": "contracts/PropsProtocol.sol:88"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address"
+          },
+          "t_mapping(t_address,t_address)": {
+            "label": "mapping(address => address)"
+          },
+          "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
+            "label": "mapping(address => mapping(address => uint256))"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_bytes32": {
+            "label": "bytes32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          }
+        }
+      }
     }
   },
   "admin": {
