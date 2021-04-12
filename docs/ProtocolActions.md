@@ -6,8 +6,9 @@ The following are all the actions that regular users can execute on the Props pr
 - stake
 - stake rewards
 - stake on behalf
-- stake as delegate
-- stake rewards as delegate
+- reallocate stakes
+- reallocate staked as delegate
+- unstake
 - claim AppPoints rewards
 - claim user Props rewards
 - claim user Props rewards and stake

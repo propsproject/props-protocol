@@ -34,35 +34,43 @@ Adjust the stake amounts to the given apps. Positive stake amounts correspond to
 function stake(address[] _apps, int256[] _amounts)
 ```
 
-##### Stake as delegate
-
-Delegated staking. Readjust existing stake on behalf of an account that explicitly delegated its staking rights. The delegatee cannot introduce new stake or remove existing stake on behalf of the delegator.
-
-```solidity
-function stakeAsDelegate(
-    address[] _apps,
-    int256[] _amounts,
-    address _account
-)
-```
-
 ##### Stake rewards
 
-Similar to regular stake, but the stake amounts are to be retrieved from the user's escrowed rewards instead of their wallet. User Props rewards are escrowed, meaning that once claimed they get locked for a known amount of time. However, these locked Props rewards can be separately staked in order to gain additional rewards.
+Similar to regular stake, but the stakes are to be retrieved from the user's escrowed rewards instead of their wallet. User Props rewards are escrowed, meaning that once claimed they get locked for a known amount of time. However, these locked Props rewards can be separately staked in order to gain additional rewards.
 
 ```solidity
 function stakeRewards(address[] _apps, int256[] _amounts)
 ```
 
-##### Stake rewards as delegate
+##### Reallocate stakes
 
-Delegated rewards staking. Readjust existing rewards stake on behalf of an account that explicitly delegated its staking rights. As opposed to `stakeAsDelegate`, the delegatee can introduce new stake from the delegator's rewards escrow but it cannot withdraw existing stake.
+Reallocate existing stakes. This action can only be used to reallocate existing stakes to certain apps - no additional stake can be introduced or existing stake get withdrawn.
 
 ```solidity
-function stakeRewardsAsDelegate(
-    address[] _apps,
-    int256[] _amounts,
+function reallocateStakes(address[] calldata _apps, int256[] calldata _reallocations)
+```
+
+##### Reallocate stakes as delegate
+
+Delegated stakes reallocation. Readjust existing stake on behalf of an account that explicitly delegated its staking rights. As for the direct stakes reallocation action, the delegatee cannot introduce new stake or remove existing stake on behalf of the delegator.
+
+```solidity
+function reallocateStakesAsDelegate(
+    address[] calldata _apps,
+    int256[] calldata _reallocations,
     address _account
+)
+```
+
+##### Unstake
+
+Unstake principal and/or rewards. This action is used to unstake (principal and/or rewards) from certain apps. The amount of principal versus rewards to get unstaked is controlled via the `_principalAmount` parameter, which is used to specify the amount of total principal to get unstaked as part of this action - the remaining amount will be unstaked from the user's staked rewards pool.
+
+```solidity
+function unstake(
+    address[] calldata _apps,
+    uint256[] calldata _amounts,
+    uint256 _principalAmount
 )
 ```
 
@@ -131,7 +139,7 @@ function unlockUserPropsRewards()
 
 ##### Delegate
 
-With delegation, accounts can outsource the following actions: adjust existing stake (without triggering any stake withdraws), stake rewards, claim and directly stake user Props rewards.
+With delegation, accounts can outsource the following actions: reallocate existing stakes, claim and directly stake user Props rewards.
 
 ```solidity
 function delegate(address _to)
