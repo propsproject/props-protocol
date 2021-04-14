@@ -1069,6 +1069,62 @@ describe("PropsProtocol", () => {
     expect(earned.sub(inWallet).abs().lte(inWallet.div(10000))).to.be.true;
   });
 
+  it("unstake and claim", async () => {
+    const [appPoints1, appPointsStaking1] = await deployApp();
+    const [appPoints2, appPointsStaking2] = await deployApp();
+
+    // Stake
+    const [stakeAmount1, stakeAmount2] = [expandTo18Decimals(50), expandTo18Decimals(70)];
+    await propsToken.connect(deployer).transfer(alice.address, expandTo18Decimals(120));
+    await propsToken.connect(alice).approve(propsProtocol.address, expandTo18Decimals(120));
+    await propsProtocol
+      .connect(alice)
+      .stake([appPoints1.address, appPoints2.address], [stakeAmount1, stakeAmount2]);
+
+    // Fast-forward a few days
+    await mineBlock((await now()).add(daysToTimestamp(10)));
+
+    const earnedProps = await propsUserStaking.earned(alice.address);
+    const earnedAppPoints1 = await appPointsStaking1.earned(alice.address);
+    const earnedAppPoints2 = await appPointsStaking2.earned(alice.address);
+
+    // Unstake and claim
+    await propsProtocol
+      .connect(alice)
+      .unstakeAndClaim(
+        [appPoints1.address, appPoints2.address],
+        [stakeAmount1, stakeAmount2],
+        stakeAmount1.add(stakeAmount2),
+        [appPoints1.address, appPoints2.address]
+      );
+
+    // Fast-forward a few days
+    await mineBlock((await now()).add(daysToTimestamp(3)));
+
+    // Check that the unstake indeed took place
+    expect(await propsProtocol.totalPrincipalStaked(alice.address)).to.eq(bn(0));
+    expect(await propsProtocol.totalRewardsStaked(alice.address)).to.eq(bn(0));
+
+    // Check that all rewards were claimed
+    expect(await propsUserStaking.earned(alice.address)).to.eq(bn(0));
+    expect(await appPointsStaking1.earned(alice.address)).to.eq(bn(0));
+    expect(await appPointsStaking2.earned(alice.address)).to.eq(bn(0));
+
+    // Ensure results are within .01%
+    const propsInEscrow = await propsProtocol.rewardsEscrow(alice.address);
+    expect(earnedProps.sub(propsInEscrow).abs().lte(propsInEscrow.div(10000))).to.be.true;
+
+    // Ensure results are within .01%
+    const balanceAppPoints1 = await appPoints1.balanceOf(alice.address);
+    expect(earnedAppPoints1.sub(balanceAppPoints1).abs().lte(balanceAppPoints1.div(10000))).to.be
+      .true;
+
+    // Ensure results are within .01%
+    const balanceAppPoints2 = await appPoints2.balanceOf(alice.address);
+    expect(earnedAppPoints2.sub(balanceAppPoints2).abs().lte(balanceAppPoints2.div(10000))).to.be
+      .true;
+  });
+
   it("update the rewards escrow cooldown", async () => {
     const [appPoints] = await deployApp();
 

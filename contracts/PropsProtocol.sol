@@ -475,7 +475,7 @@ contract PropsProtocol is
         address[] calldata _apps,
         uint256[] calldata _amounts,
         uint256 _principalAmount
-    ) external {
+    ) public {
         require(_apps.length == _amounts.length, "Invalid input");
 
         for (uint256 i = 0; i < _apps.length; i++) {
@@ -519,7 +519,7 @@ contract PropsProtocol is
      * @dev Allow users to claim their app points rewards.
      * @param _apps Array of apps to claim the app points rewards of
      */
-    function claimAppPointsRewards(address[] memory _apps) external whenNotPaused {
+    function claimAppPointsRewards(address[] memory _apps) public whenNotPaused {
         for (uint256 i = 0; i < _apps.length; i++) {
             require(appPointsStaking[_apps[i]] != address(0), "Invalid app");
 
@@ -584,7 +584,7 @@ contract PropsProtocol is
     /**
      * @dev Allow users to claim their Props rewards.
      */
-    function claimUserPropsRewards() external whenNotPaused {
+    function claimUserPropsRewards() public whenNotPaused {
         uint256 reward = IStaking(propsUserStaking).earned(_msgSender());
         if (reward > 0) {
             // Claim the rewards but don't transfer them to the user's wallet
@@ -647,6 +647,25 @@ contract PropsProtocol is
 
             emit RewardsEscrowUpdated(_msgSender(), 0, 0);
         }
+    }
+
+    /**
+     * @dev Helper function that aggregates unstaking and claiming (both user
+     *      Props rewards and app points rewards).
+     * @param _unstakeApps Apps to unstake from
+     * @param _unstakeAmounts Amounts to unstake from each app
+     * @param _unstakePrincipalAmount Amount of principal to unstake
+     * @param _claimApps Apps to claim app points rewards of
+     */
+    function unstakeAndClaim(
+        address[] calldata _unstakeApps,
+        uint256[] calldata _unstakeAmounts,
+        uint256 _unstakePrincipalAmount,
+        address[] calldata _claimApps
+    ) external whenNotPaused {
+        claimUserPropsRewards();
+        claimAppPointsRewards(_claimApps);
+        unstake(_unstakeApps, _unstakeAmounts, _unstakePrincipalAmount);
     }
 
     /***************************************

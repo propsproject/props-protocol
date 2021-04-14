@@ -47,7 +47,7 @@ function stakeRewards(address[] _apps, int256[] _amounts)
 Reallocate existing stakes. This action can only be used to reallocate existing stakes to certain apps - no additional stake can be introduced or existing stake get withdrawn.
 
 ```solidity
-function reallocateStakes(address[] calldata _apps, int256[] calldata _reallocations)
+function reallocateStakes(address[] _apps, int256[] _reallocations)
 ```
 
 ##### Reallocate stakes as delegate
@@ -56,8 +56,8 @@ Delegated stakes reallocation. Readjust existing stake on behalf of an account t
 
 ```solidity
 function reallocateStakesAsDelegate(
-    address[] calldata _apps,
-    int256[] calldata _reallocations,
+    address[] _apps,
+    int256[] _reallocations,
     address _account
 )
 ```
@@ -68,8 +68,8 @@ Unstake principal and/or rewards. This action is used to unstake (principal and/
 
 ```solidity
 function unstake(
-    address[] calldata _apps,
-    uint256[] calldata _amounts,
+    address[] _apps,
+    uint256[] _amounts,
     uint256 _principalAmount
 )
 ```
@@ -135,6 +135,19 @@ Allow users to unlock their escrowed rewards, if the cooldown period passed. Thi
 
 ```solidity
 function unlockUserPropsRewards()
+```
+
+##### Unstake and claim
+
+Helper function that aggregates unstaking and claiming (both user Props rewards and app points rewards).
+
+```solidity
+function unstakeAndClaim(
+    address[] _unstakeApps,
+    uint256[] _unstakeAmounts,
+    uint256 _unstakePrincipalAmount,
+    address[] _claimApps
+)
 ```
 
 ##### Delegate
