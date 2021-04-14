@@ -15,8 +15,8 @@ import type {
 import { bn, deployContract, deployContractUpgradeable, expandTo18Decimals } from "../../utils";
 
 // Constants
-const APP_PROPS_DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
-const USER_PROPS_DAILY_REWARDS_EMISSION = bn(1e14);
+const APP_PROPS_DAILY_REWARDS_EMISSION = ethers.utils.parseEther("0.03658").div(100);
+const USER_PROPS_DAILY_REWARDS_EMISSION = ethers.utils.parseEther("0.1").div(100);
 
 // Matic contracts
 const MATIC_FX_CHILD_ADDRESS = process.env.TESTNET
