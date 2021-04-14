@@ -3,5 +3,10 @@
     "appPointsLogic": "0xde6CEDE80752C4bb6DE7b1fCF8148940562e07Cf",
     "appProxyFactory": "0x6b22C5ee65Bde43C17bdCEc77379926b6bFF4792",
     "appProxyFactoryBridge": "0xAbe3E51B63F510eeC3F77cEff85a6FA8588cE272"
+  },
+  {
+    "appPointsLogic": "0x9F13706Eb2Eb90CAC083694cADdeC626221B9fDd",
+    "appProxyFactory": "0x4c10f9de4A106295F5922104a1134302Ee4c5B39",
+    "appProxyFactoryBridge": "0x673ea2195CAa92aD6e7A6eEDFB2B758f609f5515"
   }
 ]

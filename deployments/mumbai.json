@@ -10,5 +10,17 @@
     "appPointsStakingLogic": "0x6C8AAF5A7f255fc463c2c09510CFdfb3087930Cf",
     "appProxyFactory": "0x4663fb76C9E3A11d075d2d1596EEee39092bcdc9",
     "appProxyFactoryBridge": "0xbF8446F61AFECF0924D4E73086612EBc881bbe91"
+  },
+  {
+    "propsToken": "0x48987E8B356e0dE474ddE9Bc10541F8106C88A23",
+    "propsProtocol": "0x35a411f9EB4242ec7204Bb25B75b853744f3E106",
+    "rPropsToken": "0x2d76EC30dE1a86E41d73C53A31a25Ec22deB749E",
+    "sPropsToken": "0xC53d98373B2De3B529323A315D31A188689EEDA3",
+    "propsAppStaking": "0x6ca154977fcc24c5f132c60C41F2A2e9e5B4aEF7",
+    "propsUserStaking": "0x390aae25b83f46987a4cB58E094B8d83bA8F86cA",
+    "appPointsLogic": "0x9F13706Eb2Eb90CAC083694cADdeC626221B9fDd",
+    "appPointsStakingLogic": "0x4c10f9de4A106295F5922104a1134302Ee4c5B39",
+    "appProxyFactory": "0x673ea2195CAa92aD6e7A6eEDFB2B758f609f5515",
+    "appProxyFactoryBridge": "0x31ffb78B8171bF1B2722904Ef2Adc84CcDAbd263"
   }
 ]

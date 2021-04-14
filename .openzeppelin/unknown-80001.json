@@ -1942,6 +1942,372 @@
           }
         }
       }
+    },
+    "137efa4cea9fdca41fe5701078317e35db5e4db01c6b9c0a2e9222b6e14068b9": {
+      "address": "0x502B1f8255D7b93da67b530365238695D97eaB23",
+      "txHash": "0xefecc1ed18b527a8c2408334df69e8bac9d2896782024eca0f965d5bc0555eda",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:24"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:29"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/GSN/ContextUpgradeable.sol:31"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "_paused",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:28"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:96"
+          },
+          {
+            "contract": "MetaTransactionProvider",
+            "label": "ROOT_CHAIN_ID",
+            "type": "t_uint256",
+            "src": "contracts/utils/MetaTransactionProvider.sol:40"
+          },
+          {
+            "contract": "MetaTransactionProvider",
+            "label": "DOMAIN_SEPARATOR_L1",
+            "type": "t_bytes32",
+            "src": "contracts/utils/MetaTransactionProvider.sol:42"
+          },
+          {
+            "contract": "MetaTransactionProvider",
+            "label": "DOMAIN_SEPARATOR_L2",
+            "type": "t_bytes32",
+            "src": "contracts/utils/MetaTransactionProvider.sol:44"
+          },
+          {
+            "contract": "MetaTransactionProvider",
+            "label": "META_TRANSACTION_TYPEHASH",
+            "type": "t_bytes32",
+            "src": "contracts/utils/MetaTransactionProvider.sol:47"
+          },
+          {
+            "contract": "MetaTransactionProvider",
+            "label": "nonces",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/utils/MetaTransactionProvider.sol:49"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "controller",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:43"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "guardian",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:46"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "propsToken",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:49"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "sPropsToken",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:50"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "rPropsToken",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:51"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "appProxyFactory",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:54"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "propsAppStaking",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:57"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "propsUserStaking",
+            "type": "t_address",
+            "src": "contracts/PropsProtocol.sol:59"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "appPointsStaking",
+            "type": "t_mapping(t_address,t_address)",
+            "src": "contracts/PropsProtocol.sol:62"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "stakes",
+            "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+            "src": "contracts/PropsProtocol.sol:66"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "appStakes",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/PropsProtocol.sol:69"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "totalPrincipalStaked",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/PropsProtocol.sol:72"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "totalRewardsStaked",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/PropsProtocol.sol:74"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "delegatee",
+            "type": "t_mapping(t_address,t_address)",
+            "src": "contracts/PropsProtocol.sol:77"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "rewardsEscrow",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/PropsProtocol.sol:80"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "rewardsEscrowUnlock",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/PropsProtocol.sol:82"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "rewardsEscrowCooldown",
+            "type": "t_uint256",
+            "src": "contracts/PropsProtocol.sol:85"
+          },
+          {
+            "contract": "PropsProtocol",
+            "label": "appWhitelist",
+            "type": "t_mapping(t_address,t_bool)",
+            "src": "contracts/PropsProtocol.sol:88"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address"
+          },
+          "t_mapping(t_address,t_address)": {
+            "label": "mapping(address => address)"
+          },
+          "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
+            "label": "mapping(address => mapping(address => uint256))"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_bytes32": {
+            "label": "bytes32"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          }
+        }
+      }
+    },
+    "fd8374b29687160d6531513eb7bc285c34e6da7b772d80c289f61fd6a336c8e8": {
+      "address": "0x2079Cb4c2A52792Dea19FcB2879CF8de98931446",
+      "txHash": "0xcc894394c68aabf3db7efc8cfa7bde7527b7b7a8f9bb7b9966536102f217fd03",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:24"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:29"
+          },
+          {
+            "contract": "SPropsToken",
+            "label": "controller",
+            "type": "t_address",
+            "src": "contracts/tokens/props/SPropsToken.sol:34"
+          },
+          {
+            "contract": "SPropsToken",
+            "label": "_name",
+            "type": "t_string_storage",
+            "src": "contracts/tokens/props/SPropsToken.sol:36"
+          },
+          {
+            "contract": "SPropsToken",
+            "label": "_symbol",
+            "type": "t_string_storage",
+            "src": "contracts/tokens/props/SPropsToken.sol:37"
+          },
+          {
+            "contract": "SPropsToken",
+            "label": "_decimals",
+            "type": "t_uint8",
+            "src": "contracts/tokens/props/SPropsToken.sol:38"
+          },
+          {
+            "contract": "SPropsToken",
+            "label": "_totalSupply",
+            "type": "t_uint256",
+            "src": "contracts/tokens/props/SPropsToken.sol:39"
+          },
+          {
+            "contract": "SPropsToken",
+            "label": "_allowances",
+            "type": "t_mapping(t_address,t_mapping(t_address,t_uint96))",
+            "src": "contracts/tokens/props/SPropsToken.sol:42"
+          },
+          {
+            "contract": "SPropsToken",
+            "label": "_balances",
+            "type": "t_mapping(t_address,t_uint96)",
+            "src": "contracts/tokens/props/SPropsToken.sol:45"
+          },
+          {
+            "contract": "SPropsToken",
+            "label": "delegates",
+            "type": "t_mapping(t_address,t_address)",
+            "src": "contracts/tokens/props/SPropsToken.sol:48"
+          },
+          {
+            "contract": "SPropsToken",
+            "label": "checkpoints",
+            "type": "t_mapping(t_address,t_mapping(t_uint32,t_struct(Checkpoint)9282_storage))",
+            "src": "contracts/tokens/props/SPropsToken.sol:57"
+          },
+          {
+            "contract": "SPropsToken",
+            "label": "numCheckpoints",
+            "type": "t_mapping(t_address,t_uint32)",
+            "src": "contracts/tokens/props/SPropsToken.sol:60"
+          },
+          {
+            "contract": "SPropsToken",
+            "label": "DOMAIN_TYPEHASH",
+            "type": "t_bytes32",
+            "src": "contracts/tokens/props/SPropsToken.sol:64"
+          },
+          {
+            "contract": "SPropsToken",
+            "label": "DELEGATION_TYPEHASH",
+            "type": "t_bytes32",
+            "src": "contracts/tokens/props/SPropsToken.sol:68"
+          },
+          {
+            "contract": "SPropsToken",
+            "label": "nonces",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/tokens/props/SPropsToken.sol:71"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address"
+          },
+          "t_string_storage": {
+            "label": "string"
+          },
+          "t_uint8": {
+            "label": "uint8"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_mapping(t_address,t_mapping(t_address,t_uint96))": {
+            "label": "mapping(address => mapping(address => uint96))"
+          },
+          "t_mapping(t_address,t_uint96)": {
+            "label": "mapping(address => uint96)"
+          },
+          "t_uint96": {
+            "label": "uint96"
+          },
+          "t_mapping(t_address,t_address)": {
+            "label": "mapping(address => address)"
+          },
+          "t_mapping(t_address,t_mapping(t_uint32,t_struct(Checkpoint)9282_storage))": {
+            "label": "mapping(address => mapping(uint32 => struct SPropsToken.Checkpoint))"
+          },
+          "t_mapping(t_uint32,t_struct(Checkpoint)9282_storage)": {
+            "label": "mapping(uint32 => struct SPropsToken.Checkpoint)"
+          },
+          "t_uint32": {
+            "label": "uint32"
+          },
+          "t_struct(Checkpoint)9282_storage": {
+            "label": "struct SPropsToken.Checkpoint",
+            "members": [
+              {
+                "label": "fromBlock",
+                "type": "t_uint32"
+              },
+              {
+                "label": "votes",
+                "type": "t_uint96"
+              }
+            ]
+          },
+          "t_mapping(t_address,t_uint32)": {
+            "label": "mapping(address => uint32)"
+          },
+          "t_bytes32": {
+            "label": "bytes32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)"
+          },
+          "t_bool": {
+            "label": "bool"
+          }
+        }
+      }
     }
   },
   "admin": {

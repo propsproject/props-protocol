@@ -15,7 +15,8 @@ import type {
 import { bn, deployContract, deployContractUpgradeable, expandTo18Decimals } from "../../utils";
 
 // Constants
-const DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
+const APP_PROPS_DAILY_REWARDS_EMISSION = bn(3658).mul(1e11);
+const USER_PROPS_DAILY_REWARDS_EMISSION = bn(1e14);
 
 // Matic contracts
 const MATIC_FX_CHILD_ADDRESS = process.env.TESTNET
@@ -49,6 +50,7 @@ async function main() {
 
     console.log("Deploying `PropsTokenL2`");
     propsToken = await deployContractUpgradeable("PropsTokenL2", deployer, controller.address);
+    // propsToken = (await ethers.getContractFactory("PropsTokenL2")).attach("") as PropsTokenL2;
     addresses["propsToken"] = propsToken.address;
 
     console.log("Deploying `PropsProtocol`");
@@ -81,7 +83,7 @@ async function main() {
       propsProtocol.address,
       rPropsToken.address,
       rPropsToken.address,
-      DAILY_REWARDS_EMISSION
+      APP_PROPS_DAILY_REWARDS_EMISSION
     );
     addresses["propsAppStaking"] = propsAppStaking.address;
 
@@ -92,7 +94,7 @@ async function main() {
       propsProtocol.address,
       rPropsToken.address,
       rPropsToken.address,
-      DAILY_REWARDS_EMISSION
+      USER_PROPS_DAILY_REWARDS_EMISSION
     );
     addresses["propsUserStaking"] = propsUserStaking.address;
 
