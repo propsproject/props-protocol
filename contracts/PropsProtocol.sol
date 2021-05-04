@@ -119,7 +119,7 @@ contract PropsProtocol is
     }
 
     modifier validApp(address _app) {
-        require(appPointsStaking[_app] != address(0), "Invalid app");
+        require(_app == address(0) || appPointsStaking[_app] != address(0), "Invalid app");
         _;
     }
 
@@ -694,7 +694,7 @@ contract PropsProtocol is
         StakeMode _mode
     ) internal {
         // Can only stake to whitelisted apps
-        require(appWhitelist[_app], "App not whitelisted");
+        require(_app == address(0) || appWhitelist[_app], "App not whitelisted");
 
         // Mint corresponding sProps
         ISPropsToken(sPropsToken).mint(_account, _amount);
@@ -702,15 +702,21 @@ contract PropsProtocol is
         // Stake the Props in the user Props staking contract
         IStaking(propsUserStaking).stake(_account, _amount);
 
-        // Stake the Props in the app Props staking contract
-        IStaking(propsAppStaking).stake(_app, _amount);
+        if (_app != address(0)) {
+            // Stake the Props in the app Props staking contract
+            IStaking(propsAppStaking).stake(_app, _amount);
 
-        // Stake the Props in the app points staking contract
-        IStaking(appPointsStaking[_app]).stake(_account, _amount);
+            // Stake the Props in the app points staking contract
+            IStaking(appPointsStaking[_app]).stake(_account, _amount);
 
-        // Update global stake data
+            // Update global app stake data
+            appStakes[_app] = appStakes[_app].add(_amount);
+
+            emit AppDataUpdated(_app, appStakes[_app]);
+        }
+
+        // Update global user stake data
         stakes[_account][_app] = stakes[_account][_app].add(_amount);
-        appStakes[_app] = appStakes[_app].add(_amount);
 
         if (_mode == StakeMode.Principal) {
             totalPrincipalStaked[_account] = totalPrincipalStaked[_account].add(_amount);
@@ -718,7 +724,6 @@ contract PropsProtocol is
             totalRewardsStaked[_account] = totalRewardsStaked[_account].add(_amount);
         }
 
-        emit AppDataUpdated(_app, appStakes[_app]);
         if (_mode != StakeMode.Reallocation) {
             emit AccountDataUpdated(
                 _account,
@@ -726,7 +731,7 @@ contract PropsProtocol is
                 totalRewardsStaked[_account]
             );
         }
-        emit StakeUpdated(_app, _account, IStaking(appPointsStaking[_app]).balanceOf(_account));
+        emit StakeUpdated(_app, _account, stakes[_account][_app]);
     }
 
     function _unstake(
@@ -736,7 +741,7 @@ contract PropsProtocol is
         StakeMode _mode
     ) internal {
         // Unstakes can also happen from non-whitelisted apps
-        require(appPointsStaking[_app] != address(0), "Invalid app");
+        require(_app == address(0) || appPointsStaking[_app] != address(0), "Invalid app");
 
         // Burn corresponding sProps
         ISPropsToken(sPropsToken).burn(_account, _amount);
@@ -744,18 +749,24 @@ contract PropsProtocol is
         // Unstake the Props from the user Props staking contract
         IStaking(propsUserStaking).withdraw(_account, _amount);
 
-        // Only if the app is whitelisted (blacklisted apps have no staked Props)
-        if (appWhitelist[_app]) {
-            // Unstake the Props from the app Props staking contract
-            IStaking(propsAppStaking).withdraw(_app, _amount);
+        if (_app != address(0)) {
+            // Only if the app is whitelisted (blacklisted apps have no staked Props)
+            if (appWhitelist[_app]) {
+                // Unstake the Props from the app Props staking contract
+                IStaking(propsAppStaking).withdraw(_app, _amount);
+            }
+
+            // Unstake the Props from the app points staking contract
+            IStaking(appPointsStaking[_app]).withdraw(_account, _amount);
+
+            // Update global app stake data
+            appStakes[_app] = appStakes[_app].sub(_amount);
+
+            emit AppDataUpdated(_app, appStakes[_app]);
         }
 
-        // Unstake the Props from the app points staking contract
-        IStaking(appPointsStaking[_app]).withdraw(_account, _amount);
-
-        // Update global stake data
+        // Update global user stake data
         stakes[_account][_app] = stakes[_account][_app].sub(_amount);
-        appStakes[_app] = appStakes[_app].sub(_amount);
 
         if (_mode == StakeMode.Principal) {
             totalPrincipalStaked[_account] = totalPrincipalStaked[_account].sub(_amount);
@@ -763,7 +774,6 @@ contract PropsProtocol is
             totalRewardsStaked[_account] = totalRewardsStaked[_account].sub(_amount);
         }
 
-        emit AppDataUpdated(_app, appStakes[_app]);
         if (_mode != StakeMode.Reallocation) {
             emit AccountDataUpdated(
                 _account,
@@ -771,7 +781,7 @@ contract PropsProtocol is
                 totalRewardsStaked[_account]
             );
         }
-        emit StakeUpdated(_app, _account, IStaking(appPointsStaking[_app]).balanceOf(_account));
+        emit StakeUpdated(_app, _account, stakes[_account][_app]);
     }
 
     function _reallocateStakes(
