@@ -827,6 +827,32 @@ describe("PropsProtocol", () => {
     expect(await propsAppStaking.balanceOf(appPoints.address)).to.eq(bobStakeAmount);
   });
 
+  it("no app stake", async () => {
+    const noApp = "0x0000000000000000000000000000000000000000";
+
+    // Stake
+    const stakeAmount = expandTo18Decimals(100);
+    await propsToken.connect(deployer).transfer(alice.address, stakeAmount);
+    await propsToken.connect(alice).approve(propsProtocol.address, stakeAmount);
+    await propsProtocol.connect(alice).stake([noApp], [stakeAmount]);
+
+    // Fast-forward a few days
+    await mineBlock((await now()).add(daysToTimestamp(10)));
+
+    // No app Props stake or rewards
+    expect(await propsAppStaking.balanceOf(noApp)).to.eq(bn(0));
+    expect(await propsAppStaking.earned(noApp)).to.eq(bn(0));
+
+    // Cannot claim app points rewards of no app
+    await expect(propsProtocol.connect(alice).claimAppPointsRewards([noApp])).to.be.revertedWith(
+      "Invalid app"
+    );
+
+    // User is earning Props rewards
+    expect(await propsUserStaking.balanceOf(alice.address)).to.eq(stakeAmount);
+    expect((await propsUserStaking.earned(alice.address)).gt(0)).to.be.true;
+  });
+
   it("claim app points rewards", async () => {
     const [appPoints, appPointsStaking] = await deployApp();
 
